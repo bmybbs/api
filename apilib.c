@@ -30,16 +30,6 @@ int shm_init()
 		return 0;
 }
 
-/** 初始化 ctx 的 HTTP Header
- *
- * @param ctx
- */
-void api_init(struct s_cgi_context *ctx)
-{
-	cgi_context_enable_buffer(ctx);
-	header_add(ctx, "Content-type", "application/json; charset=utf-8");
-}
-
 /** 映射 .PASSWDS 文件到内存
  * 设置 ummap_ptr 地址为文件映射的地址，并且
  * 设置 ummap_size 为文件大小。
