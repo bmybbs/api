@@ -9,9 +9,12 @@ CFILES	:= main.c api_error.c api_template.c api_user.c \
 		   apilib.c
 		   
 COBJS	:= $(CFILES:.c=.o)
-.c.o	;  $(CC) -c $*.c $(FLAGS)
+.c.o	:; $(CC) -c $*.c $(FLAGS)
 
 all: $(PROGNAME)
 
 $(PROGNAME): $(COBJS)
 	$(CC) -o $@ $^ $(BBSLIBS) $(ONILIBS)
+	
+clean:
+	rm -rf $(COBJS) $(PROGNAME)
