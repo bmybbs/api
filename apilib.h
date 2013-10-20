@@ -3,12 +3,21 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
+#include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <ght_hash_table.h>
 
 #include "bbs.h"
 #include "ythtlib.h"
 #include "ythtbbs.h"
+
+typedef char* api_template;
+api_template api_template_create(const char * filepath);
+void api_template_set(api_template *tpl, const char *key, char *fmt, ...);
+void api_template_free(api_template tpl);
 
 struct UTMPFILE   *shm_utmp;
 struct BCACHE     *shm_bcache;
