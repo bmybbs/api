@@ -8,6 +8,17 @@ static void shutdown_server(int _)
 
 int main(int argc, char *argv[])
 {
+	seteuid(BBSUID);
+	setuid(BBSUID);
+	setgid(BBSGID);
+
+	chdir(MY_BBS_HOME);
+
+	if(shm_init()<0)
+		return -1;
+	if(ummap()<0)
+		return -1;
+
 	signal(SIGINT, shutdown_server);
 	signal(SIGTERM, shutdown_server);
 
