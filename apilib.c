@@ -6,6 +6,9 @@
  */
 
 #include "apilib.h"
+char *ummap_ptr = NULL;
+int ummap_size = 0;
+
 /** 再应用程序启动的时候初始化共享内存
  *
  * @return <ul><li>0:成功</li><li>-1:失败</li></ul>

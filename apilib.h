@@ -26,8 +26,8 @@ struct UCACHEHASH *shm_uidhash;
 struct UINDEX     *shm_uindex;
 int shm_init();
 
-char *ummap_ptr = NULL;
-int ummap_size = 0;
+extern char *ummap_ptr;
+extern int ummap_size;
 int ummap();
 
 
