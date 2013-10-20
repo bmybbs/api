@@ -14,10 +14,10 @@
 #include "ythtlib.h"
 #include "ythtbbs.h"
 
-typedef char* api_template;
-api_template api_template_create(const char * filepath);
-void api_template_set(api_template *tpl, const char *key, char *fmt, ...);
-void api_template_free(api_template tpl);
+typedef char* api_template_t;
+api_template_t api_template_create(const char * filepath);
+void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...);
+void api_template_free(api_template_t tpl);
 
 struct UTMPFILE   *shm_utmp;
 struct BCACHE     *shm_bcache;

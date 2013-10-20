@@ -2,7 +2,7 @@
 
 static char *template_string_replace(char *ori, const char *old, const char *new);
 
-api_template api_template_create(char *filename)
+api_template_t api_template_create(char *filename)
 {
 	char *p, *s;
 	int fd;
@@ -36,7 +36,7 @@ api_template api_template_create(char *filename)
 	return s;
 }
 
-void api_template_set(api_template *tpl, const char *key, char *fmt, ...)
+void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...)
 {
 	if(!tpl)
 		return;
@@ -83,8 +83,7 @@ char *template_string_replace(char *ori, const char *old, const char *new)
 	return ori;
 }
 
-void api_template_free(api_template tpl)
+void api_template_free(api_template_t tpl)
 {
 	free(tpl);
-}
 }
