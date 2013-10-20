@@ -9,7 +9,7 @@
 #include <signal.h>
 #include <netdb.h>
 
-onion *o=NULL;
+extern onion *o;
 
 #define ONION_FUNC_PROTO_STR void *p, onion_request *req, onion_response *res
 

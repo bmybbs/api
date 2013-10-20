@@ -1,5 +1,7 @@
 #include "api.h"
 
+onion *o=NULL;
+
 static void shutdown_server(int _)
 {
 	if (o)
