@@ -15,7 +15,7 @@
 #include "ythtbbs.h"
 
 typedef char* api_template_t;
-api_template_t api_template_create(const char * filepath);
+api_template_t api_template_create(const char * filename);
 void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...);
 void api_template_free(api_template_t tpl);
 

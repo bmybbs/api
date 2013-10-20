@@ -2,7 +2,7 @@
 
 static char *template_string_replace(char *ori, const char *old, const char *new);
 
-api_template_t api_template_create(char *filename)
+api_template_t api_template_create(const char *filename)
 {
 	char *p, *s;
 	int fd;
