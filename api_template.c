@@ -50,6 +50,7 @@ void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...)
 
 	// old_string = "<% key %>"
 	old_string = malloc(strlen(key) + 7);
+	memset(old_string, 0, strlen(key)+7);
 	sprintf(old_string, "<%% %s %%>", key);
 
 	*tpl = template_string_replace(*tpl, old_string, new_string);
