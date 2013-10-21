@@ -107,7 +107,7 @@ int getusernum(const char *id)
  * @param id
  * @return
  */
-int useridhash(char *id)
+int useridhash(const char *id)
 {
 	int n1 = 0;
 	int n2 = 0;
@@ -131,7 +131,7 @@ int useridhash(char *id)
  * @param userid
  * @return
  */
-int finduseridhash(struct useridhashitem *ptr, int size, char *userid)
+int finduseridhash(struct useridhashitem *ptr, int size, const char *userid)
 {
 	int h, s, i, j;
 	h = useridhash(userid);
