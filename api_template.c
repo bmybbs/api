@@ -58,7 +58,7 @@ void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...)
 	free(old_string);
 }
 
-char *template_string_replace(char *ori, const char *old, const char *new)
+static char *template_string_replace(char *ori, const char *old, const char *new)
 {
 	int tmp_string_length = strlen(ori) + strlen(new) - strlen(old) + 1;
 
