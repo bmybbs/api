@@ -32,8 +32,8 @@ int ummap();
 
 
 int finduseridhash(struct useridhashitem *ptr, int size, char *userid);
-int getusernum(char *id);
-struct userec * getuser(char *id);
+int getusernum(const char *id);
+struct userec * getuser(const char *id);
 char * getuserlevelname(unsigned userlevel);
 int save_user_data(struct userec *x);
 

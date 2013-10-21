@@ -70,7 +70,7 @@ int ummap()
  * @see getusernum
  * @see finduseridhash
  */
-struct userec * getuser(char *id)
+struct userec * getuser(const char *id)
 {
 	struct userec *user = malloc(sizeof(struct userec));
 	int uid;
@@ -85,7 +85,7 @@ struct userec * getuser(char *id)
 	return user;
 }
 
-int getusernum(char *id)
+int getusernum(const char *id)
 {
 	int i;
 	if(id[0] == 0 || strchr(id, '.'))
