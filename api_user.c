@@ -9,6 +9,11 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 {
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
 	const char * userid = onion_dict_get(param_dict, "userid");
+
+	if(userid==NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
 	if(userid[0]=='\0') {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
@@ -21,6 +26,9 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 	}
 
 	api_template_t tpl = api_template_create("templates/api_user_info.json");
+	if(tpl==NULL) {
+		return api_error(p, req, res, API_RT_NOTEMPLATE);
+	}
 	api_template_set(&tpl, "UserID", "%s", ue->userid);
 	api_template_set(&tpl, "UserNickName", "%s", ue->username);
 	api_template_set(&tpl, "LoginCounts", "%d", ue->numlogins);
