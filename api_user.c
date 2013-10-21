@@ -38,6 +38,7 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 	onion_response_printf(res, "%s", tpl);
 
 	api_template_free(tpl);
+	free(ue);
 
 	return OCS_PROCESSED;
 }
