@@ -37,4 +37,6 @@ struct userec * getuser(const char *id);
 char * getuserlevelname(unsigned userlevel);
 int save_user_data(struct userec *x);
 
+int setbmstatus(struct userec *ue, int online);
+
 #endif

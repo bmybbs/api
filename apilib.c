@@ -200,3 +200,32 @@ int save_user_data(struct userec *x)
 	close(fd);
 	return 1;
 }
+
+int setbmstatus(struct userec *ue, int online)
+{
+	char path[256];
+	sethomefile(path, ue->userid, "mboard");
+
+	bmfilesync(ue);
+
+	new_apply_record(path, sizeof(struct boardmanager), (void *) setbmhat, &online);
+	return 0;
+}
+
+int setbmhat(struct boardmanager *bm, int *online)
+{
+	/*
+	if(strcmp(shm_bcache->bcache[bm->bid].header.filename, bm->board)) {
+		errlog("error board name %s, %s. user %d",
+			   shm_bcache->bcache[bm->bid].header.filename,
+			   bm->board, bm->bid);
+		return -1;
+	}
+	if(*online) {
+		shm_bcache->bcache[bm->bid].bmonline |= (1 << bm->bmpos);
+		if(u)
+	}*/
+
+	//TODO
+	return 0;
+}
