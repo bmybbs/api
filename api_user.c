@@ -98,7 +98,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	api_template_set(&tpl, "SessionID", "%c%c%c%s",
 			(utmp_index-1) / 26 / 26 + 'A',
 			(utmp_index-1) / 26 % 26 + 'A',
-			(utmp_index-1) % 26,
+			(utmp_index-1) % 26 + 'A',
 			shm_utmp->uinfo[utmp_index-1].sessionid);
 	api_template_set(&tpl, "Token", shm_utmp->uinfo[utmp_index-1].token);
 
