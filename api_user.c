@@ -178,7 +178,7 @@ int api_user_check_session(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	onion_response_print(res, "{\"errcode\":0}");
+	onion_response_printf(res, "{\"errcode\":0}");
 	free(ue);
 
 	return OCS_NOT_IMPLEMENTED;

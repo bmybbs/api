@@ -6,6 +6,7 @@
  */
 
 #include "apilib.h"
+#include "error_code.h"
 char *ummap_ptr = NULL;
 int ummap_size = 0;
 
