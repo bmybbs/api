@@ -26,7 +26,7 @@ static void remove_uindex(int uid, int utmpent);
 
 static int cmpfuid(unsigned int *a, unsigned int *b);
 
-static int initfriends(struct user_info);
+static int initfriends(struct user_info *u);
 
 int api_user_login(ONION_FUNC_PROTO_STR)
 {
@@ -224,7 +224,7 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char *app
 		newtrace(buf);
 		shm_uindex->user[uid-1][earlest_pos] = 0;
 		insert_pos = earlest_pos;
-		memset(shm_utmp->uinfo[*utmp_pos-1], 0, sizeof(struct user_info));
+		memset(&(shm_utmp->uinfo[*utmp_pos-1]), 0, sizeof(struct user_info));
 	}
 
 	/* 此时应该 shm_uindex 的位置有了，而 shm_utmp 可能有可能没有。
@@ -355,7 +355,7 @@ static int initfriends(struct user_info *u)
 	struct override *fff = (struct override *)malloc(MAXFRIENDS * sizeof(struct override));
 	// TODO: 判断 malloc 调用失败
 	memset(fff, 0, MAXFRIENDS*sizeof(struct override));
-	fp = fopen(buf);
+	fp = fopen(buf, "r");
 	fread(fff, sizeof(struct override), MAXFRIENDS, fp);
 
 	for(i=0; i<u->fnum; ++i) {
