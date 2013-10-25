@@ -172,6 +172,14 @@ int api_user_check_session(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_NOSUCHUSER);
 	}
 
+	int r=check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	onion_response_print(res, "{\"errcode\":0}");
+	free(ue);
 
 	return OCS_NOT_IMPLEMENTED;
 }

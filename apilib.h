@@ -37,6 +37,15 @@ struct userec * getuser(const char *id);
 char * getuserlevelname(unsigned userlevel);
 int save_user_data(struct userec *x);
 
+/**
+ * @brief 检查用户 session 是否有效
+ * @param x
+ * @param sessid
+ * @param appkey
+ * @return api_error_code
+ */
+int check_user_session(struct userec *x, const char *sessid, const char *appkey);
+
 int setbmhat(struct boardmanager *bm, int *online);
 int setbmstatus(struct userec *ue, int online);
 

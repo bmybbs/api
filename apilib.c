@@ -229,3 +229,26 @@ int setbmhat(struct boardmanager *bm, int *online)
 	//TODO
 	return 0;
 }
+
+int check_user_session(struct userec *x, const char *sessid, const char *appkey)
+{
+	if(strlen(sessid) != 33) { // 不考虑来自 term 的用户
+		return API_RT_WRONGSESS;
+	}
+
+	int uent_index = (sessid[0] - 'A') * 26 * 26
+					+(sessid[0] - 'A') * 26
+					+(sessid[0] - 'A');
+	char ssid[30];
+	strncpy(ssid, sessid+3, 30);
+
+	struct user_info *ui = &(shm_utmp->uinfo[uent_index]);
+
+	if(ui->pid == APPPID
+			&& strcasecmp(ui->userid, x->userid)==0
+			&& strcasecmp(ui->sessionid, ssid)==0
+			&& strcasecmp(ui->appkey, appkey)==0)
+		return API_RT_SUCCESSFUL;
+	else
+		return API_RT_WRONGSESS;
+}
