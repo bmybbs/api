@@ -154,6 +154,10 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 
 int api_user_check_session(ONION_FUNC_PROTO_STR)
 {
+	const onion_dict *param_dict = onion_request_get_query_dict(req);
+	const char * userid = onion_dict_get(param_dict, "userid");
+	const char * sessid = onion_dict_get(param_dict, "sessid");
+	const char * appkey = onion_dict_get(param_dict, "appkey");
 	return OCS_NOT_IMPLEMENTED;
 }
 
@@ -162,7 +166,7 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char *app
 	*utmp_pos = 0;
 	time_t earlest_app_time;
 	int uid, i, uent_index, earlest_pos, n, clubnum;
-	int free_pos=0, insert_pos=0;
+	int insert_pos=0;
 	char ULIST[STRLEN], hostnamebuf[256], buf[256], fname[80], genbuf[256];
 	struct user_info *u;
 	FILE *fp_ulist, *fp_clubright;
@@ -301,7 +305,7 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char *app
 				clubnum = atoi(genbuf);
 				u->clubrights[clubnum/32] |= (1<<clubnum%32);
 			}
-			close(fp_clubright);
+			fclose(fp_clubright);
 		}
 	} else {
 		memset(u->clubrights, 0, 4*sizeof(int));
