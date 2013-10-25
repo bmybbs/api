@@ -359,7 +359,7 @@ static int initfriends(struct user_info *u)
 	fread(fff, sizeof(struct override), MAXFRIENDS, fp);
 
 	for(i=0; i<u->fnum; ++i) {
-		u->friend[i] = getusernu(fff[i].id) + 1;
+		u->friend[i] = getusernum(fff[i].id) + 1;
 		if(u->friend[i])
 			fnum++;
 		else
