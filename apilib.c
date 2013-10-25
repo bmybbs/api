@@ -233,7 +233,7 @@ int setbmhat(struct boardmanager *bm, int *online)
 
 int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 {
-	if(strlen(sessid) != 33) { // 不考虑来自 term 的用户
+	if(strlen(sessid) != 32) { // 不考虑来自 term 的用户
 		return API_RT_WRONGSESS;
 	}
 

@@ -96,9 +96,9 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	api_template_t tpl = api_template_create("templates/api_user_login.json");
 	api_template_set(&tpl, "UserID", ue->userid);
 	api_template_set(&tpl, "SessionID", "%c%c%c%s",
-			utmp_index / 26 / 26 + 'A',
-			utmp_index / 26 % 26 + 'A',
-			utmp_index % 26,
+			(utmp_index-1) / 26 / 26 + 'A',
+			(utmp_index-1) / 26 % 26 + 'A',
+			(utmp_index-1) % 26,
 			shm_utmp->uinfo[utmp_index-1].sessionid);
 	api_template_set(&tpl, "Token", shm_utmp->uinfo[utmp_index-1].token);
 
@@ -181,7 +181,7 @@ int api_user_check_session(ONION_FUNC_PROTO_STR)
 	onion_response_printf(res, "{\"errcode\":0}");
 	free(ue);
 
-	return OCS_NOT_IMPLEMENTED;
+	return OCS_PROCESSED;
 }
 
 static int api_do_login(struct userec *ue, const char *fromhost, const char *appkey, time_t login_time, int *utmp_pos)
