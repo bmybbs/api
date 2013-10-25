@@ -66,6 +66,12 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 		}
 	}
 
+	int r = api_do_login(ue, fromhost, appkey, now_t, &utmp_index);
+	if(r != API_RT_SUCCESSFUL) { // TODO: 检查是否还有未释放的资源
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
 	if(strcasecmp(userid, "guest")) {
 		t = ue->lastlogin;
 		ue->lastlogin = now_t;
@@ -86,11 +92,6 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 
 	sprintf(buf, "%s enter %s api", ue->userid, fromhost);
 	newtrace(buf);
-
-	int r = api_do_login(ue, fromhost, appkey, now_t, &utmp_index);
-	if(r != API_RT_SUCCESSFUL) { // TODO: 检查是否还有未释放的资源
-		return api_error(p, req, res, r);
-	}
 
 	api_template_t tpl = api_template_create("templates/api_user_login.json");
 	api_template_set(&tpl, "UserID", ue->userid);
@@ -158,6 +159,20 @@ int api_user_check_session(ONION_FUNC_PROTO_STR)
 	const char * userid = onion_dict_get(param_dict, "userid");
 	const char * sessid = onion_dict_get(param_dict, "sessid");
 	const char * appkey = onion_dict_get(param_dict, "appkey");
+
+	if(userid == NULL || sessid == NULL || appkey == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	if(!strcmp(userid, ""))
+		userid="guest";
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0) {
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
+
 	return OCS_NOT_IMPLEMENTED;
 }
 
