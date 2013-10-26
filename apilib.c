@@ -240,6 +240,27 @@ int get_user_utmp_index(const char *sessid)
 			+(sessid[2] - 'A');
 }
 
+int count_uindex(int uid)
+{
+	int i, utmp_index, count=0;
+	struct user_info *ui;
+	if(uid <= 0 || uid > MAXUSERS)
+		return 0;
+
+	for (i=0; i<6; i++) {
+		utmp_index = shm_uindex->user[uid-1][i];
+		if(utmp_index<=0)
+			continue;
+		ui = &(shm_utmp->uinfo[utmp_index-1]);
+		if(!ui->active || ui->pid==0 || ui->uid != uid)
+			continue;
+
+		count++;
+	}
+
+	return count;
+}
+
 int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 {
 	int uent_index = get_user_utmp_index(sessid);

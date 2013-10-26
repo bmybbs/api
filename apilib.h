@@ -45,6 +45,13 @@ int save_user_data(struct userec *x);
 int get_user_utmp_index(const char *sessid);
 
 /**
+ * @brief 计算uid为uid的用户当前在登录的个数
+ * @param uid uid，从1开始索引
+ * @return
+ */
+int count_uindex(int uid);
+
+/**
  * @brief 检查用户 session 是否有效
  * @param x
  * @param sessid
