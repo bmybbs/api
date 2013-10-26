@@ -180,7 +180,7 @@ char * getuserlevelname(unsigned userlevel)
 }
 
 /** 保存用户数据到 passwd 文件中
- * @warning 还不是线程安全的。
+ * @warning 线程安全有待检查。
  * @param x
  * @return
  */
@@ -193,11 +193,13 @@ int save_user_data(struct userec *x)
 	fd = open(".PASSWDS", O_WRONLY);
 	if(fd < 0)
 		return 0;
+	flock(fd, LOCK_EX);
 	if(lseek(fd, n*sizeof(struct userec), SEEK_SET) < 0) {
 		close(fd);
 		return 0;
 	}
 	write(fd, x, sizeof(struct userec));
+	flock(fd, LOCK_UN);
 	close(fd);
 	return 1;
 }
