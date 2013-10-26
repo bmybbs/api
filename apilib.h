@@ -38,6 +38,13 @@ char * getuserlevelname(unsigned userlevel);
 int save_user_data(struct userec *x);
 
 /**
+ * @brief 从 sessid 中获取 utmp 的索引值
+ * @param sessid 前三位为索引的sessionid
+ * @return utmp 的索引值，注意是从0开始。
+ */
+int get_user_utmp_index(const char *sessid);
+
+/**
  * @brief 检查用户 session 是否有效
  * @param x
  * @param sessid

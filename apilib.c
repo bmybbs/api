@@ -233,11 +233,16 @@ int setbmhat(struct boardmanager *bm, int *online)
 	return 0;
 }
 
+int get_user_utmp_index(const char *sessid)
+{
+	return (sessid[0] - 'A') * 26 * 26
+			+(sessid[1] - 'A') * 26
+			+(sessid[2] - 'A');
+}
+
 int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 {
-	int uent_index = (sessid[0] - 'A') * 26 * 26
-					+(sessid[1] - 'A') * 26
-					+(sessid[2] - 'A');
+	int uent_index = get_user_utmp_index(sessid);
 	char ssid[30];
 	strncpy(ssid, sessid+3, 30);
 
