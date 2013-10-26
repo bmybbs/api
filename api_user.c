@@ -150,7 +150,51 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 
 int api_user_logout(ONION_FUNC_PROTO_STR)
 {
-	return OCS_NOT_IMPLEMENTED;
+	const onion_dict *param_dict = onion_request_get_query_dict(req);
+	const char * userid = onion_dict_get(param_dict, "userid");
+	const char * sessid = onion_dict_get(param_dict, "sessid");
+	const char * appkey = onion_dict_get(param_dict, "appkey");
+	const char * fromhost = onion_request_get_client_description(req);
+	time_t now_t = time(NULL);
+	char buf[512];
+
+	if(userid == NULL || sessid == NULL || appkey == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	if(strcasecmp(userid, "guest") == 0) {
+		return api_error(p, req, res, API_RT_CNTLGOTGST);
+	}
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0) {
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	sprintf(buf, "%s exitbbs api", ue->userid);
+	newtrace(buf);
+	strsncpy(ue->lasthost, fromhost, 16);
+	ue->lastlogout = now_t;
+	save_user_data(ue);
+
+	int utmp_index = get_user_utmp_index(sessid);
+	int uid=shm_utmp->uinfo[utmp_index].uid;
+	remove_uindex(uid, utmp_index+1);
+	memset(&(shm_utmp->uinfo[utmp_index]), 0, sizeof(struct user_info));
+
+	if(check_user_perm(ue, PERM_BOARDS) && count_uindex(uid)==0)
+		setbmstatus(ue, 0);
+
+	free(ue);
+
+	return api_error(p, req, res, API_RT_SUCCESSFUL);
+	return OCS_PROCESSED;
 }
 
 int api_user_check_session(ONION_FUNC_PROTO_STR)
