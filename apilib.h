@@ -9,6 +9,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <ght_hash_table.h>
+#include <json/json.h>
+#include <libxml/HTMLparser.h>
+#include <libxml/HTMLtree.h>
+#include <libxml/xpath.h>
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+#include <libxml/xmlmemory.h>
+#include <libxml/xmlsave.h>
 
 #include "bbs.h"
 #include "ythtlib.h"
