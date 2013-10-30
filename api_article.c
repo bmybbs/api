@@ -69,6 +69,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	}
 
 	struct bmy_article top_list[listmax];
+	memset(top_list, 0, sizeof(top_list[0]) * listmax);
 
 	htmlDocPtr doc = htmlParseFile(ttfile, "GBK");
 	if(doc==NULL)
