@@ -76,8 +76,14 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		return api_error(p, req, res, API_RT_NOTOP10FILE);
 
 	char xpath_links[40], xpath_nums[16];
-	sprintf(xpath_links, "//div[@class='td-overflow']/a");
-	sprintf(xpath_nums, "//tr/td[4]");
+
+	if(mode == 0) { //十大
+		sprintf(xpath_links, "//div[@class='td-overflow']/a");
+		sprintf(xpath_nums, "//tr/td[4]");
+	} else { //分区
+		sprintf(xpath_links, "//div[@class='bd-overflow']/a");
+		sprintf(xpath_nums, "//tr/td[3]");
+	}
 
 	xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
 	if(ctx==NULL) {
@@ -88,9 +94,18 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	xmlXPathObjectPtr r_links = xmlXPathEvalExpression((const xmlChar*)xpath_links, ctx);
 	xmlXPathObjectPtr r_nums = xmlXPathEvalExpression((const xmlChar*)xpath_nums, ctx);
 
+	if(r_links->nodesetval == 0 || r_nums->nodesetval == 0) {
+		xmlXPathFreeObject(r_links);
+		xmlXPathFreeObject(r_nums);
+		xmlXPathFreeContext(ctx);
+		xmlFreeDoc(doc);
+		return api_error(p, req, res, API_RT_XMLFMTERROR);
+	}
+
 	int total = r_links->nodesetval->nodeNr;
 	if( total == 0 || total>listmax ||
-		r_nums->nodesetval->nodeNr - total != 1) {
+		(mode == 0 && r_nums->nodesetval->nodeNr - total != 1) ||
+		(mode == 1 && r_nums->nodesetval->nodeNr != total)) {
 		xmlXPathFreeObject(r_links);
 		xmlXPathFreeObject(r_nums);
 		xmlXPathFreeContext(ctx);
@@ -103,13 +118,22 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	char *link, *num, *t1, *t2, buf[256], tmp[16];
 	for(i=0; i<total; ++i) {
 		cur_link = r_links->nodesetval->nodeTab[i];
-		cur_num = r_nums->nodesetval->nodeTab[i+1];
+		if(mode==0)
+			cur_num = r_nums->nodesetval->nodeTab[i+1];
+		else
+			cur_num = r_nums->nodesetval->nodeTab[i];
 
 		link = (char *)xmlGetProp(cur_link, (const xmlChar*)"href");
 		num = (char *)xmlNodeGetContent(cur_num);
 
 		top_list[i].type = (strstr(link, "tfind?board") != NULL);
-		top_list[i].th_num = atoi(num);
+		if(mode == 0) {
+			top_list[i].th_num = atoi(num);
+		} else {
+			// 分区模式下num格式为 (7)
+			snprintf(tmp, strlen(num)-1, "%s", num+1);
+			top_list[i].th_num = atoi(tmp);
+		}
 		strncpy(top_list[i].title, (const char*)xmlNodeGetContent(cur_link), 80);
 
 		memset(buf, 0, 256);
