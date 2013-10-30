@@ -76,7 +76,7 @@ static char *template_string_replace(char *ori, const char *old, const char *new
 	strncpy(tmp_string, ori, ch - ori);
 	*(tmp_string + (ch - ori)) = 0;
 	sprintf(tmp_string + (ch - ori), "%s%s", new, ch+strlen(old));
-	*(tmp_string + tmp_string_length) = 0;
+	*(tmp_string + tmp_string_length - 1) = 0;
 
 	free(ori);
 	ori = tmp_string;
