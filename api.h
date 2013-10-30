@@ -22,4 +22,6 @@ int api_user_check_session(ONION_FUNC_PROTO_STR);
 
 int api_article_list(ONION_FUNC_PROTO_STR);
 
+int api_board_list(ONION_FUNC_PROTO_STR);
+
 #endif

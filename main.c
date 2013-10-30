@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^user/logout$", api_user_logout);
 	onion_url_add(urls, "^user/checksession$", api_user_check_session);
 	onion_url_add(urls, "^article/list$", api_article_list);
+	onion_url_add(urls, "^board/list$", api_board_list);
 
 	onion_listen(o);
 
