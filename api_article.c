@@ -28,7 +28,7 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
  * @param secstr 分区字符
  * @return
  */
-static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, char *secstr);
+static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const char *secstr);
 
 int api_article_list(ONION_FUNC_PROTO_STR)
 {
@@ -56,7 +56,7 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 }
 
-static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, char *secstr)
+static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const char *secstr)
 {
 	int listmax;
 	char ttfile[40];
@@ -142,7 +142,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, char *sec
 	xmlFreeDoc(doc);
 
 	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
-	onion_response_printf(res, "%s", s);
+	onion_response_write0(res, s);
 
 	free(s);
 
@@ -161,8 +161,8 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
 	for(i=0; i<count; ++i) {
 		p = &(ba_list[i]);
 		memset(buf, 0, 512);
-		sprintf(buf, "{ \"type\":%d, \"board\":%s, \"aid\":%d, \"tid\":%d, "
-				"\"title\":%s, \"author\":%s, \"th_num\":%d, \"mark\":%d }",
+		sprintf(buf, "{ \"type\":%d, \"board\":\"%s\", \"aid\":%d, \"tid\":%d, "
+				"\"title\":\"%s\", \"author\":\"%s\", \"th_num\":%d, \"mark\":%d }",
 				p->type, p->board, p->filetime, p->thread,
 				p->title, p->author, p->th_num, p->mark);
 		jp = json_tokener_parse(buf);
