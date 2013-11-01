@@ -199,9 +199,9 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode)
 {
 	const int max_list_number = 20;
-	struct bmy_article comment_list[max_list_number];
+	struct bmy_article commend_list[max_list_number];
 	struct commend x;
-	memset(comment_list, 0, sizeof(comment_list[0]) * max_list_number);
+	memset(commend_list, 0, sizeof(commend_list[0]) * max_list_number);
 
 	FILE *fp = NULL;
 	if(0 == mode)
@@ -218,28 +218,27 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode)
 		if(fread(&x, sizeof(struct commend), 1, fp)<=0)
 			break;
 		if(x.accessed & FH_ALLREPLY)
-			comment_list[i].mark = x.accessed;
-		comment_list[i].type = 0;
-
+			commend_list[i].mark = x.accessed;
+		commend_list[i].type = 0;
 		length = strlen(x.title);
-		g2u(x.title, length, comment_list[i].title, length);
-		strcpy(comment_list[i].author, x.userid);
-		strcpy(comment_list[i].board, x.board);
-		comment_list[i].filetime = 0;
+		g2u(x.title, length, commend_list[i].title, length);
+		strcpy(commend_list[i].author, x.userid);
+		strcpy(commend_list[i].board, x.board);
+		commend_list[i].filetime = 0;
 		char *p_filename = (char *)x.filename;
 		while(*p_filename != 0 && (*p_filename > '9' || *p_filename < '0'))
 			++p_filename;
 		while(*p_filename != 0 && '0' <= *p_filename && *p_filename <= '9')
 		{
-			comment_list[i].filetime = comment_list[i].filetime * 10 + (*p_filename) - '0';
+			commend_list[i].filetime = commend_list[i].filetime * 10 + (*p_filename) - '0';
 			++p_filename;
 		}
-		comment_list[i].thread = get_thread_by_filetime(comment_list[i].board, comment_list[i].filetime);
-		comment_list[i].th_num = get_number_of_articles_in_thread(comment_list[i].board, comment_list[i].thread);
+		commend_list[i].thread = get_thread_by_filetime(commend_list[i].board, commend_list[i].filetime);
+		commend_list[i].th_num = get_number_of_articles_in_thread(commend_list[i].board, commend_list[i].thread);
 		++count;
 	}
 	fclose(fp);
-	char *s = bmy_article_array_to_json_string(comment_list, count);
+	char *s = bmy_article_array_to_json_string(commend_list, count);
 	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
 	onion_response_write0(res, s);
 	free(s);
@@ -282,7 +281,7 @@ static int get_thread_by_filetime(char *board, int filetime)
 
 	sprintf(dir, "boards/%s/.DIR", board);
 	MMAP_TRY{
-		if(mmapfile(dir, &mf) == 0)
+		if(mmapfile(dir, &mf) == -1)
 		{
 			MMAP_UNTRY;
 			return 0;
@@ -297,6 +296,7 @@ static int get_thread_by_filetime(char *board, int filetime)
 		int num = Search_Bin(mf.ptr, filetime, 0, total - 1);
 		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
 		memcpy(&fh, p_fh, sizeof(struct fileheader));
+		mmapfile(NULL, &mf);
 		return fh.thread;
 	}
 	MMAP_CATCH{
@@ -322,12 +322,6 @@ static int get_number_of_articles_in_thread(char *board, int thread)
 			MMAP_UNTRY;
 			return 0;
 		}
-		if(0 == mf.size)
-		{
-			MMAP_UNTRY;
-			mmapfile(NULL, &mf);
-			return 0;
-		}
 		num_records = mf.size / sizeof(struct fileheader);
 		if(0 != thread)
 		{
@@ -344,6 +338,7 @@ static int get_number_of_articles_in_thread(char *board, int thread)
 			else
 				++num_in_thread;
 		}
+		mmapfile(NULL, &mf);
 		return num_in_thread;
 	}
 	MMAP_CATCH
