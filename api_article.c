@@ -30,6 +30,28 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
  */
 static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const char *secstr);
 
+/**
+ * @brief 将美文推荐，或通知公告转为JSON数据输出
+ * @param mode 0 为美文推荐，1为通知公告 
+ * @return 同上
+ */
+static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode);
+
+/**
+ * @brief 通过版面名，文章ID，查找对应主题ID
+ * @param board : board name 
+ * @param filetime : file id
+ * @return thread id; return 0 means not find the thread id
+ */
+static int get_thread_by_filetime(char *board, int filetime);
+
+/**
+ * @brief 通过主题ID查找同主题文章数量
+ * @param thread : the thread id
+ * @return the nubmer of articles in the thread
+ */
+static int get_number_of_articles_in_thread(char *board, int thread);
+
 int api_article_list(ONION_FUNC_PROTO_STR)
 {
 	const char *type = onion_request_get_query(req, "type");
@@ -45,9 +67,9 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 
 		return api_article_list_xmltopfile(p, req, res, 1, secstr);
 	} else if(strcasecmp(type, "commend")==0) { // 美文推荐
-		return OCS_NOT_IMPLEMENTED;
+		return api_article_list_commend(p, req, res, 0);
 	} else if(strcasecmp(type, "announce")==0) { // 通知公告
-		return OCS_NOT_IMPLEMENTED;
+		return api_article_list_commend(p, req, res, 1); 
 	} else if(strcasecmp(type, "board")==0) { // 版面文章
 		return OCS_NOT_IMPLEMENTED;
 	} else if(strcasecmp(type, "thread")==0) { // 同主题列表
@@ -174,6 +196,57 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	return OCS_PROCESSED;
 }
 
+static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode)
+{
+	const int max_list_number = 20;
+	struct bmy_article comment_list[max_list_number];
+	struct commend x;
+	memset(comment_list, 0, sizeof(comment_list[0]) * max_list_number);
+
+	FILE *fp = NULL;
+	if(0 == mode)
+		fp = fopen(".COMMEND", "r");
+	else if(1 == mode)
+		fp = fopen(".COMMEND2", "r");
+	if(!fp)
+		return api_error(p, req, res, API_RT_NOCOMMENDFILE);
+
+
+	fseek(fp, -20*sizeof(struct commend), SEEK_END);
+	int count=0, length = 0, i;
+	for(i=0; i<max_list_number; i++) {
+		if(fread(&x, sizeof(struct commend), 1, fp)<=0)
+			break;
+		if(x.accessed & FH_ALLREPLY)
+			comment_list[i].mark = x.accessed;
+		comment_list[i].type = 0;
+
+		length = strlen(x.title);
+		g2u(x.title, length, comment_list[i].title, length);
+		strcpy(comment_list[i].author, x.userid);
+		strcpy(comment_list[i].board, x.board);
+		comment_list[i].filetime = 0;
+		char *p_filename = (char *)x.filename;
+		while(*p_filename != 0 && (*p_filename > '9' || *p_filename < '0'))
+			++p_filename;
+		while(*p_filename != 0 && '0' <= *p_filename && *p_filename <= '9')
+		{
+			comment_list[i].filetime = comment_list[i].filetime * 10 + (*p_filename) - '0';
+			++p_filename;
+		}
+		comment_list[i].thread = get_thread_by_filetime(comment_list[i].board, comment_list[i].filetime);
+		comment_list[i].th_num = get_number_of_articles_in_thread(comment_list[i].board, comment_list[i].thread);
+		++count;
+	}
+	fclose(fp);
+	char *s = bmy_article_array_to_json_string(comment_list, count);
+	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	onion_response_write0(res, s);
+	free(s);
+	return OCS_PROCESSED;
+}
+
+
 static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count)
 {
 	char buf[512];
@@ -199,4 +272,84 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
 	json_object_put(obj);
 
 	return r;
+}
+
+static int get_thread_by_filetime(char *board, int filetime)
+{
+	char dir[80];
+	struct mmapfile mf = { ptr:NULL };
+	struct fileheader fh, *p_fh;
+
+	sprintf(dir, "boards/%s/.DIR", board);
+	MMAP_TRY{
+		if(mmapfile(dir, &mf) == 0)
+		{
+			MMAP_UNTRY;
+			return 0;
+		}
+		int total;
+		total = mf.size / sizeof(struct fileheader);
+		if(total == 0){
+			mmapfile(NULL, &mf);
+			MMAP_UNTRY;
+			return 0;
+		}
+		int num = Search_Bin(mf.ptr, filetime, 0, total - 1);
+		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
+		memcpy(&fh, p_fh, sizeof(struct fileheader));
+		return fh.thread;
+	}
+	MMAP_CATCH{
+		mmapfile(NULL, &mf);
+		return 0;
+	}
+	MMAP_END mmapfile(NULL, &mf);
+	return 0;
+}
+
+static int get_number_of_articles_in_thread(char *board, int thread)
+{
+	char dir[80];
+	int i = 0, num_in_thread = 0, num_records = 0;
+	struct mmapfile mf = { ptr:NULL };
+	if(NULL == board)
+		return 0;
+	sprintf(dir, "boards/%s/.DIR",board);
+	MMAP_TRY
+	{
+		if(-1 == mmapfile(dir, &mf))
+		{
+			MMAP_UNTRY;
+			return 0;
+		}
+		if(0 == mf.size)
+		{
+			MMAP_UNTRY;
+			mmapfile(NULL, &mf);
+			return 0;
+		}
+		num_records = mf.size / sizeof(struct fileheader);
+		if(0 != thread)
+		{
+			i = Search_Bin(mf.ptr, thread, 0, num_records - 1);
+			if(i < 0)
+				i = -(i + 1);
+		}
+		else
+			i = 0;
+		for(; i < num_records; ++i)
+		{
+			if(((struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)))->thread != thread)
+				continue;
+			else
+				++num_in_thread;
+		}
+		return num_in_thread;
+	}
+	MMAP_CATCH
+	{
+		num_in_thread = 0;
+	}
+	MMAP_END mmapfile(NULL, &mf);
+	return 0;
 }
