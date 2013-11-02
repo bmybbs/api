@@ -32,10 +32,34 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 
 /**
  * @brief 将美文推荐，或通知公告转为JSON数据输出
+ * @param board 版面名
  * @param mode 0 为美文推荐，1为通知公告 
- * @return 同上
+ * @param startnum 输出的第一篇文章序号，默认为(最新的文章-number)
+ * @param number 总共输出的文章数，暂时默认为20
+ * @return 返回json格式的查询结果 
  */
-static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode);
+static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum, int number);
+
+/**
+ * @brief 将版面文章列表转为JSON数据输出
+ * @param board 版面名
+ * @param mode 0为一般模式， 1为主题模式
+ * @param startnum 输出的第一篇文章序号，默认为(最新的文章-number)
+ * @param number 总共输出的文章数，由用户设定，暂时默认为20 
+ * @return 返回json格式的查询结果
+ */
+static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int mode, int startnum, int number);
+
+/**
+ * @brief 将同主题文章列表转为JSON数据输出
+ * @param board 版面名
+ * @param thread 主题ID 
+ * @param startnum 输出的第一篇文章序号，默认为(1)
+ * @param number 总共输出的文章数，由用户设定，默认为全部内容 
+ * @return 返回json格式的查询结果
+ */
+static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int thread, int startnum, int number);
+
 
 /**
  * @brief 通过版面名，文章ID，查找对应主题ID
@@ -66,14 +90,61 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 			return api_error(p, req, res, API_RT_WRONGPARAM);
 
 		return api_article_list_xmltopfile(p, req, res, 1, secstr);
+
 	} else if(strcasecmp(type, "commend")==0) { // 美文推荐
-		return api_article_list_commend(p, req, res, 0);
+		const char *str_start = onion_request_get_query(req, "startnum");
+		const char *str_number = onion_request_get_query(req, "count");
+		int start = 0, number = 0;
+		if(NULL != str_start)
+			start = atoi(str_start);
+		if(NULL != str_number)
+			number = atoi(str_number);
+		return api_article_list_commend(p, req, res, 0, start, number); 
+
 	} else if(strcasecmp(type, "announce")==0) { // 通知公告
-		return api_article_list_commend(p, req, res, 1); 
+		const char *str_start = onion_request_get_query(req, "startnum");
+		const char *str_number = onion_request_get_query(req, "count");
+		int start = 0, number = 0;
+		if(NULL != str_start)
+			start = atoi(str_start);
+		if(NULL != str_number)
+			number = atoi(str_number);
+		return api_article_list_commend(p, req, res, 1, start, number);
+
 	} else if(strcasecmp(type, "board")==0) { // 版面文章
-		return OCS_NOT_IMPLEMENTED;
+		const char *board = onion_request_get_query(req, "board");
+		const char *str_start = onion_request_get_query(req, "startnum");
+		const char *str_number = onion_request_get_query(req, "count");
+		const char *str_btype = onion_request_get_query(req, "btype");
+		int start = 1, number = 20, mode = -1;
+		if(NULL != str_start)
+			start = atoi(str_start);
+		if(NULL != str_number)
+			number = atoi(str_number);
+		if(NULL == str_btype)
+			return api_error(p, req, res, API_RT_WRONGPARAM);
+		else if(strcasecmp(str_btype, "b") == 0)
+			mode = 0;
+		else if(strcasecmp(str_btype, "t") == 0)
+			mode = 1;
+		else
+			return api_error(p, req, res, API_RT_WRONGPARAM);
+		return api_article_list_board(p, req, res, board, mode, start, number);
+
 	} else if(strcasecmp(type, "thread")==0) { // 同主题列表
-		return OCS_NOT_IMPLEMENTED;
+		const char *board = onion_request_get_query(req, "board");
+		const char *str_start = onion_request_get_query(req, "startnum");
+		const char *str_number = onion_request_get_query(req, "count");
+		const char *str_thread = onion_request_get_query(req, "thread");
+		int thread = 0, start = 1, number = 20;
+		if(NULL != str_start)
+			start = atoi(str_start);
+		if(NULL != str_number)
+			number = atoi(str_number);
+		if(NULL != str_thread)
+			thread = atoi(str_thread);
+		return api_article_list_thread(p, req, res, board, thread, start, number);
+
 	} else
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 }
@@ -196,43 +267,43 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	return OCS_PROCESSED;
 }
 
-static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode)
+static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum, int number)
 {
-	const int max_list_number = 20;
-	struct bmy_article commend_list[max_list_number];
+	if(0 >= number)
+		number = 20;
+	struct bmy_article commend_list[number];
 	struct commend x;
-	memset(commend_list, 0, sizeof(commend_list[0]) * max_list_number);
-
+	memset(commend_list, 0, sizeof(commend_list[0]) * number);
+	char dir[80];
 	FILE *fp = NULL;
 	if(0 == mode)
-		fp = fopen(".COMMEND", "r");
+		strcpy(dir, ".COMMEND");
 	else if(1 == mode)
-		fp = fopen(".COMMEND2", "r");
-	if(!fp)
+		strcpy(dir, ".COMMEND2");
+	int fsize = file_size(dir);
+	int total = fsize / sizeof(struct commend);
+	fp = fopen(dir, "r");
+
+	if(!fp || fsize == 0)
 		return api_error(p, req, res, API_RT_NOCOMMENDFILE);
+	if(startnum == 0)
+		startnum = total- number + 1;
+	if(startnum <= 0)
+		startnum = 1;
 
-
-	fseek(fp, -20*sizeof(struct commend), SEEK_END);
+	fseek(fp, (startnum - 1) * sizeof(struct commend), SEEK_SET);
 	int count=0, length = 0, i;
-	for(i=0; i<max_list_number; i++) {
+	for(i=0; i<number; i++) {
 		if(fread(&x, sizeof(struct commend), 1, fp)<=0)
 			break;
 		if(x.accessed & FH_ALLREPLY)
 			commend_list[i].mark = x.accessed;
 		commend_list[i].type = 0;
 		length = strlen(x.title);
-		g2u(x.title, length, commend_list[i].title, length);
+		g2u(x.title, length, commend_list[i].title, 80);
 		strcpy(commend_list[i].author, x.userid);
 		strcpy(commend_list[i].board, x.board);
-		commend_list[i].filetime = 0;
-		char *p_filename = (char *)x.filename;
-		while(*p_filename != 0 && (*p_filename > '9' || *p_filename < '0'))
-			++p_filename;
-		while(*p_filename != 0 && '0' <= *p_filename && *p_filename <= '9')
-		{
-			commend_list[i].filetime = commend_list[i].filetime * 10 + (*p_filename) - '0';
-			++p_filename;
-		}
+		commend_list[i].filetime = atoi((char *)x.filename + 2);
 		commend_list[i].thread = get_thread_by_filetime(commend_list[i].board, commend_list[i].filetime);
 		commend_list[i].th_num = get_number_of_articles_in_thread(commend_list[i].board, commend_list[i].thread);
 		++count;
@@ -243,6 +314,206 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode)
 	onion_response_write0(res, s);
 	free(s);
 	return OCS_PROCESSED;
+}
+
+static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int mode, int startnum, int number)
+{
+	if(0 >= number)
+		number = 20;
+	if(NULL == board)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	int fd = 0;
+	struct bmy_article board_list[number];
+	memset(board_list, 0, sizeof(board_list[0]) * number);
+	struct fileheader *data = NULL, x2;
+	char dir[80], filename[80];
+	int i = 0, total = 0, total_article = 0;
+
+	sprintf(dir, "boards/%s/.DIR", board);
+	int fsize = file_size(dir);
+	fd = open(dir, O_RDONLY);
+	if(0 == fd || 0 == fsize)
+		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+	MMAP_TRY
+	{
+		data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
+		close(fd);
+		if((void *) -1 == data)
+		{
+			MMAP_UNTRY;
+			return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+		}
+		total = fsize / sizeof(struct fileheader);
+		if(0 == mode)
+		{
+			total_article = total;
+		}
+		else if(1 == mode)
+		{
+			total_article = 0;
+			for(i = 0; i < total; ++i)
+				if(data[i].thread == data[i].filetime)
+					++total_article;
+		
+		}
+		if(startnum == 0)
+			startnum = total_article - number + 1;
+		if(startnum <= 0)
+			startnum = 1;
+		int sum = 0, count = 0;
+		for(i = 0; i < total; ++i)
+		{
+			if(0 == mode)
+				++sum;
+			else if(1 == mode && data[i].thread == data[i].filetime)
+				++sum;
+			if(sum < startnum || (1 == mode && data[i].thread != data[i].filetime))
+				continue;
+			while (data[i].sizebyte == 0)
+			{
+				sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
+				data[i].sizebyte = numbyte(eff_size(filename));
+				fd = open(dir, O_RDWR);
+				if (fd < 0)
+					break;
+				flock(fd, LOCK_EX);
+				lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
+				if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime)
+				{
+					x2.sizebyte = data[i].sizebyte;
+					lseek(fd, -1 * sizeof (x2), SEEK_CUR);
+					write(fd, &x2, sizeof (x2));
+				}
+				flock(fd, LOCK_UN);
+				close(fd);
+				break;
+			}
+			board_list[count].mark = data[i].accessed;
+			board_list[count].filetime = data[i].filetime;
+			board_list[count].thread = data[i].thread;
+		
+			strcpy(board_list[count].board, board);
+			strcpy(board_list[count].author, data[i].owner);
+			int length = strlen(data[i].title);
+			g2u(data[i].title, length, board_list[count].title, 80);
+			++count;
+			if(count >= number)
+				break;
+
+		}
+		munmap(data, fsize);
+		for(i = 0; i < count; ++i){
+			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
+		}
+		char *s = bmy_article_array_to_json_string(board_list, count);
+		onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+		onion_response_write0(res, s);
+		free(s);
+		return OCS_PROCESSED;	
+	}
+	MMAP_CATCH
+	{
+		;
+	}
+	MMAP_END munmap(data, fsize);
+	return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+}
+
+static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int thread, int startnum, int number)
+{
+	if(NULL == board)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	if(thread <= 0)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	int fd = 0;
+	struct fileheader *data = NULL, x2;
+	char dir[80], filename[80];
+	int i = 0, total = 0, total_article = 0;
+	sprintf(dir, "boards/%s/.DIR", board);
+	int fsize = file_size(dir);
+	fd = open(dir, O_RDONLY);
+	if(0 == fd || 0 == fsize)
+		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+	MMAP_TRY
+	{
+		data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
+		close(fd);
+		if((void *) -1 == data)
+		{
+			MMAP_UNTRY;
+			return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+		}
+		total = fsize / sizeof(struct fileheader);
+		total_article = 0;
+		for(i = 0; i < total; ++i)
+		{
+			if(data[i].thread == thread)
+				++total_article;
+		}
+		if(number == 0)
+			number = total_article;
+		struct bmy_article board_list[number];
+		memset(board_list, 0, sizeof(board_list[0]) * number);
+		if(startnum == 0)
+			startnum = total_article - number + 1;
+		if(startnum <= 0)
+			startnum = 1;
+		int sum = 0, count = 0;
+		for(i = 0; i < total; ++i)
+		{
+			if(data[i].thread != thread)
+				continue;
+			++sum;
+			if(sum < startnum)
+				continue;
+			while (data[i].sizebyte == 0)
+			{
+				sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
+				data[i].sizebyte = numbyte(eff_size(filename));
+				fd = open(dir, O_RDWR);
+				if (fd < 0)
+					break;
+				flock(fd, LOCK_EX);
+				lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
+				if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime)
+				{
+					x2.sizebyte = data[i].sizebyte;
+					lseek(fd, -1 * sizeof (x2), SEEK_CUR);
+					write(fd, &x2, sizeof (x2));
+				}
+				flock(fd, LOCK_UN);
+				close(fd);
+				break;
+			}
+			board_list[count].mark = data[i].accessed;
+			board_list[count].filetime = data[i].filetime;
+			board_list[count].thread = data[i].thread;
+		
+			strcpy(board_list[count].board, board);
+			strcpy(board_list[count].author, data[i].owner);
+			int length = strlen(data[i].title);
+			g2u(data[i].title, length, board_list[count].title, 80);
+			++count;
+			if(count >= number)
+				break;
+
+		}
+		munmap(data, fsize);
+		for(i = 0; i < count; ++i){
+			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
+		}
+		char *s = bmy_article_array_to_json_string(board_list, count);
+		onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+		onion_response_write0(res, s);
+		free(s);
+		return OCS_PROCESSED;	
+	}
+	MMAP_CATCH
+	{
+		;
+	}
+	MMAP_END munmap(data, fsize);
+	return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
 }
 
 
@@ -296,12 +567,10 @@ static int get_thread_by_filetime(char *board, int filetime)
 		int num = Search_Bin(mf.ptr, filetime, 0, total - 1);
 		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
 		memcpy(&fh, p_fh, sizeof(struct fileheader));
-		mmapfile(NULL, &mf);
 		return fh.thread;
 	}
 	MMAP_CATCH{
 		mmapfile(NULL, &mf);
-		return 0;
 	}
 	MMAP_END mmapfile(NULL, &mf);
 	return 0;
