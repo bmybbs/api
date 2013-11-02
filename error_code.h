@@ -8,9 +8,11 @@ enum api_error_code {
 	API_RT_NOTOP10FILE  = 3,		///< 没有十大文件
 	API_RT_NOSUCHFILE   = 30,		///< 没有找到对应文件
 	API_RT_NOCOMMENDFILE = 31,		///< 没有找到美文、通知的文件
+	API_RT_NOGDBRDFILE	= 32,		///< 没有用户的收藏夹文件
 	API_RT_XMLFMTERROR  = 4,		///< 十大、分区热门话题文件格式有误
 	API_RT_WRONGPARAM	= 1000,		///< 接口参数错误
 	API_RT_WRONGSESS	= 1001,		///< 错误的session
+	API_RT_NOTLOGGEDIN	= 1002,		///< 没有登录
 	API_RT_NOTEMPLATE	= 1100,		///< 没有模板
 	API_RT_NOSUCHUSER 	= 100000, 	///< 没有此用户
 	API_RT_SITEFBDIP	= 100001,	///< 站点禁用IP

@@ -21,6 +21,7 @@
 #include "bbs.h"
 #include "ythtlib.h"
 #include "ythtbbs.h"
+#include "api_brc.h"
 
 typedef char* api_template_t;
 api_template_t api_template_create(const char * filename);
