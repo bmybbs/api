@@ -2,7 +2,7 @@ var $ = require('jquery');
 
 exports.test_get_top_10_article_list = function(test) {
 	test.done();
-}
+};
 
 exports.test_get_announce_article_list_if_announce_exist = function(test) {
 	var url = 'http://extdev.ironblood.net:8080/article/list?type=announce';
@@ -19,7 +19,7 @@ exports.test_get_announce_article_list_if_announce_exist = function(test) {
 			test.done();
 		}
 	});
-}
+};
 
 exports.test_get_commend_article_list_if_commend_exist = function(test) {
 	var url = 'http://extdev.ironblood.net:8080/article/list?type=commend';
@@ -36,7 +36,7 @@ exports.test_get_commend_article_list_if_commend_exist = function(test) {
 			test.done();
 		}
 	});
-}
+};
 
 exports.test_get_the_second_annouce_entry_with_startnum_and_count = function(test) {
 	var url = 'http://extdev.ironblood.net:8080/article/list?type=announce&startnum=2&count=1';
@@ -54,7 +54,7 @@ exports.test_get_the_second_annouce_entry_with_startnum_and_count = function(tes
 			test.done();
 		}
 	});
-}
+};
 
 exports.test_get_the_second_commend_entry_with_startnum_and_count = function(test) {
 	var url = 'http://extdev.ironblood.net:8080/article/list?type=commend&startnum=2&count=1';
@@ -72,4 +72,4 @@ exports.test_get_the_second_commend_entry_with_startnum_and_count = function(tes
 			test.done();
 		}
 	});
-}
+};

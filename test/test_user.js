@@ -11,5 +11,5 @@ exports.test_user_login_test_with_correct_password = function(test) {
 			test.ok(false, "user test login failed. errcode: " + data.errcode);
 			test.done();
 		}
-	})
+	});
 };
