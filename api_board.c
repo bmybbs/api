@@ -145,7 +145,60 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 
 static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 {
-	return OCS_NOT_IMPLEMENTED;
+	const char * secstr = onion_request_get_query(req, "secstr");
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+	const char * sortmode_s = onion_request_get_query(req, "sortmode");
+	const char * fromhost = onion_request_get_client_description(req);
+	//const char guest_str[] = "guest";
+	const char sec_array[] = "0123456789GNHAC";
+
+	if(secstr == NULL || strlen(secstr)>=2 || strstr(sec_array, secstr) == NULL)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	if(!userid || !sessid || !appkey)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	struct boardmem *board_array[MAXBOARD], *x;
+	int len,  hasintro = 0, i = 0, count = 0;
+	const struct sectree *sec;
+	int uent_index = get_user_utmp_index(sessid);
+	struct user_info *ui = &(shm_utmp->uinfo[uent_index]);
+	sec = getsectree(secstr);
+	len = strlen(secstr);
+	if(sec->introstr[0])
+		hasintro = 1;
+	for(i=0; i<MAXBOARD && i<shm_bcache->number; ++i) {
+		x = &(shm_bcache->bcache[i]);
+		if(x->header.filename[0]<=32 || x->header.filename[0]>'z')
+			continue;
+		if(hasintro){
+			if(strcmp(secstr, x->header.sec1) && strcmp(secstr, x->header.sec2))
+				continue;
+		}else{
+			if(strncmp(secstr, x->header.sec1, len) && strncmp(secstr, x->header.sec2, len))
+				continue;
+		}
+		if(!check_user_read_perm_x(ui, x))
+			continue;
+		board_array[count] = x;
+		count++;
+	}
+	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ui);
+	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	onion_response_write0(res, s);
+	free(ue);
+	free(s);
+	return OCS_PROCESSED;
 }
 
 static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, int sortmode, const char *fromhost, struct user_info *ui)

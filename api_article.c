@@ -121,13 +121,9 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 			start = atoi(str_start);
 		if(NULL != str_number)
 			number = atoi(str_number);
-		if(NULL == str_btype)
-			return api_error(p, req, res, API_RT_WRONGPARAM);
-		else if(strcasecmp(str_btype, "b") == 0)
-			mode = 0;
-		else if(strcasecmp(str_btype, "t") == 0)
-			mode = 1;
-		else
+		if(NULL != str_btype)
+			mode = atoi(str_btype);
+		if(mode != 1 && mode != 0)
 			return api_error(p, req, res, API_RT_WRONGPARAM);
 		return api_article_list_board(p, req, res, board, mode, start, number);
 
@@ -306,6 +302,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		commend_list[i].filetime = atoi((char *)x.filename + 2);
 		commend_list[i].thread = get_thread_by_filetime(commend_list[i].board, commend_list[i].filetime);
 		commend_list[i].th_num = get_number_of_articles_in_thread(commend_list[i].board, commend_list[i].thread);
+		commend_list[i].type = 0;
 		++count;
 	}
 	fclose(fp);
@@ -391,6 +388,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int m
 			board_list[count].mark = data[i].accessed;
 			board_list[count].filetime = data[i].filetime;
 			board_list[count].thread = data[i].thread;
+			board_list[count].type = mode;
 		
 			strcpy(board_list[count].board, board);
 			strcpy(board_list[count].author, data[i].owner);
@@ -488,6 +486,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int 
 			board_list[count].mark = data[i].accessed;
 			board_list[count].filetime = data[i].filetime;
 			board_list[count].thread = data[i].thread;
+			board_list[count].type = 0;
 		
 			strcpy(board_list[count].board, board);
 			strcpy(board_list[count].author, data[i].owner);
