@@ -41,11 +41,11 @@ static int readmybrd(char mybrd[GOOD_BRC_NUM][80], int *mybrdnum, const char *us
 static int ismybrd(char *board, char (*mybrd)[80], int mybrdnum);
 
 /**
- * @brief
- * @param board
- * @param lastpost
- * @param ui
- * @return
+ * @brief 检查版面是否已读
+ * @param board 版面名称
+ * @param lastpost 版面最后一篇帖子的filetime
+ * @param ui 用户会话
+ * @return 若lastpost已读，返回1，否则返回0.
  */
 static int board_read(char *board, int lastpost, const char *fromhost, struct user_info *ui);
 
@@ -241,7 +241,7 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 				"\"unread\":%d, \"voting\":%d, \"article_num\":%d, \"score\":%d,"
 				"\"inboard_num\":%d, \"secstr\":\"%s\", \"keyword\":\"%s\" }",
 				bp->header.filename, zh_name, type,
-				board_read(bp->header.filename, bp->lastpost, fromhost, ui),
+				!board_read(bp->header.filename, bp->lastpost, fromhost, ui),
 				(bp->header.flag & VOTE_FLAG),
 				bp->total, bp->score,
 				bp->inboard, bp->header.sec1, keyword);
