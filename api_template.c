@@ -1,7 +1,5 @@
 #include "apilib.h"
 
-static char *template_string_replace(char *ori, const char *old, const char *new);
-
 api_template_t api_template_create(const char *filename)
 {
 	char *p, *s;
@@ -53,35 +51,10 @@ void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...)
 	memset(old_string, 0, strlen(key)+7);
 	sprintf(old_string, "<%% %s %%>", key);
 
-	*tpl = template_string_replace(*tpl, old_string, new_string);
+	*tpl = string_replace(*tpl, old_string, new_string);
 
 	free(new_string);
 	free(old_string);
-}
-
-static char *template_string_replace(char *ori, const char *old, const char *new)
-{
-	int tmp_string_length = strlen(ori) + strlen(new) - strlen(old) + 1;
-
-	char *ch;
-	ch = strstr(ori, old);
-
-	if(!ch)
-		return ori;
-
-	char *tmp_string = (char *)malloc(tmp_string_length);
-	if(tmp_string == NULL) return ori;
-
-	memset(tmp_string, 0, tmp_string_length);
-	strncpy(tmp_string, ori, ch - ori);
-	*(tmp_string + (ch - ori)) = 0;
-	sprintf(tmp_string + (ch - ori), "%s%s", new, ch+strlen(old));
-	*(tmp_string + tmp_string_length - 1) = 0;
-
-	free(ori);
-	ori = tmp_string;
-
-	return ori;
 }
 
 void api_template_free(api_template_t tpl)
