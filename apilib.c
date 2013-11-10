@@ -10,7 +10,7 @@
 char *ummap_ptr = NULL;
 int ummap_size = 0;
 
-static void add_attach_link(struct attach_link **attach_link_list, const char *link);
+static void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size);
 static void free_attach_link_list(struct attach_link *attach_link_list);
 
 typedef struct selem *pelem;
@@ -306,6 +306,9 @@ int count_uindex(int uid)
 
 int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 {
+	if(!x || !sessid || !appkey)
+		return API_RT_WRONGSESS;
+
 	int uent_index = get_user_utmp_index(sessid);
 	char ssid[30];
 	strncpy(ssid, sessid+3, 30);
@@ -358,11 +361,12 @@ char *string_replace(char *ori, const char *old, const char *new)
 	return ori;
 }
 
-static void add_attahc_link(struct attach_link **attach_link_list, const char *link)
+static void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size)
 {
 	struct attach_link *a = (struct attach_link *)malloc(sizeof(struct attach_link));
 	memset(a, 0, sizeof(*a));
 	strncpy(a->link, link, 256);
+	a->size = size;
 
 	if(!(*attach_link_list))
 		*attach_link_list = a;
@@ -489,7 +493,7 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 			memset(link, 0, 256);
 			snprintf(link, 256, "http://%s:8080/%s/%s/%d/%s", MY_BBS_DOMAIN,
 					bname, fname, -4+(int)ftell(article_stream), attach_filename);
-			add_attach_link(&attach_link_list, link);
+			add_attach_link(&attach_link_list, link, attach_file_size);
 			fseek(article_stream, attach_file_size, SEEK_CUR);
 			continue;
 		}

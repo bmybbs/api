@@ -30,6 +30,7 @@ enum article_parse_mode {
 
 struct attach_link {
 	char link[256];
+	unsigned int size;
 	struct attach_link *next;
 };
 
