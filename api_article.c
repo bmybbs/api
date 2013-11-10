@@ -33,10 +33,10 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 /**
  * @brief 将美文推荐，或通知公告转为JSON数据输出
  * @param board 版面名
- * @param mode 0 为美文推荐，1为通知公告 
+ * @param mode 0 为美文推荐，1为通知公告
  * @param startnum 输出的第一篇文章序号，默认为(最新的文章-number)
  * @param number 总共输出的文章数，暂时默认为20
- * @return 返回json格式的查询结果 
+ * @return 返回json格式的查询结果
  */
 static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum, int number);
 
@@ -45,7 +45,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
  * @param board 版面名
  * @param mode 0为一般模式， 1为主题模式
  * @param startnum 输出的第一篇文章序号，默认为(最新的文章-number)
- * @param number 总共输出的文章数，由用户设定，暂时默认为20 
+ * @param number 总共输出的文章数，由用户设定，暂时默认为20
  * @return 返回json格式的查询结果
  */
 static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int mode, int startnum, int number);
@@ -53,9 +53,9 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int m
 /**
  * @brief 将同主题文章列表转为JSON数据输出
  * @param board 版面名
- * @param thread 主题ID 
+ * @param thread 主题ID
  * @param startnum 输出的第一篇文章序号，默认为(1)
- * @param number 总共输出的文章数，由用户设定，默认为全部内容 
+ * @param number 总共输出的文章数，由用户设定，默认为全部内容
  * @return 返回json格式的查询结果
  */
 static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int thread, int startnum, int number);
@@ -75,6 +75,17 @@ static int get_thread_by_filetime(char *board, int filetime);
  * @return the nubmer of articles in the thread
  */
 static int get_number_of_articles_in_thread(char *board, int thread);
+
+/**
+ * @brief 获取文章内容。
+ * api_article_getHTMLContent() 和 api_article_getRAWContent() 放个方法
+ * 实际上是这个方法的封装，通过 mode 参数进行区别。
+ * article/getHTMLContent 和 article/getRAWContent 两个接口单独区分开，意
+ * 在强调在做修改文章操作时，<strong>应当</strong>调用 getRAWcontent。
+ * @param mode 参见 enum article_parse_mode
+ * @return
+ */
+static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode);
 
 int api_article_list(ONION_FUNC_PROTO_STR)
 {
@@ -143,6 +154,16 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 
 	} else
 		return api_error(p, req, res, API_RT_WRONGPARAM);
+}
+
+int api_article_getHTMLContent(ONION_FUNC_PROTO_STR)
+{
+	return api_article_get_content(p, req, res, ARTICLE_PARSE_WITH_ANSICOLOR);
+}
+
+int api_article_getRAWContent(ONION_FUNC_PROTO_STR)
+{
+	return api_article_get_content(p, req, res, ARTICLE_PARSE_WITHOUT_ANSICOLOR);
 }
 
 static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const char *secstr)
@@ -515,6 +536,10 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int 
 	return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
 }
 
+static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
+{
+	return OCS_NOT_IMPLEMENTED;
+}
 
 static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count)
 {
