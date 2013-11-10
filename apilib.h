@@ -104,4 +104,7 @@ char *string_replace(char *ori, const char *old, const char *new);
  */
 char *parse_article(const char *bname, const char *fname, int mode, struct attach_link **attach_link_list);
 
+void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size);
+void free_attach_link_list(struct attach_link *attach_link_list);
+
 #endif

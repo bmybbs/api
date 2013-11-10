@@ -10,9 +10,6 @@
 char *ummap_ptr = NULL;
 int ummap_size = 0;
 
-static void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size);
-static void free_attach_link_list(struct attach_link *attach_link_list);
-
 typedef struct selem *pelem;
 typedef struct selem {
 	unsigned char digit[8];
@@ -361,7 +358,7 @@ char *string_replace(char *ori, const char *old, const char *new)
 	return ori;
 }
 
-static void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size)
+void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size)
 {
 	struct attach_link *a = (struct attach_link *)malloc(sizeof(struct attach_link));
 	memset(a, 0, sizeof(*a));
@@ -374,7 +371,7 @@ static void add_attach_link(struct attach_link **attach_link_list, const char *l
 		(*attach_link_list)->next = a;
 }
 
-static void free_attach_link_list(struct attach_link *attach_link_list)
+void free_attach_link_list(struct attach_link *attach_link_list)
 {
 	struct attach_link *cur=NULL, *p=NULL;
 	cur = attach_link_list;
