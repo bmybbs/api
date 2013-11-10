@@ -22,6 +22,9 @@ int api_user_check_session(ONION_FUNC_PROTO_STR);
 
 int api_article_list(ONION_FUNC_PROTO_STR);
 
+int api_article_getHTMLContent(ONION_FUNC_PROTO_STR);	// 获取 HTML 格式的内容
+int api_article_getRAWContent(ONION_FUNC_PROTO_STR);	// 获取原始内容，'\033' 字符将被转为 "[ESC]" 字符串
+
 int api_board_list(ONION_FUNC_PROTO_STR);
 
 #endif
