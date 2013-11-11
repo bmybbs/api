@@ -113,7 +113,6 @@ int ummap()
  */
 struct userec * getuser(const char *id)
 {
-	struct userec *user = malloc(sizeof(struct userec));
 	int uid;
 	uid = getusernum(id);
 	if(uid<0)
@@ -122,6 +121,8 @@ struct userec * getuser(const char *id)
 		ummap(); // 重新 mmap PASSWDS 文件到内存
 	if(!ummap_ptr)
 		return 0;
+
+	struct userec *user = malloc(sizeof(struct userec));
 	memcpy(user, ummap_ptr + sizeof(*user) * uid, sizeof(*user));
 	return user;
 }
