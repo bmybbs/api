@@ -569,11 +569,10 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	if(ue == 0)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	int r;
 	if(check_user_session(ue, sessid, appkey) != API_RT_SUCCESSFUL) {
 		free(ue);
 		userid = "guest";	// session 不合法的情况下，userid 和 ue 转为 guest
-		ue = getuser(ue);
+		ue = getuser(userid);
 	}
 
 	int uent_index = get_user_utmp_index(sessid);
@@ -586,7 +585,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	// 删除回复提醒
 	if(is_post_in_notification(ue->userid, bname, aid))
-		del_post_in_notification(ue->userid, bname, aid);
+		del_post_notification(ue->userid, bname, aid);
 
 	int total = bmem->total;
 	if(total<=0) {
@@ -607,7 +606,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	const char * num_str = onion_request_get_query(req, "num");
 	int num = (num_str == NULL) ? -1 : (atoi(num_str)-1);
-	fh = findbarticle(mf, aid, &num, 1);
+	fh = findbarticle(&mf, aid, &num, 1);
 	if(fh == NULL) {
 		mmapfile(NULL, &mf);
 		free(ue);
@@ -658,7 +657,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	free(article_content_utf8);
 	free(article_json_str);
 	json_object_put(jp);
-	free_attach_lint_list(attach_link_list);
+	free_attach_link_list(attach_link_list);
 
 	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
 	onion_response_write0(res, api_output);
