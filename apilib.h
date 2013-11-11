@@ -104,7 +104,18 @@ char *string_replace(char *ori, const char *old, const char *new);
  */
 char *parse_article(const char *bname, const char *fname, int mode, struct attach_link **attach_link_list);
 
+/**
+ * @brief 将文章中的附件链接单独存放在 attach_link 链表中。
+ * @param attach_link_list
+ * @param link 附件链接
+ * @param size 附件大小
+ */
 void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size);
+
+/**
+ * @ 释放附件链表
+ * @param attach_link_list
+ */
 void free_attach_link_list(struct attach_link *attach_link_list);
 
 #endif
