@@ -491,7 +491,7 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 			memset(link, 0, 256);
 			snprintf(link, 256, "http://%s:8080/%s/%s/%d/%s", MY_BBS_DOMAIN,
 					bname, fname, -4+(int)ftell(article_stream), attach_filename);
-			add_attach_link(&attach_link_list, link, attach_file_size);
+			add_attach_link(attach_link_list, link, attach_file_size);
 			fseek(article_stream, attach_file_size, SEEK_CUR);
 			continue;
 		}
