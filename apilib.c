@@ -727,9 +727,10 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 			case '\"': 	fprintf(out_stream, "&quot;"); break;
 			case '<':	fprintf(out_stream, "&lt;"); break;
 			case '>':	fprintf(out_stream, "&gt;"); break;
-			case '\n':case 13: momline++;
-								 line=0;
-			default:	 fprintf(out_stream, "<br />%c",c);
+			case '\n':
+			case 13: 	momline++;line=0;
+						fprintf(out_stream, "<br />\n"); break;
+			default:	fprintf(out_stream, "%c",c);
 			}
 		}
 	}
