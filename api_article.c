@@ -48,7 +48,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
  * @param number 总共输出的文章数，由用户设定，暂时默认为20 
  * @return 返回json格式的查询结果
  */
-static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int mode, int startnum, int number);
+static int api_article_list_board(ONION_FUNC_PROTO_STR);
 
 /**
  * @brief 将同主题文章列表转为JSON数据输出
@@ -58,7 +58,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int m
  * @param number 总共输出的文章数，由用户设定，默认为全部内容 
  * @return 返回json格式的查询结果
  */
-static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int thread, int startnum, int number);
+static int api_article_list_thread(ONION_FUNC_PROTO_STR);
 
 
 /**
@@ -112,35 +112,10 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 		return api_article_list_commend(p, req, res, 1, start, number);
 
 	} else if(strcasecmp(type, "board")==0) { // 版面文章
-		const char *board = onion_request_get_query(req, "board");
-		const char *str_start = onion_request_get_query(req, "startnum");
-		const char *str_number = onion_request_get_query(req, "count");
-		const char *str_btype = onion_request_get_query(req, "btype");
-		int start = 1, number = 20, mode = -1;
-		if(NULL != str_start)
-			start = atoi(str_start);
-		if(NULL != str_number)
-			number = atoi(str_number);
-		if(NULL != str_btype)
-			mode = atoi(str_btype);
-		if(mode != 1 && mode != 0)
-			return api_error(p, req, res, API_RT_WRONGPARAM);
-		return api_article_list_board(p, req, res, board, mode, start, number);
+		return api_article_list_board(p, req, res);
 
 	} else if(strcasecmp(type, "thread")==0) { // 同主题列表
-		const char *board = onion_request_get_query(req, "board");
-		const char *str_start = onion_request_get_query(req, "startnum");
-		const char *str_number = onion_request_get_query(req, "count");
-		const char *str_thread = onion_request_get_query(req, "thread");
-		int thread = 0, start = 1, number = 20;
-		if(NULL != str_start)
-			start = atoi(str_start);
-		if(NULL != str_number)
-			number = atoi(str_number);
-		if(NULL != str_thread)
-			thread = atoi(str_thread);
-		return api_article_list_thread(p, req, res, board, thread, start, number);
-
+		return api_article_list_thread(p, req, res);
 	} else
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 }
@@ -313,15 +288,53 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	return OCS_PROCESSED;
 }
 
-static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int mode, int startnum, int number)
+static int api_article_list_board(ONION_FUNC_PROTO_STR)
 {
-	if(0 >= number)
-		number = 20;
-	if(NULL == board)
+	const char * board        = onion_request_get_query(req, "board");
+	const char * str_btype    = onion_request_get_query(req, "btype");
+	const char * str_startnum = onion_request_get_query(req, "startnum");
+	const char * str_count    = onion_request_get_query(req, "count");
+	const char * userid   = onion_request_get_query(req, "usereid");
+	const char * appkey   = onion_request_get_query(req, "appkey");
+	const char * sessid   = onion_request_get_query(req, "sessid");
+	//判断必要参数
+	if(!(board && str_btype && userid && appkey && sessid))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
+	if(strlen(sessid) != 32)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	//TODO: 签名检查
+	//...
+	//判断版面访问权
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL){
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct boardmem *b   = getboardbyname(board);
+	if(b == NULL)
+		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+	if(!check_user_read_perm_x(ui, b))
+		return api_error(p, req, res, API_RT_FBDNUSER);
+
+	int mode = 0, startnum = 0, count = 0;
+	if(str_startnum != NULL)
+		startnum = atoi(str_startnum);
+	if(str_count != NULL)
+		count = atoi(str_count);
+	if(0 >= count)
+		count = 20;
+	if(str_btype[0] == 't')
+		mode = 1;
+	else
+		mode = 0;
+
 	int fd = 0;
-	struct bmy_article board_list[number];
-	memset(board_list, 0, sizeof(board_list[0]) * number);
+	struct bmy_article board_list[count];
+	memset(board_list, 0, sizeof(board_list[0]) * count);
 	struct fileheader *data = NULL, x2;
 	char dir[80], filename[80];
 	int i = 0, total = 0, total_article = 0;
@@ -354,10 +367,10 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int m
 		
 		}
 		if(startnum == 0)
-			startnum = total_article - number + 1;
+			startnum = total_article - count + 1;
 		if(startnum <= 0)
 			startnum = 1;
-		int sum = 0, count = 0;
+		int sum = 0, num = 0;
 		for(i = 0; i < total; ++i)
 		{
 			if(0 == mode)
@@ -385,25 +398,23 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int m
 				close(fd);
 				break;
 			}
-			board_list[count].mark = data[i].accessed;
-			board_list[count].filetime = data[i].filetime;
-			board_list[count].thread = data[i].thread;
-			board_list[count].type = mode;
+			board_list[num].mark = data[i].accessed;
+			board_list[num].filetime = data[i].filetime;
+			board_list[num].thread = data[i].thread;
+			board_list[num].type = mode;
 		
-			strcpy(board_list[count].board, board);
-			strcpy(board_list[count].author, data[i].owner);
-			int length = strlen(data[i].title);
-			g2u(data[i].title, length, board_list[count].title, 80);
-			++count;
-			if(count >= number)
+			strcpy(board_list[num].board, board);
+			strcpy(board_list[num].author, data[i].owner);
+			g2u(data[i].title, strlen(data[i].title), board_list[count].title, 80);
+			++num;
+			if(num >= count)
 				break;
-
 		}
 		munmap(data, fsize);
-		for(i = 0; i < count; ++i){
+		for(i = 0; i < num; ++i){
 			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 		}
-		char *s = bmy_article_array_to_json_string(board_list, count);
+		char *s = bmy_article_array_to_json_string(board_list, num);
 		onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
 		onion_response_write0(res, s);
 		free(s);
@@ -417,12 +428,45 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR, const char *board, int m
 	return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
 }
 
-static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int thread, int startnum, int number)
+static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 {
-	if(NULL == board)
+	const char * board        = onion_request_get_query(req, "board");
+	const char * str_thread   = onion_request_get_query(req, "thread");
+	const char * str_startnum = onion_request_get_query(req, "startnum");
+	const char * str_count    = onion_request_get_query(req, "count");
+	const char * userid   = onion_request_get_query(req, "usereid");
+	const char * appkey   = onion_request_get_query(req, "appkey");
+	const char * sessid   = onion_request_get_query(req, "sessid");
+	//判断必要参数
+	if(!(board && str_thread && userid && appkey && sessid))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
-	if(thread <= 0)
+	int thread = atoi(str_thread);
+	if(strlen(sessid) != 32 || thread == 0)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
+	//TODO: 签名检查
+	//...
+	//判断版面访问权
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL){
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct boardmem *b   = getboardbyname(board);
+	if(b == NULL)
+		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+	if(!check_user_read_perm_x(ui, b))
+		return api_error(p, req, res, API_RT_FBDNUSER);
+
+	int startnum = 0, count = 0;
+	if(str_startnum != NULL)
+		startnum = atoi(str_startnum);
+	if(str_count != NULL)
+		count = atoi(str_count);
+
 	int fd = 0;
 	struct fileheader *data = NULL, x2;
 	char dir[80], filename[80];
@@ -448,15 +492,15 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int 
 			if(data[i].thread == thread)
 				++total_article;
 		}
-		if(number == 0)
-			number = total_article;
-		struct bmy_article board_list[number];
-		memset(board_list, 0, sizeof(board_list[0]) * number);
+		if(count == 0)
+			count = total_article;
+		struct bmy_article board_list[count];
+		memset(board_list, 0, sizeof(board_list[0]) * count);
 		if(startnum == 0)
-			startnum = total_article - number + 1;
+			startnum = total_article - count + 1;
 		if(startnum <= 0)
 			startnum = 1;
-		int sum = 0, count = 0;
+		int sum = 0, num = 0;
 		for(i = 0; i < total; ++i)
 		{
 			if(data[i].thread != thread)
@@ -483,25 +527,24 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR, const char *board, int 
 				close(fd);
 				break;
 			}
-			board_list[count].mark = data[i].accessed;
-			board_list[count].filetime = data[i].filetime;
-			board_list[count].thread = data[i].thread;
-			board_list[count].type = 0;
+			board_list[num].mark = data[i].accessed;
+			board_list[num].filetime = data[i].filetime;
+			board_list[num].thread = data[i].thread;
+			board_list[num].type = 0;
 		
-			strcpy(board_list[count].board, board);
-			strcpy(board_list[count].author, data[i].owner);
-			int length = strlen(data[i].title);
-			g2u(data[i].title, length, board_list[count].title, 80);
-			++count;
-			if(count >= number)
+			strcpy(board_list[num].board, board);
+			strcpy(board_list[num].author, data[i].owner);
+			g2u(data[i].title, strlen(data[i].title), board_list[count].title, 80);
+			++num;
+			if(num >= count)
 				break;
 
 		}
 		munmap(data, fsize);
-		for(i = 0; i < count; ++i){
+		for(i = 0; i < num; ++i){
 			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 		}
-		char *s = bmy_article_array_to_json_string(board_list, count);
+		char *s = bmy_article_array_to_json_string(board_list, num);
 		onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
 		onion_response_write0(res, s);
 		free(s);
@@ -547,7 +590,8 @@ static int get_thread_by_filetime(char *board, int filetime)
 {
 	char dir[80];
 	struct mmapfile mf = { ptr:NULL };
-	struct fileheader fh, *p_fh;
+	struct fileheader *p_fh;
+	int thread;
 
 	sprintf(dir, "boards/%s/.DIR", board);
 	MMAP_TRY{
@@ -565,8 +609,9 @@ static int get_thread_by_filetime(char *board, int filetime)
 		}
 		int num = Search_Bin(mf.ptr, filetime, 0, total - 1);
 		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
-		memcpy(&fh, p_fh, sizeof(struct fileheader));
-		return fh.thread;
+		thread = p_fh->thread;
+		mmapfile(NULL, &mf);
+		return thread;
 	}
 	MMAP_CATCH{
 		mmapfile(NULL, &mf);
