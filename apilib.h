@@ -23,6 +23,17 @@
 #include "ythtbbs.h"
 #include "api_brc.h"
 
+enum article_parse_mode {
+	ARTICLE_PARSE_WITH_ANSICOLOR,		///< 将颜色转换为 HTML 样式
+	ARTICLE_PARSE_WITHOUT_ANSICOLOR		///< 将 \033 字符转换为 [ESC]
+};
+
+struct attach_link {
+	char link[256];
+	unsigned int size;
+	struct attach_link *next;
+};
+
 typedef char* api_template_t;
 api_template_t api_template_create(const char * filename);
 void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...);
@@ -71,5 +82,40 @@ int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 
 int setbmhat(struct boardmanager *bm, int *online);
 int setbmstatus(struct userec *ue, int online);
+
+/**
+ * @brief 字符串替换函数
+ * @param ori 原始字符串
+ * @param old 需要替换的字符串
+ * @param new 替换的新字符串
+ * @return 替换完成后的字符串
+ * @warning ori 字符串应当存在在堆上，同样返回的字符串也位于堆上，使用完成记得 free。
+ */
+char *string_replace(char *ori, const char *old, const char *new);
+
+/**
+ * @brief 读取BMY文章内容，并转换为便于处理或者显示。
+ * @param bname 版面名称
+ * @param fname 帖子名称
+ * @param mode 参见 enum article_parse_mode
+ * @param attach_link_list 存放BMY附件链接的链表
+ * @return 处理后的字符串，该字符串已转换为 UTF-8 编码。
+ * @warning 在使用完成后记得 free。
+ */
+char *parse_article(const char *bname, const char *fname, int mode, struct attach_link **attach_link_list);
+
+/**
+ * @brief 将文章中的附件链接单独存放在 attach_link 链表中。
+ * @param attach_link_list
+ * @param link 附件链接
+ * @param size 附件大小
+ */
+void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size);
+
+/**
+ * @ 释放附件链表
+ * @param attach_link_list
+ */
+void free_attach_link_list(struct attach_link *attach_link_list);
 
 #endif
