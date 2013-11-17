@@ -346,10 +346,14 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	}
 	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	struct boardmem *b   = getboardbyname(board);
-	if(b == NULL)
-		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
-	if(!check_user_read_perm_x(ui, b))
-		return api_error(p, req, res, API_RT_FBDNUSER);
+	if(b == NULL) {
+		free(ue);
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
+	}
+	if(!check_user_read_perm_x(ui, b)) {
+		free(ue);
+		return api_error(p, req, res, API_RT_NOBRDRPERM);
+	}
 
 	int mode = 0, startnum = 0, count = 0;
 	if(str_startnum != NULL)
@@ -373,8 +377,10 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	sprintf(dir, "boards/%s/.DIR", board);
 	int fsize = file_size(dir);
 	fd = open(dir, O_RDONLY);
-	if(0 == fd || 0 == fsize)
-		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+	if(0 == fd || 0 == fsize) {
+		free(ue);
+		return api_error(p, req, res, API_RT_EMPTYBRD);
+	}
 	MMAP_TRY
 	{
 		data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
@@ -382,7 +388,8 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		if((void *) -1 == data)
 		{
 			MMAP_UNTRY;
-			return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+			free(ue);
+			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 		}
 		total = fsize / sizeof(struct fileheader);
 		if(0 == mode)
@@ -448,6 +455,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		char *s = bmy_article_array_to_json_string(board_list, num);
 		onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
 		onion_response_write0(res, s);
+		free(ue);
 		free(s);
 		return OCS_PROCESSED;	
 	}
@@ -456,7 +464,8 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		;
 	}
 	MMAP_END munmap(data, fsize);
-	return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+	free(ue);
+	return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 }
 
 static int api_article_list_thread(ONION_FUNC_PROTO_STR)
@@ -488,7 +497,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL)
-		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	if(!check_user_read_perm_x(ui, b))
 		return api_error(p, req, res, API_RT_FBDNUSER);
 
@@ -505,8 +514,10 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	sprintf(dir, "boards/%s/.DIR", board);
 	int fsize = file_size(dir);
 	fd = open(dir, O_RDONLY);
-	if(0 == fd || 0 == fsize)
-		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+	if(0 == fd || 0 == fsize) {
+		free(ue);
+		return api_error(p, req, res, API_RT_EMPTYBRD);
+	}
 	MMAP_TRY
 	{
 		data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
@@ -514,7 +525,8 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		if((void *) -1 == data)
 		{
 			MMAP_UNTRY;
-			return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+			free(ue);
+			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 		}
 		total = fsize / sizeof(struct fileheader);
 		total_article = 0;
@@ -578,6 +590,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		char *s = bmy_article_array_to_json_string(board_list, num);
 		onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
 		onion_response_write0(res, s);
+		free(ue);
 		free(s);
 		return OCS_PROCESSED;	
 	}
@@ -586,7 +599,8 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		;
 	}
 	MMAP_END munmap(data, fsize);
-	return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+	free(ue);
+	return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 }
 
 static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
