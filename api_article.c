@@ -76,6 +76,27 @@ static int get_thread_by_filetime(char *board, int filetime);
  */
 static int get_number_of_articles_in_thread(char *board, int thread);
 
+/**
+ * @brief 获取文章内容。
+ * api_article_getHTMLContent() 和 api_article_getRAWContent() 放个方法
+ * 实际上是这个方法的封装，通过 mode 参数进行区别。
+ * article/getHTMLContent 和 article/getRAWContent 两个接口单独区分开，意
+ * 在强调在做修改文章操作时，<strong>应当</strong>调用 getRAWcontent。
+ * @param mode 参见 enum article_parse_mode
+ * @return
+ */
+static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode);
+
+/**
+ * @brief 从 .DIR 中依据 filetime 寻找文章对应的 fileheader 数据
+ * @param mf 映射到内存中的 .DIR 文件内容
+ * @param filetime 文件的时间戳
+ * @param num
+ * @param mode 1表示 .DIR 按时间排序，0表示不排序
+ * @return
+ */
+static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *num, int mode);
+
 int api_article_list(ONION_FUNC_PROTO_STR)
 {
 	const char *type = onion_request_get_query(req, "type");
@@ -118,6 +139,16 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 		return api_article_list_thread(p, req, res);
 	} else
 		return api_error(p, req, res, API_RT_WRONGPARAM);
+}
+
+int api_article_getHTMLContent(ONION_FUNC_PROTO_STR)
+{
+	return api_article_get_content(p, req, res, ARTICLE_PARSE_WITH_ANSICOLOR);
+}
+
+int api_article_getRAWContent(ONION_FUNC_PROTO_STR)
+{
+	return api_article_get_content(p, req, res, ARTICLE_PARSE_WITHOUT_ANSICOLOR);
 }
 
 static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const char *secstr)
@@ -256,7 +287,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	fp = fopen(dir, "r");
 
 	if(!fp || fsize == 0)
-		return api_error(p, req, res, API_RT_NOCOMMENDFILE);
+		return api_error(p, req, res, API_RT_NOCMMNDFILE);
 	if(startnum == 0)
 		startnum = total- number + 1;
 	if(startnum <= 0)
@@ -318,7 +349,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL)
-		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	if(!check_user_read_perm_x(ui, b))
 		return api_error(p, req, res, API_RT_FBDNUSER);
 	int mode = 0, startnum = 0, count = 0;
@@ -343,7 +374,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	int fsize = file_size(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize)
-		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	MMAP_TRY
 	{
 		data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
@@ -351,7 +382,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		if((void *) -1 == data)
 		{
 			MMAP_UNTRY;
-			return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 		}
 		total = fsize / sizeof(struct fileheader);
 		if(0 == mode)
@@ -425,7 +456,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		;
 	}
 	MMAP_END munmap(data, fsize);
-	return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+	return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 }
 
 static int api_article_list_thread(ONION_FUNC_PROTO_STR)
@@ -459,7 +490,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL)
-		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	if(!check_user_read_perm_x(ui, b))
 		return api_error(p, req, res, API_RT_FBDNUSER);
 
@@ -477,7 +508,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	int fsize = file_size(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize)
-		return api_error(p, req, res, API_RT_WRONG_BOARD_NAME);
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	MMAP_TRY
 	{
 		data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
@@ -485,7 +516,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		if((void *) -1 == data)
 		{
 			MMAP_UNTRY;
-			return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 		}
 		total = fsize / sizeof(struct fileheader);
 		total_article = 0;
@@ -557,9 +588,128 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		;
 	}
 	MMAP_END munmap(data, fsize);
-	return api_error(p, req, res, API_RT_FAIL_TO_GET_BOARD);
+	return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 }
 
+static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
+{
+	const char * bname = onion_request_get_query(req, "board");
+	const char * aid_str = onion_request_get_query(req, "aid");
+
+	if(!bname || !aid_str) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	struct boardmem *bmem = getboardbyname(bname);
+	if(!bmem)
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
+
+	int aid = atoi(aid_str);
+
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	if(check_user_session(ue, sessid, appkey) != API_RT_SUCCESSFUL) {
+		free(ue);
+		userid = "guest";	// session 不合法的情况下，userid 和 ue 转为 guest
+		ue = getuser(userid);
+	}
+
+	int uent_index = get_user_utmp_index(sessid);
+	struct user_info *ui = (strcasecmp(userid, "guest")==0) ?
+			NULL : &(shm_utmp->uinfo[uent_index]);
+	if(!check_user_read_perm_x(ui, bmem)) {
+		free(ue);
+		return api_error(p, req, res, API_RT_NOBRDRPERM);
+	}
+
+	// 删除回复提醒
+	if(is_post_in_notification(ue->userid, bname, aid))
+		del_post_notification(ue->userid, bname, aid);
+
+	int total = bmem->total;
+	if(total<=0) {
+		free(ue);
+		return api_error(p, req, res, API_RT_EMPTYBRD);
+	}
+
+	char dir_file[80], filename[80];
+	struct fileheader *fh = NULL;
+	sprintf(filename, "M.%d.A", aid);
+	sprintf(dir_file, "boards/%s/.DIR", bname);
+
+	struct mmapfile mf = { ptr:NULL };
+	if(mmapfile(dir_file, &mf) == -1) {
+		free(ue);
+		return api_error(p, req, res, API_RT_EMPTYBRD);
+	}
+
+	const char * num_str = onion_request_get_query(req, "num");
+	int num = (num_str == NULL) ? -1 : (atoi(num_str)-1);
+	fh = findbarticle(&mf, aid, &num, 1);
+	if(fh == NULL) {
+		mmapfile(NULL, &mf);
+		free(ue);
+		return api_error(p, req, res, API_RT_NOSUCHATCL);
+	}
+
+	if(fh->owner[0] == '-') {
+		mmapfile(NULL, &mf);
+		free(ue);
+		return api_error(p, req, res, API_RT_ATCLDELETED);
+	}
+
+	char title_utf8[180];
+	memset(title_utf8, 0, 180);
+	g2u(fh->title, strlen(fh->title), title_utf8, 180);
+
+	struct attach_link *attach_link_list=NULL;
+	char * article_content_utf8 = parse_article(bmem->header.filename,
+			filename, mode, &attach_link_list);
+
+	char * article_json_str = (char *)malloc(strlen(article_content_utf8) + 512);
+	memset(article_json_str, 0, strlen(article_content_utf8) + 512);
+	int curr_permission = !strncmp(ui->userid, fh->owner, IDLEN+1);
+	sprintf(article_json_str, "{\"errcode\":0, \"attach\":[], "
+			"\"can_edit\":%d, \"can_delete\":%d, \"can_reply\":%d, "
+			"\"board\":\"%s\", \"author\":\"%s\", \"thread\":%d, \"num\":%d}",
+			curr_permission, curr_permission,
+			!(fh->accessed & FH_NOREPLY), bmem->header.filename,
+			fh2owner(fh), fh->thread, num);
+
+	struct json_object * jp = json_tokener_parse(article_json_str);
+	json_object_object_add(jp, "content", json_object_new_string(article_content_utf8));
+	if(attach_link_list) {
+		struct json_object * attach_array = json_object_object_get(jp, "attach");
+		char at_buf[320];
+		struct attach_link * alp = attach_link_list;
+		while(alp) {
+			memset(at_buf, 0, 320);
+			sprintf(at_buf, "{\"link\":\"%s\", \"size\":%d}", alp->link, alp->size);
+			json_object_array_add(attach_array, json_tokener_parse(at_buf));
+			alp=alp->next;
+		}
+	}
+
+	char * api_output = strdup(json_object_to_json_string(jp));
+
+	free(ue);
+	mmapfile(NULL, &mf);
+	free(article_content_utf8);
+	free(article_json_str);
+	json_object_put(jp);
+	free_attach_link_list(attach_link_list);
+
+	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	onion_response_write0(res, api_output);
+	free(api_output);
+	return OCS_PROCESSED;
+}
 
 static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count)
 {
@@ -663,3 +813,38 @@ static int get_number_of_articles_in_thread(char *board, int thread)
 	MMAP_END mmapfile(NULL, &mf);
 	return 0;
 }
+
+static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *num, int mode)
+{
+	struct fileheader *ptr;
+	int total = mf->size / sizeof(struct fileheader);
+	if(total == 0)
+		return NULL;
+
+	if(*num >= total)
+		*num = total;
+	if(*num < 0) {
+		*num = Search_Bin(mf->ptr, filetime, 0, total - 1);
+		if(*num >= 0) {
+			ptr = (struct fileheader *)(mf->ptr + *num * sizeof(struct fileheader));
+			return ptr;
+		}
+		return NULL;
+	}
+
+	ptr = (struct fileheader *)(mf->ptr + *num * sizeof(struct fileheader ));
+	int i;
+	for(i = (*num); i>=0; i--) {
+		if(mode && ptr->filetime < filetime)
+			return NULL;
+
+		if(ptr->filetime == filetime) {
+			*num = i;
+			return ptr;
+		}
+		ptr--;
+	}
+
+	return NULL;
+}
+
