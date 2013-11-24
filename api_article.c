@@ -60,6 +60,38 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR);
  */
 static int api_article_list_thread(ONION_FUNC_PROTO_STR);
 
+enum API_POST_TYPE {
+	API_POST_TYPE_POST,		///< 发帖模式
+	API_POST_TYPE_REPLY		///< 回帖模式
+};
+
+/**
+ * @brief 实际处理发文的接口。
+ * 使用 api_article_post 和 api_article_reply 封装。
+ * @param mode 参见 API_POST_TYPE
+ * @return
+ */
+static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode);
+
+/**
+ * @brief 实际处理发文的函数。
+ * 该函数来自 nju09。
+ * @param board 版面名称
+ * @param title 文章标题
+ * @param filename 位于 bbstmpfs 中的文章内容
+ * @param id 用于显示的作者 id
+ * @param nickname 作者昵称
+ * @param ip 来自 ip
+ * @param sig 选用的签名档数字
+ * @param mark fileheader 的标记
+ * @param outgoing 是否转信
+ * @param realauthor 实际的作者 id
+ * @param thread 主题编号
+ * @return 返回文件名中实际使用的时间戳
+ */
+static int do_article_post(char *board, char *title, char *filename, char *id,
+		char *nickname, char *ip, int sig, int mark,
+		int outgoing, char *realauthor, int thread);
 
 /**
  * @brief 通过版面名，文章ID，查找对应主题ID
@@ -723,6 +755,218 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	return OCS_PROCESSED;
 }
 
+int api_article_post(ONION_FUNC_PROTO_STR)
+{
+	return api_article_do_post(p, req, res, API_POST_TYPE_POST);
+}
+
+int api_article_reply(ONION_FUNC_PROTO_STR)
+{
+	return api_article_do_post(p, req, res, API_POST_TYPE_REPLY);
+}
+
+static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
+{
+	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	const char * board = onion_request_get_query(req, "board");
+	const char * title = onion_request_get_query(req, "title");
+	const char * ref_str = onion_request_get_query(req, "ref"); // 回复的文章时间
+	const char * rid_str = onion_request_get_query(req, "rid");	// 回复的文章编号
+	const char * th_str = onion_request_get_query(req, "th");	// 回复的主题
+
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+	const char * token  = onion_request_get_query(req, "token");
+
+	if(!board || !title || !userid || !sessid || !appkey || !token)
+		return api_error(req, API_RT_WRONGPARAM);
+
+	if(mode==API_POST_TYPE_REPLY && (!ref_str || !rid_str || !th_str))
+		return api_error(req, API_RT_WRONGPARAM);
+
+	if(title[0]==0)
+		return api_error(p, req, res, API_RT_ATCLNOTITLE);
+
+	struct userec *ue = getuser(userid);
+	if(ue==NULL)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	if(check_user_session(ue, sessid, appkey) != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, API_RT_WRONGSESS);
+	}
+
+	const char * fromhost = onion_request_get_client_description(req);
+
+	struct boardmem * bmem = getboardbyname(board);
+	if(bmem==NULL) {
+		free(ue);
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
+	}
+
+	int thread = -1;
+	int mark;
+	char noti_userid[14] = { '\0' };
+	if(API_POST_TYPE_REPLY) { // 已通过参数校验
+		char dir[80];
+		sprintf(dir, "boards/%s/.DIR", bmem->header.filename);
+		int ref = atoi(ref_str);
+		int rid = atoi(rid_str);
+
+		struct mmapfile mf = { ptr:NULL };
+		if(mmapfile(dir, &mf) == -1) {
+			free(ue);
+			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
+		}
+
+		struct fileheader *x = findbarticle(&mf, ref, &rid, 1);
+
+		if(x->accessed & FH_NOREPLY) {
+			mmapfile(NULL, &mf);
+			free(ue);
+			return api_error(p, req, res, API_RT_ATCLFBDREPLY);
+		}
+
+		if(x && (x->accessed & FH_ALLREPLY)) {
+			mark |= FH_ALLREPLY;
+		}
+
+		if(x) {
+			thread = x->thread;
+			if(strchr(x->owner, '.') == NULL) {
+				if(x->owner == 0) {
+					memcpy(noti_userid, &x->owner[1], IDLEN);
+				} else {
+					memcpy(noti_userid, x->owner, IDLEN);
+				}
+			}
+		} else {
+			thread = -1;
+		}
+
+		mmapfile(NULL, &mf);
+	}
+
+	int uent_index = get_user_utmp_index(sessid);
+	struct user_info *ui = &(shm_utmp->uinfo[uent_index]);
+
+	if(!check_user_post_perm_x(ui, bmem)) {
+		free(ue);
+		return api_error(p, req, res, API_RT_NOBRDPPERM);
+	}
+
+	if(strcmp(ui->token, token) !=0 ) {
+		free(ue);
+		return api_error(p, req, res, API_RT_WRONGTOKEN);
+	}
+
+	if(!strcasecmp(ue->userid, "guest") && seek_in_file(MY_BBS_HOME "/etc/guestbanip", fromhost)) {
+		free(ue);
+		return api_error(p, req, res, API_RT_FBDGSTPIP);
+	}
+
+	const onion_block * http_req_body = onion_request_get_data(req);
+	const char *data = onion_block_data(http_req_body);
+
+	char filename[80];
+	sprintf(filename, "bbstmpfs/tmp/%s_%s.tmp", ue->userid, appkey); // line:141
+
+	char * data_gbk = (char *)malloc(strlen(data)*2);
+	memset(data_gbk, 0, strlen(data)*2);
+	u2g(data, strlen(data), data_gbk, strlen(data)*2);
+
+	while(strstr(data_gbk, "[ESC]")!=NULL)
+		data_gbk = string_replace(data_gbk, "[ESC]", "\033");
+
+	f_write(filename, data_gbk);
+// 	TODO: free(data_gbk);
+
+	int is_anony = strlen(onion_request_get_query(req, "anony"));
+	int is_norep = strlen(onion_request_get_query(req, "norep"));
+	if(is_norep)
+		mark |= FH_NOREPLY;
+
+	if(is_anony && (bmem->header.flag & ANONY_FLAG))
+		is_anony = 1;
+	else
+		is_anony = 0;
+
+	int is_1984 = (bmem->header.flag & IS1984_FLAG) ? 1 : 0;
+
+	char * title_gbk = (char *)malloc(strlen(title)*2);
+	memset(title_gbk, 0, strlen(title)*2);
+	u2g(title, strlen(title), title_gbk, strlen(title)*2);
+	int i;
+	for(i=0;i<strlen(title_gbk);++i) {
+		if(title_gbk[i]<=27 && title_gbk[i]>=-1)
+			title_gbk[i] = ' ';
+	}
+	i = strlen(title_gbk) - 1;
+	while(i>0 && isspace(title_gbk[i]))
+		title_gbk[i--] = 0;
+
+	// TODO: 处理签名档
+
+	// TODO: 缺少 nju09/bbssnd.c:143 有关报警的逻辑
+
+	//if(insertattachments(filename, data_gbk, ue->userid))
+		//mark = mark | FH_ATTACHED;
+
+	int r;
+	if(is_anony) {
+		r = do_article_post(bmem->header.filename, title_gbk, filename, "Anonymous",
+				"我是匿名天使", "匿名天使的家", 0, mark,
+				0, ui->userid, thread);
+	} else {
+		r = do_article_post(bmem->header.filename, title_gbk, filename, ui->userid,
+				ui->username, fromhost, 0, mark,
+				0, ui->userid, thread);
+	}
+
+	if(r<=0) {
+		free(ue);
+		free(title_gbk);
+		free(data_gbk);
+		unlink(filename);
+		api_error(p, req, res, API_RT_ATCLINNERR);
+	}
+
+	// TODO: 更新未读标记
+	//brc_initial
+
+	unlink(filename);
+
+	char buf[256];
+	sprintf(buf, "%s post %s %s", ui->userid, bmem->header.filename, title_gbk);
+	newtrace(buf);
+
+	if(bmem->header.clubnum == 0 && !junkboard(bmem->header.filename)) {
+		ue->numposts++;
+		save_user_data(ue);
+	}
+
+	//回帖提醒
+	if(API_POST_TYPE_REPLY && !strcmp(ue->userid, noti_userid)) {
+		add_post_notification(noti_userid, (is_anony) ? "Anonymous" : ue->userid,
+				bmem->header.filename, r, title_gbk);
+	}
+
+	free(ue);
+	free(title_gbk);
+	free(data_gbk);
+	getrandomstr_r(ui->token, TOKENLENGTH+1);
+	memset(ui->from, 0, 20);
+	strncpy(ui->from, fromhost, 20);
+	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	onion_response_write(res, "{ \"errcode\":0, \"aid\":%d, \"token\":\"%s\" }",
+			r, ui->token);
+
+	return OCS_NOT_IMPLEMENTED;
+}
+
 static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count)
 {
 	char buf[512];
@@ -735,13 +979,16 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
 	for(i=0; i<count; ++i) {
 		p = &(ba_list[i]);
 		memset(buf, 0, 512);
-		sprintf(buf, "{ \"type\":%d, \"board\":\"%s\", \"aid\":%d, \"tid\":%d, "
-				"\"title\":\"%s\", \"author\":\"%s\", \"th_num\":%d, \"mark\":%d }",
-				p->type, p->board, p->filetime, p->thread,
-				p->title, p->author, p->th_num, p->mark);
+		sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
+				"\"th_num\":%d, \"mark\":%d }",
+				p->type, p->filetime, p->thread, p->th_num, p->mark);
 		jp = json_tokener_parse(buf);
-		if(jp)
+		if(jp) {
+			json_object_object_add(jp, "board", json_object_new_string(p->board));
+			json_object_object_add(jp, "title", json_object_new_string(p->title));
+			json_object_object_add(jp, "author", json_object_new_string(p->author));
 			json_object_array_add(json_array, jp);
+		}
 	}
 
 	char *r = strdup(json_object_to_json_string(obj));
@@ -844,7 +1091,7 @@ static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *
 		return NULL;
 	}
 
-	ptr = (struct fileheader *)(mf->ptr + *num * sizeof(struct fileheader ));
+	ptr = (struct fileheader *)(mf->ptr + *num * sizeof(struct fileheader));
 	int i;
 	for(i = (*num); i>=0; i--) {
 		if(mode && ptr->filetime < filetime)
@@ -858,4 +1105,78 @@ static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *
 	}
 
 	return NULL;
+}
+
+static int do_post_article(char *board, char *title, char *filename, char *id,
+		char *nickname, char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
+{
+	FILE *fp, *fp2;
+	char buf3[1024];
+	struct fileheader header;
+	memset(&header, 0, sizeof(header));
+	int t;
+
+	if(strcasecmp(id, "Anonymous") != 0)
+		fh_setowner(&header, id, 0);
+	else
+		fh_setowner(&header, realauthor, 1);
+
+	sprintf(buf3, "boards/%s/", board);
+
+	time_t now_t = time(NULL);
+	t = trycreatefile(buf3, "M.%d.A", now_t, 100);
+	if(t<0)
+		return -1;
+
+	header.filetime = t;
+	strsncpy(header.title, title, sizeof(header.title));
+	header.accessed |= mark;
+
+	if(outgoing)
+		header.accessed |= FH_INND;
+
+	fp = fopn(buf3, "w");
+	if(NULL == fp)
+		return -1;
+	fprintf(fp,
+			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: %s (%24.24s), %s)\n\n",
+			id, nickname, board, title, MY_BBS_NAME, Ctime(now_t),
+			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
+
+	fp2 = open(filename, "r");
+	if(fp2!=0) {
+		while(1) {  // 将 bbstmpfs 中文章主体的内容写到实际文件中
+			int retv = fread(buf3, 1, sizeof(buf3), fp2);
+			if(retv<=0)
+				break;
+			fwrite(buf3, 1, retv, fp);
+		}
+
+		fclose(fp2);
+	}
+
+	// TODO: QMD
+	// fprintf(fp, "\n--\n");
+	// sig_append
+
+	fprintf(fp, "\033[1;%dm※ 来源:．%s %s [FROM: %.20s]\033[m\n",
+			31+rand()%7, MY_BBS_NAME, "API", ip);
+
+	fclose(fp);
+
+	sprintf(buf3, "boards/%s/M.%d.A", board, t);
+	header.sizebyte = numbyte(eff_size(buf3));
+
+	if(thread == -1)
+		header.thread = header.filetime;
+	else
+		header.thread = thread;
+
+	sprintf(buf3, "boards/%s/.DIR", board);
+	append_record(buf3, &header, sizeof(header));
+
+	//if(outgoing)
+
+	updatelastpost(board);  //TODO:
+	return t;
 }
