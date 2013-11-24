@@ -738,3 +738,25 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 	if ((fc!=-1) || (bc!=-1) || (ul!=0) || (bo!=0) || (bl!=0))
 		fprintf(out_stream, "</span>\n");
 }
+
+int f_write(char *filename, char *buf)
+{
+	FILE *fp;
+	fp = fopen(filename, "w");
+	if (fp == 0)
+		return -1;
+	fputs(buf, fp);
+	fclose(fp);
+	return 0;
+}
+
+int f_append(char *filename, char *buf)
+{
+	FILE *fp;
+	fp = fopen(filename, "a");
+	if (fp == 0)
+		return -1;
+	fputs(buf, fp);
+	fclose(fp);
+	return 0;
+}

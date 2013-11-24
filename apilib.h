@@ -113,9 +113,37 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size);
 
 /**
- * @ 释放附件链表
+ * @brief 释放附件链表
  * @param attach_link_list
  */
 void free_attach_link_list(struct attach_link *attach_link_list);
+
+/**
+ * @brief 将字符串写入指定的文件中。
+ * 该方法来自 nju09。
+ * @param filename 文件名
+ * @param buf 字符串
+ * @return 成功返回 0，失败返回 -1。
+ */
+int f_write(char *filename, char *buf);
+
+/**
+ * @brief 将字符串追加到指定的文件中。
+ * 该方法来自 nju09。
+ * @param filename 文件名
+ * @param buf 字符串
+ * @return 成功返回 0，失败返回 -1。
+ */
+int f_append(char *filename, char *buf);
+
+/**
+ * @brief 向指定的文件中追加记录。
+ * 该方法来自 nju09。
+ * @param filename 文件名
+ * @param record 需要存放的记录
+ * @param size 需要存放的记录长度
+ * @return
+ */
+int append_record(char *filename, void *record, int size);
 
 #endif
