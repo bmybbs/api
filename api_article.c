@@ -357,14 +357,14 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	const char * str_btype    = onion_request_get_query(req, "btype");
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
-	const char * userid   = onion_request_get_query(req, "usereid");
+	const char * userid   = onion_request_get_query(req, "userid");
 	const char * appkey   = onion_request_get_query(req, "appkey");
 	const char * sessid   = onion_request_get_query(req, "sessid");
 	//判断必要参数
 	if(!(board && str_btype && userid && appkey && sessid))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
-	if(strlen(sessid) != 32)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
+	//if(strlen(sessid) != 32)
+	//	return api_error(p, req, res, API_RT_WRONGPARAM);
 	//TODO: 签名检查
 	//...
 	//判断版面访问权
@@ -376,6 +376,8 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		free(ue);
 		return api_error(p, req, res, r);
 	}
+	if(ue != NULL)
+		free(ue);
 	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL) {
@@ -398,7 +400,6 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		mode = 1;
 	else
 		mode = 0;
-
 	int fd = 0;
 	struct bmy_article board_list[count];
 	memset(board_list, 0, sizeof(board_list[0]) * count);
@@ -475,7 +476,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		
 			strcpy(board_list[num].board, board);
 			strcpy(board_list[num].author, data[i].owner);
-			g2u(data[i].title, strlen(data[i].title), board_list[count].title, 80);
+			g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
 			++num;
 			if(num >= count)
 				break;
@@ -506,14 +507,14 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	const char * str_thread   = onion_request_get_query(req, "thread");
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
-	const char * userid   = onion_request_get_query(req, "usereid");
+	const char * userid   = onion_request_get_query(req, "userid");
 	const char * appkey   = onion_request_get_query(req, "appkey");
 	const char * sessid   = onion_request_get_query(req, "sessid");
 	//判断必要参数
 	if(!(board && str_thread && userid && appkey && sessid))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	int thread = atoi(str_thread);
-	if(strlen(sessid) != 32 || thread == 0)
+	if(thread == 0)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	//TODO: 签名检查
 	//...
@@ -526,6 +527,8 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		free(ue);
 		return api_error(p, req, res, r);
 	}
+	if(ue != NULL)
+		free(ue);
 	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL)
@@ -609,7 +612,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		
 			strcpy(board_list[num].board, board);
 			strcpy(board_list[num].author, data[i].owner);
-			g2u(data[i].title, strlen(data[i].title), board_list[count].title, 80);
+			g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
 			++num;
 			if(num >= count)
 				break;
@@ -782,10 +785,10 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	const char * token  = onion_request_get_query(req, "token");
 
 	if(!board || !title || !userid || !sessid || !appkey || !token)
-		return api_error(req, API_RT_WRONGPARAM);
+		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	if(mode==API_POST_TYPE_REPLY && (!ref_str || !rid_str || !th_str))
-		return api_error(req, API_RT_WRONGPARAM);
+		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	if(title[0]==0)
 		return api_error(p, req, res, API_RT_ATCLNOTITLE);
@@ -943,7 +946,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	sprintf(buf, "%s post %s %s", ui->userid, bmem->header.filename, title_gbk);
 	newtrace(buf);
 
-	if(bmem->header.clubnum == 0 && !junkboard(bmem->header.filename)) {
+	if(bmem->header.clubnum == 0 && !board_is_junkboard(bmem->header.filename)) {
 		ue->numposts++;
 		save_user_data(ue);
 	}
@@ -961,7 +964,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	memset(ui->from, 0, 20);
 	strncpy(ui->from, fromhost, 20);
 	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
-	onion_response_write(res, "{ \"errcode\":0, \"aid\":%d, \"token\":\"%s\" }",
+	onion_response_printf(res, "{ \"errcode\":0, \"aid\":%d, \"token\":\"%s\" }",
 			r, ui->token);
 
 	return OCS_NOT_IMPLEMENTED;
@@ -1107,7 +1110,7 @@ static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *
 	return NULL;
 }
 
-static int do_post_article(char *board, char *title, char *filename, char *id,
+static int do_article_post(char *board, char *title, char *filename, char *id,
 		char *nickname, char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
 {
 	FILE *fp, *fp2;
@@ -1135,7 +1138,7 @@ static int do_post_article(char *board, char *title, char *filename, char *id,
 	if(outgoing)
 		header.accessed |= FH_INND;
 
-	fp = fopn(buf3, "w");
+	fp = fopen(buf3, "w");
 	if(NULL == fp)
 		return -1;
 	fprintf(fp,
@@ -1143,7 +1146,7 @@ static int do_post_article(char *board, char *title, char *filename, char *id,
 			id, nickname, board, title, MY_BBS_NAME, Ctime(now_t),
 			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
 
-	fp2 = open(filename, "r");
+	fp2 = fopen(filename, "r");
 	if(fp2!=0) {
 		while(1) {  // 将 bbstmpfs 中文章主体的内容写到实际文件中
 			int retv = fread(buf3, 1, sizeof(buf3), fp2);
@@ -1177,6 +1180,6 @@ static int do_post_article(char *board, char *title, char *filename, char *id,
 
 	//if(outgoing)
 
-	updatelastpost(board);  //TODO:
+	//updatelastpost(board);  //TODO:
 	return t;
 }
