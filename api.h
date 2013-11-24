@@ -6,6 +6,7 @@
 #include <onion/onion.h>
 #include <onion/dict.h>
 #include <onion/log.h>
+#include <onion/block.h>
 #include <signal.h>
 #include <netdb.h>
 
@@ -24,6 +25,9 @@ int api_article_list(ONION_FUNC_PROTO_STR);
 
 int api_article_getHTMLContent(ONION_FUNC_PROTO_STR);	// 获取 HTML 格式的内容
 int api_article_getRAWContent(ONION_FUNC_PROTO_STR);	// 获取原始内容，'\033' 字符将被转为 "[ESC]" 字符串
+
+int api_article_post(ONION_FUNC_PROTO_STR);				// 发帖接口
+int api_article_reply(ONION_FUNC_PROTO_STR);			// 回帖
 
 int api_board_list(ONION_FUNC_PROTO_STR);
 
