@@ -4,6 +4,6 @@
 		"UserID":"<% UserID %>",
 		"UserNickName":"<% UserNickName %>",
 		"LoginCounts":<% LoginCounts %>,
-		"PostCounts":<% PostCounts %>,
+		"PostCounts":<% PostCounts %>
 	}
 }
