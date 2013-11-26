@@ -811,7 +811,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	int thread = -1;
-	int mark;
+	int mark=0;
 	char noti_userid[14] = { '\0' };
 	if(mode == API_POST_TYPE_REPLY) { // 已通过参数校验
 		char dir[80];
@@ -878,15 +878,12 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	char filename[80];
 	sprintf(filename, "bbstmpfs/tmp/%s_%s.tmp", ue->userid, appkey); // line:141
 
-	char * data_gbk = (char *)malloc(strlen(data)*2);
-	memset(data_gbk, 0, strlen(data)*2);
-	u2g(data, strlen(data), data_gbk, strlen(data)*2);
+	char *data2 = strdup(data);
+	while(strstr(data2, "[ESC]")!=NULL)
+		data2 = string_replace(data2, "[ESC]", "\033");
 
-	while(strstr(data_gbk, "[ESC]")!=NULL)
-		data_gbk = string_replace(data_gbk, "[ESC]", "\033");
-
-	f_write(filename, data_gbk);
-// 	TODO: free(data_gbk);
+	f_write(filename, data2);
+	free(data2);
 
 	int is_anony = (onion_request_get_query(req, "anony")==NULL) ? 0 : 1;
 	int is_norep = (onion_request_get_query(req, "norep")==NULL) ? 0 : 1;
@@ -933,7 +930,6 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	if(r<=0) {
 		free(ue);
 		free(title_gbk);
-		free(data_gbk);
 		unlink(filename);
 		api_error(p, req, res, API_RT_ATCLINNERR);
 	}
@@ -960,7 +956,6 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	free(ue);
 	free(title_gbk);
-	free(data_gbk);
 	getrandomstr_r(ui->token, TOKENLENGTH+1);
 	memset(ui->from, 0, 20);
 	strncpy(ui->from, fromhost, 20);
@@ -1114,8 +1109,9 @@ static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *
 static int do_article_post(char *board, char *title, char *filename, char *id,
 		char *nickname, char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
 {
-	FILE *fp, *fp2;
-	char buf3[1024];
+	FILE *fp, *fp1, *fp2;
+	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_utf8;
+	size_t content_utf8_buf_len;
 	struct fileheader header;
 	memset(&header, 0, sizeof(header));
 	int t;
@@ -1139,17 +1135,22 @@ static int do_article_post(char *board, char *title, char *filename, char *id,
 	if(outgoing)
 		header.accessed |= FH_INND;
 
-	fp = fopen(buf3, "w");
-	if(NULL == fp)
+	fp1 = fopen(buf3, "w");
+	if(NULL == fp1)
 		return -1;
-	fprintf(fp,
-			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: %s (%24.24s), %s)\n\n",
-			id, nickname, board, title, MY_BBS_NAME, Ctime(now_t),
-			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
+	title_utf8 = (char *)malloc(strlen(title)*2);
+	memset(title_utf8, 0, strlen(title)*2);
+	g2u(title, strlen(title), title_utf8, strlen(title)*2);
 
+	fp = open_memstream(&content_utf8_buf, &content_utf8_buf_len);
+	fprintf(fp,
+			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n",
+			id, nickname, board, title_utf8, Ctime(now_t),
+			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
+	free(title_utf8);
 	fp2 = fopen(filename, "r");
 	if(fp2!=0) {
-		while(1) {  // 将 bbstmpfs 中文章主体的内容写到实际文件中
+		while(1) {  // 将 bbstmpfs 中文章主体的内容写到 content_utf8_buf 中
 			int retv = fread(buf3, 1, sizeof(buf3), fp2);
 			if(retv<=0)
 				break;
@@ -1160,13 +1161,20 @@ static int do_article_post(char *board, char *title, char *filename, char *id,
 	}
 
 	// TODO: QMD
-	// fprintf(fp, "\n--\n");
+	fprintf(fp, "\n--\n");
 	// sig_append
 
-	fprintf(fp, "\033[1;%dm※ 来源:．%s %s [FROM: %.20s]\033[m\n",
-			31+rand()%7, MY_BBS_NAME, "API", ip);
+	fprintf(fp, "\033[1;%dm※ 来源:．兵马俑BBS %s [FROM: %.20s]\033[0m\n",
+			31+rand()%7, MY_BBS_DOMAIN " API", ip);
 
+	fflush(fp);
 	fclose(fp);
+
+	content_gbk_buf = (char *)malloc(content_utf8_buf_len *2);
+	memset(content_gbk_buf, 0, content_utf8_buf_len *2);
+	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len*2);
+	fprintf(fp1, "%s", content_gbk_buf);
+	fclose(fp1);
 
 	sprintf(buf3, "boards/%s/M.%d.A", board, t);
 	header.sizebyte = numbyte(eff_size(buf3));
