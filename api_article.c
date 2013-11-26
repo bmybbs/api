@@ -293,7 +293,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	xmlXPathFreeContext(ctx);
 	xmlFreeDoc(doc);
 
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_write0(res, s);
 
 	free(s);
@@ -345,7 +345,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	}
 	fclose(fp);
 	char *s = bmy_article_array_to_json_string(commend_list, count);
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
 	return OCS_PROCESSED;
@@ -486,7 +486,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 		}
 		char *s = bmy_article_array_to_json_string(board_list, num);
-		onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+		api_set_json_header(res);
 		onion_response_write0(res, s);
 		free(ue);
 		free(s);
@@ -623,7 +623,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 		}
 		char *s = bmy_article_array_to_json_string(board_list, num);
-		onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+		api_set_json_header(res);
 		onion_response_write0(res, s);
 		free(ue);
 		free(s);
@@ -752,7 +752,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	json_object_put(jp);
 	free_attach_link_list(attach_link_list);
 
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_write0(res, api_output);
 	free(api_output);
 	return OCS_PROCESSED;
@@ -964,7 +964,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	getrandomstr_r(ui->token, TOKENLENGTH+1);
 	memset(ui->from, 0, 20);
 	strncpy(ui->from, fromhost, 20);
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_printf(res, "{ \"errcode\":0, \"aid\":%d, \"token\":\"%s\" }",
 			r, ui->token);
 

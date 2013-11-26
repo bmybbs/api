@@ -136,7 +136,7 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 	}
 
 	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ui);
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(ue);
 	free(s);
@@ -194,7 +194,7 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 		count++;
 	}
 	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ui);
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(ue);
 	free(s);

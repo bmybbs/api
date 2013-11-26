@@ -31,4 +31,14 @@ int api_article_reply(ONION_FUNC_PROTO_STR);			// 回帖
 
 int api_board_list(ONION_FUNC_PROTO_STR);
 
+/**
+ * @brief 为 onion_response 添加 json 的 MIME 信息
+ * @param res
+ * @return
+ */
+static inline void api_set_json_header(onion_response *res)
+{
+	onion_response_set_header(res, "Content-Type", "application/json; charset=utf-8");
+}
+
 #endif

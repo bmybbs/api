@@ -102,7 +102,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 			shm_utmp->uinfo[utmp_index-1].sessionid);
 	api_template_set(&tpl, "Token", shm_utmp->uinfo[utmp_index-1].token);
 
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_write0(res, tpl);
 
 	api_template_free(tpl);
@@ -139,7 +139,7 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 	api_template_set(&tpl, "LoginCounts", "%d", ue->numlogins);
 	api_template_set(&tpl, "PostCounts", "%d", ue->numposts);
 
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_write0(res, tpl);
 
 	api_template_free(tpl);
@@ -222,7 +222,7 @@ int api_user_check_session(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	onion_response_set_header(res, "Content-type", "application/json; charset=utf-8");
+	api_set_json_header(res);
 	onion_response_write0(res, "{\"errcode\":0}");
 	free(ue);
 
