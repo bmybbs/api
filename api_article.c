@@ -813,7 +813,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	int thread = -1;
 	int mark;
 	char noti_userid[14] = { '\0' };
-	if(API_POST_TYPE_REPLY) { // 已通过参数校验
+	if(mode == API_POST_TYPE_REPLY) { // 已通过参数校验
 		char dir[80];
 		sprintf(dir, "boards/%s/.DIR", bmem->header.filename);
 		int ref = atoi(ref_str);
@@ -871,8 +871,9 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_FBDGSTPIP);
 	}
 
-	const onion_block * http_req_body = onion_request_get_data(req);
-	const char *data = onion_block_data(http_req_body);
+	const char *data = onion_request_get_post(req, "content");
+	if(data==NULL)
+		data = " ";
 
 	char filename[80];
 	sprintf(filename, "bbstmpfs/tmp/%s_%s.tmp", ue->userid, appkey); // line:141
@@ -887,8 +888,8 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	f_write(filename, data_gbk);
 // 	TODO: free(data_gbk);
 
-	int is_anony = strlen(onion_request_get_query(req, "anony"));
-	int is_norep = strlen(onion_request_get_query(req, "norep"));
+	int is_anony = (onion_request_get_query(req, "anony")==NULL) ? 0 : 1;
+	int is_norep = (onion_request_get_query(req, "norep")==NULL) ? 0 : 1;
 	if(is_norep)
 		mark |= FH_NOREPLY;
 
@@ -952,7 +953,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	//回帖提醒
-	if(API_POST_TYPE_REPLY && !strcmp(ue->userid, noti_userid)) {
+	if(mode==API_POST_TYPE_REPLY && !strcmp(ue->userid, noti_userid)) {
 		add_post_notification(noti_userid, (is_anony) ? "Anonymous" : ue->userid,
 				bmem->header.filename, r, title_gbk);
 	}
