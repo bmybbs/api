@@ -381,11 +381,9 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL) {
-		free(ue);
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	}
 	if(!check_user_read_perm_x(ui, b)) {
-		free(ue);
 		return api_error(p, req, res, API_RT_NOBRDRPERM);
 	}
 
@@ -411,7 +409,6 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	int fsize = file_size(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
-		free(ue);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 	MMAP_TRY
@@ -421,7 +418,6 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		if((void *) -1 == data)
 		{
 			MMAP_UNTRY;
-			free(ue);
 			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 		}
 		total = fsize / sizeof(struct fileheader);
@@ -488,7 +484,6 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		char *s = bmy_article_array_to_json_string(board_list, num);
 		api_set_json_header(res);
 		onion_response_write0(res, s);
-		free(ue);
 		free(s);
 		return OCS_PROCESSED;	
 	}
@@ -497,7 +492,6 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		;
 	}
 	MMAP_END munmap(data, fsize);
-	free(ue);
 	return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 }
 
@@ -550,7 +544,6 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	int fsize = file_size(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
-		free(ue);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 	MMAP_TRY
@@ -560,7 +553,6 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		if((void *) -1 == data)
 		{
 			MMAP_UNTRY;
-			free(ue);
 			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 		}
 		total = fsize / sizeof(struct fileheader);
@@ -625,7 +617,6 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		char *s = bmy_article_array_to_json_string(board_list, num);
 		api_set_json_header(res);
 		onion_response_write0(res, s);
-		free(ue);
 		free(s);
 		return OCS_PROCESSED;	
 	}
@@ -634,7 +625,6 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		;
 	}
 	MMAP_END munmap(data, fsize);
-	free(ue);
 	return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 }
 
