@@ -94,13 +94,13 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	newtrace(buf);
 
 	api_template_t tpl = api_template_create("templates/api_user_login.json");
-	api_template_set(&tpl, "UserID", ue->userid);
-	api_template_set(&tpl, "SessionID", "%c%c%c%s",
+	api_template_set(&tpl, "userid", ue->userid);
+	api_template_set(&tpl, "sessid", "%c%c%c%s",
 			(utmp_index-1) / 26 / 26 + 'A',
 			(utmp_index-1) / 26 % 26 + 'A',
 			(utmp_index-1) % 26 + 'A',
 			shm_utmp->uinfo[utmp_index-1].sessionid);
-	api_template_set(&tpl, "Token", shm_utmp->uinfo[utmp_index-1].token);
+	api_template_set(&tpl, "token", shm_utmp->uinfo[utmp_index-1].token);
 
 	api_set_json_header(res);
 	onion_response_write0(res, tpl);
