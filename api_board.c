@@ -85,6 +85,131 @@ int api_board_list(ONION_FUNC_PROTO_STR)
 		return api_board_list_sec(p, req, res);
 }
 
+int api_board_info(ONION_FUNC_PROTO_STR)
+{
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+	const char * bname  = onion_request_get_query(req, "bname");
+
+	if(!userid || !sessid || !appkey || !bname)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	struct boardmem *bmem = getboardbyname(bname);
+	if(!bmem)
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	free(ue);
+
+	int uent_index = get_user_utmp_index(sessid);
+	struct user_info *ui = &(shm_utmp->uinfo[uent_index]);
+
+	if(!check_user_read_perm_x(ui, bmem))
+		return api_error(p, req, res, API_RT_NOBRDRPERM);
+
+	char buf[512];
+	char zh_name[80];//, type[16], keyword[128];
+	g2u(bmem->header.title, 24, zh_name, 80);
+	//g2u(bmem->header.keyword, 64, keyword, 128);
+	//g2u(bmem->header.type, 5, type, 16);
+
+	int today_num=0, i;
+	struct tm tm;
+	time_t now_t = time(NULL);
+	gmtime_r(now_t, &tm);
+	time_t day_begin = get_time_of_the_biginning_of_the_day(&tm);
+	char filename[256];
+
+	sprintf(filename, "boards/%s/.DIR", bmem->header.filename);
+	int fsize = file_size(filename);
+	int fd = open(filename, O_RDONLY);
+	if(fd==0 || fsize==0)
+		today_num = 0;
+	else {
+		struct fileheader *data = (struct fileheader*)mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
+		close(fd);
+		if(data == MAP_FAILED)
+			today_num = 0;
+		else {
+			for(i=fsize/sizeof(struct fileheader)-1; data[i].filetime>day_begin; i--)
+				today_num++;
+
+			munmap(data, fsize);
+		}
+	}
+
+	memset(filename, 0, 512);
+	sethomefile(filename, ui->userid, ".goodbrd");
+	sprintf(buf, "{\"errcode\":0, \"bm\":[], \"hot_topic\":[], \"is_fav\":%d,"
+			"\"voting\":%d, \"article_num\":%d, \"score\":%d,"
+			"\"inboard_num\":%d, \"secstr\":\"%s\", \"today_new\":%d}",
+			seek_in_file(filename, bmem->header.filename),
+			(bmem->header.flag & VOTE_FLAG),
+			bmem->total, bmem->score,
+			bmem->inboard, bmem->header.sec1, today_num);
+	struct json_object *jp = json_tokener_parse(buf);
+
+	json_object_object_add(jp, "name", json_object_new_string(bmem->header.filename));
+	json_object_object_add(jp, "zh_name", json_object_new_string(zh_name));
+
+	struct json_object *json_bm_array = json_object_object_get(jp, "bm");
+	for(i=0; i<BMNUM; ++i) {
+		if(bmem->header.bm[i][0] == 0)
+			json_object_array_add(json_bm_array, (struct json_object*)NULL);
+		else
+			json_object_array_add(json_bm_array, json_object_new_string(bmem->header.bm[i]));
+	}
+
+	struct json_object *json_hot_topic_array = json_object_object_get(jp, "hot_topic");
+	memset(filename, 0, 256);
+	sprintf(filename, "boards/%s/TOPN", bmem->header.filename);
+
+	htmlDocPtr doc = htmlParseFile(filename, "GBK");
+	if(doc != NULL) {
+		xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
+		xmlXPathObjectPtr r_link, r_num;
+		r_link = xmlXPathEvalExpression((const xmlChar*)"//tr/td[2]/a", ctx);
+		r_num  = xmlXPathEvalExpression((const xmlChar*)"//tr/td[3]", ctx);
+
+		if(r_link->nodesetval && r_num->nodesetval
+				&& r_link->nodesetval->nodeNr==r_num->nodesetval->nodeNr) {
+			for(i=0; i<r_link->nodesetval->nodeNr; ++i) {
+				char *hot_title, *hot_tid_str, *hot_num_str;
+
+				hot_title = (char *)xmlNodeGetContent(r_link->nodesetval->nodeTab[i]);
+				hot_tid_str = strstr((char *)xmlGetProp(r_link->nodesetval->nodeTab[i], (const xmlChar*)"href"), "th=") + 3;
+				hot_num_str = strstr((char *)xmlNodeGetContent(r_num->nodesetval->nodeTab[i]), ":") + 1;
+
+				memset(buf, 0, 512);
+				sprintf(buf, "{\"tid\":%d, \"num\":%d}", atoi(hot_tid_str), atoi(hot_num_str));
+				struct json_object *hot_item = json_tokener_parse(buf);
+				json_object_object_add(hot_item, "title", json_object_new_string(hot_title));
+				json_object_array_add(json_hot_topic_array, hot_item);
+			}
+		}
+
+		xmlXPathFreeObject(r_link);
+		xmlXPathFreeObject(r_num);
+		xmlXPathFreeContext(ctx);
+		xmlFreeDoc(doc);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(jp));
+	json_object_put(jp);
+	return OCS_PROCESSED;
+}
+
 static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 {
 	const char * userid = onion_request_get_query(req, "userid");

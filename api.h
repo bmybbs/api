@@ -30,6 +30,7 @@ int api_article_post(ONION_FUNC_PROTO_STR);				// 发帖接口
 int api_article_reply(ONION_FUNC_PROTO_STR);			// 回帖
 
 int api_board_list(ONION_FUNC_PROTO_STR);
+int api_board_info(ONION_FUNC_PROTO_STR);
 
 /**
  * @brief 为 onion_response 添加 json 的 MIME 信息
