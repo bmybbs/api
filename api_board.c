@@ -149,7 +149,7 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 		}
 	}
 
-	memset(filename, 0, 512);
+	memset(filename, 0, 256);
 	sethomefile(filename, ui->userid, ".goodbrd");
 	sprintf(buf, "{\"errcode\":0, \"bm\":[], \"hot_topic\":[], \"is_fav\":%d,"
 			"\"voting\":%d, \"article_num\":%d, \"score\":%d,"
