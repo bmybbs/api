@@ -125,8 +125,9 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 
 	int today_num=0, i;
 	struct tm tm;
+	memset(&tm, 0, sizeof(tm));
 	time_t now_t = time(NULL);
-	gmtime_r(now_t, &tm);
+	gmtime_r(&now_t, &tm);
 	time_t day_begin = get_time_of_the_biginning_of_the_day(&tm);
 	char filename[256];
 
