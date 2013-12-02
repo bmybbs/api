@@ -113,36 +113,48 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 int api_user_query(ONION_FUNC_PROTO_STR)
 {
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
-	const char * userid = onion_dict_get(param_dict, "userid");
-
-	if(userid==NULL) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	if(userid[0]=='\0') {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
+	const char * userid = onion_dict_get(param_dict, "userid");	//用户id
+	const char * appkey = onion_request_get_query(req, "appkey");
+	const char * queryid = onion_request_get_query(req, "queryid"); //查询id
+	const char * sessid = onion_request_get_query(req, "sessid");
+	char buf[4096];
 	struct userec *ue;
 
-	ue = getuser(userid);
-	if(ue == 0) {
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	if(!queryid || queryid[0]=='\0') {
+		// 查询自己
+		if(!userid || !appkey || !sessid)
+			return api_error(p, req, res, API_RT_WRONGPARAM);
+
+		ue = getuser(userid);
+		if(ue == 0)
+			return api_error(p, req, res, API_RT_NOSUCHUSER);
+		if(check_user_session(ue, sessid, appkey) != API_RT_SUCCESSFUL) {
+			free(ue);
+			return api_error(p, req, res, API_RT_WRONGSESS);
+		}
+
+		int unread_mail;
+		mail_count(ue->userid, &unread_mail);
+		sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
+				"\"post_counts\":%d, \"unread_mail\":%d, \"unread_notify\":%d,"
+				"\"job\":\"%s\", \"exp\":%d, \"perf\":%d,"
+				"\"exp_level\":\"%s\", \"perf_level\":\"%s\"}",
+				ue->userid, ue->numlogins, ue->numposts, unread_mail,
+				count_notification_num(ue->userid), getuserlevelname(ue->userlevel),
+				countexp(ue), countperf(ue),
+				calc_exp_str_utf8(countexp(ue)), calc_perf_str_utf8(countperf(ue)));
+	} else {
+		// 查询对方id
+		ue = getuser(queryid);
+		if(ue == 0)
+			return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+		sprintf(buf, "{\"errocde\":0, \"userid\":\"%s\", \"login_counts\":%d,"
+				"\"post_counts\":%d, \"job\":\"%s\", \"exp_level\":\"%s\","
+				"\"perf_level\":\"%s\"}", ue->userid, ue->numlogins, ue->numposts,
+				getuserlevelname(ue->userlevel),
+				calc_exp_str_utf8(countexp(ue)), calc_perf_str_utf8(countperf(ue)));
 	}
-
-	int unread_mail;
-	mail_count(ue->userid, &unread_mail);
-
-	char buf[4096];
-	sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
-			"\"post_counts\":%d, \"unread_mail\":%d, \"unread_notify\":%d,"
-			"\"job\":\"%s\", \"exp\":%d, \"perf\":%d,"
-			"\"exp_level\":\"%s\", \"perf_level\":\"%s\"}",
-			ue->userid, ue->numlogins, ue->numposts, unread_mail,
-			count_notification_num(ue->userid),
-			(getuserlevelname(ue->userlevel)==NULL) ? "" : getuserlevelname(ue->userlevel),
-			countexp(ue), countperf(ue),
-			calc_exp_str_utf8(countexp(ue)), calc_perf_str_utf8(countperf(ue)));
 
 	struct json_object *jp = json_tokener_parse(buf);
 	json_object_object_add(jp, "nickname", json_object_new_string(ue->username));

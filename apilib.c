@@ -216,8 +216,10 @@ char * getuserlevelname(unsigned userlevel)
 			return "程序组成员";
 	} else if(userlevel & PERM_ACCOUNTS)
 		return "帐号管理员";
+	else if(userlevel & PERM_BOARDS)
+		return "版主";
 	else
-		return NULL;
+		return "";
 }
 
 char * calc_exp_str_utf8(int exp)
