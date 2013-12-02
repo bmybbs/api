@@ -146,4 +146,29 @@ int f_append(char *filename, char *buf);
  */
 int append_record(char *filename, void *record, int size);
 
+/**
+ * @brief 计算某个id的站内信封数。
+ * 该方法来自 nju09/bbsfoot.c int mails()。该函数不包含用户id有效性校验，需要在逻辑
+ * 中预先校验权限。
+ * @param id 用户id
+ * @param unread 未读封数
+ * @return 总站内信封数
+ */
+int mail_count(char *id, int *unread);
+
+/**
+ * @brief 计算用户等级
+ * 该方法用于输出 utf8 编码的字符串，需要与 libythtbbs 保持一致。
+ * @param exp 输入经验值
+ * @return
+ */
+char * calc_exp_str_utf8(int exp);
+
+/**
+ * @brief 评价用户经验值
+ * 该方法用于输出 utf8 编码的字符串，需要与 libythtbbs 保持一致。
+ * @param perf
+ * @return
+ */
+char * calc_perf_str_utf8(int perf);
 #endif

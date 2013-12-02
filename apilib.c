@@ -220,6 +220,52 @@ char * getuserlevelname(unsigned userlevel)
 		return NULL;
 }
 
+char * calc_exp_str_utf8(int exp)
+{
+	int expbase = 0;
+
+	if (exp == -9999)
+		return "没等级";
+	if (exp <= 100 + expbase)
+		return "新手上路";
+	if (exp <= 450 + expbase)
+		return "一般站友";
+	if (exp <= 850 + expbase)
+		return "中级站友";
+	if (exp <= 1500 + expbase)
+		return "高级站友";
+	if (exp <= 2500 + expbase)
+		return "老站友";
+	if (exp <= 3000 + expbase)
+		return "长老级";
+	if (exp <= 5000 + expbase)
+		return "本站元老";
+	return "开国大老";
+}
+
+char * calc_perf_str_utf8(int perf)
+{
+	if (perf == -9999)
+		return "没等级";
+	if (perf <= 5)
+		return "赶快加油";
+	if (perf <= 12)
+		return "努力中";
+	if (perf <= 35)
+		return "还不错";
+	if (perf <= 50)
+		return "很好";
+	if (perf <= 90)
+		return "优等生";
+	if (perf <= 140)
+		return "太优秀了";
+	if (perf <= 200)
+		return "本站支柱";
+	if (perf <= 500)
+		return "神～～";
+	return "机器人！";
+}
+
 /** 保存用户数据到 passwd 文件中
  * @warning 线程安全有待检查。
  * @param x
@@ -759,4 +805,29 @@ int f_append(char *filename, char *buf)
 	fputs(buf, fp);
 	fclose(fp);
 	return 0;
+}
+
+int mail_count(char *id, int *unread)
+{
+	struct fileheader *x;
+	char path[80];
+	int total=0, i=0;
+	struct mmapfile mf = { ptr:NULL };
+	*unread = 0;
+
+	setmailfile(path, id, ".DIR");
+
+	if(mmapfile(path, &mf)<0)
+		return 0;
+
+	total = mf.size / sizeof(struct fileheader);
+	x = (struct fileheader*)mf.ptr;
+	for(i=0; i<total; i++) {
+		if(!(x->accessed & FH_READ))
+			(*unread)++;
+		x++;
+	}
+
+	mmapfile(NULL, &mf);
+	return total;
 }

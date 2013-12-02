@@ -130,19 +130,27 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_NOSUCHUSER);
 	}
 
-	api_template_t tpl = api_template_create("templates/api_user_info.json");
-	if(tpl==NULL) {
-		return api_error(p, req, res, API_RT_NOTEMPLATE);
-	}
-	api_template_set(&tpl, "UserID", "%s", ue->userid);
-	api_template_set(&tpl, "UserNickName", "%s", ue->username);
-	api_template_set(&tpl, "LoginCounts", "%d", ue->numlogins);
-	api_template_set(&tpl, "PostCounts", "%d", ue->numposts);
+	int unread_mail;
+	mail_count(ue->userid, &unread_mail);
+
+	char buf[4096];
+	sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
+			"\"post_counts\":%d, \"unread_mail\":%d, \"unread_notify\":%d,"
+			"\"job\":\"%s\", \"exp\":%d, \"perf\":%d,"
+			"\"exp_level\":\"%s\", \"perf_level\":\"%s\"}",
+			ue->userid, ue->numlogins, ue->numposts, unread_mail,
+			count_notification_num(ue->userid),
+			(getuserlevelname(ue->userlevel)==NULL) ? "" : getuserlevelname(ue->userlevel),
+			countexp(ue), countperf(ue),
+			calc_exp_str_utf8(countexp(ue)), calc_perf_str_utf8(countperf(ue)));
+
+	struct json_object *jp = json_tokener_parse(buf);
+	json_object_object_add(jp, "nickname", json_object_new_string(ue->username));
 
 	api_set_json_header(res);
-	onion_response_write0(res, tpl);
+	onion_response_write0(res, json_object_to_json_string(jp));
 
-	api_template_free(tpl);
+	json_object_put(jp);
 	free(ue);
 
 	return OCS_PROCESSED;
