@@ -132,6 +132,9 @@ static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *
 int api_article_list(ONION_FUNC_PROTO_STR)
 {
 	const char *type = onion_request_get_query(req, "type");
+	//type不能为空
+	if( type == NULL)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	if(strcasecmp(type, "top10")==0) { // 十大
 		return api_article_list_xmltopfile(p, req, res, 0, NULL);
