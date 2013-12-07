@@ -19,7 +19,20 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
  * @return
  */
 static int api_board_list_fav(ONION_FUNC_PROTO_STR);
+
+/**
+ * @brief 返回分区版面列表
+ * @param ONION_FUNC_PROTO_STR
+ * @return
+ */
 static int api_board_list_sec(ONION_FUNC_PROTO_STR);
+
+/**
+ * @brief 返回分区版面列表（guest权限）
+ * @param ONION_FUNC_PROTO_STR
+ * @return
+ */
+static int api_board_list_sec_guest(ONION_FUNC_PROTO_STR);
 
 /**
  * @brief 读取收藏夹文件。
@@ -282,7 +295,9 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 
 	if(secstr == NULL || strlen(secstr)>=2 || strstr(sec_array, secstr) == NULL)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
-	if(!userid || !sessid || !appkey)
+	if(!userid)
+		return api_board_list_sec_guest(p, req, res);
+	if(!sessid || !appkey)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
 	struct userec *ue = getuser(userid);
@@ -325,6 +340,58 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 	free(ue);
 	free(s);
 	return OCS_PROCESSED;
+}
+
+static int api_board_list_sec_guest(ONION_FUNC_PROTO_STR)
+{
+	int guest_uid = getusernum("guest");
+	int guest_uent_index, i;
+	struct user_info *ui=NULL;
+	for(i=0; i<6; i++) {
+		guest_uent_index = shm_uindex->user[guest_uid][i];
+		ui = &(shm_utmp->uinfo[guest_uent_index-1]);
+		if(strcasecmp(ui->userid, "guest")==0)
+			break;
+	}
+
+	if(strcasecmp(ui->userid, "guest")!=0)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	char * secstr = onion_request_get_query(req, "secstr");
+	char * sortmode_s = onion_request_get_query(req, "sortmode");
+	char * fromhost = onion_request_get_client_description(req);
+
+	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
+	int len, hasintro=0, count=0;
+
+	struct boardmem *board_array[MAXBOARD], *x;
+	struct sectree *sec = getsectree(secstr);
+	len = strlen(secstr);
+	if(sec->introstr[0])
+		hasintro = 1;
+	for(i=0; i<MAXBOARD && i<shm_bcache->number; ++i) {
+		x = &(shm_bcache->bcache[i]);
+		if(x->header.filename[0]<=32 || x->header.filename[0]>'z')
+			continue;
+		if(hasintro) {
+			if(strcmp(secstr, x->header.sec1) && strcmp(secstr, x->header.sec2))
+				continue;
+		} else {
+			if(strncmp(secstr, x->header.sec1, len) && strncmp(secstr, x->header.sec2, len))
+				continue;
+		}
+		if(!check_user_read_perm_x(ui, x))
+			continue;
+		board_array[count] = x;
+		count++;
+	}
+
+	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ui);
+	api_set_json_header(res);
+	onion_response_write0(res, s);
+	free(s);
+	return OCS_PROCESSED;
+
 }
 
 static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, int sortmode, const char *fromhost, struct user_info *ui)
