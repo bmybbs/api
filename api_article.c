@@ -9,6 +9,7 @@ struct bmy_article {
 	int thread;				///< 主题id
 	int th_num;				///< 参与主题讨论的人数
 	unsigned int mark; 		///< 文章标记，fileheader.accessed
+	int sequence_num;		///< 文章在版面的序号
 };
 
 /**
@@ -21,6 +22,7 @@ struct bmy_article {
  * @warning 记得调用完成 free
  */
 static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count);
+static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count);
 
 /**
  * @brief 将十大、分区热门话题转为 JSON 数据输出
@@ -107,6 +109,19 @@ static int get_thread_by_filetime(char *board, int filetime);
  * @return the nubmer of articles in the thread
  */
 static int get_number_of_articles_in_thread(char *board, int thread);
+
+/**
+ * @brief 
+ * @param mode
+ * mode = 1 : 通过 boardname 和 主题ID 查找该主题第一篇文章 fileheader
+ * mode = 0 : 通过 boardname 和 filetime 查找该文章的 fileheader
+ * @param id:
+ * mode = 1 : thread = id;
+ * mode = 0 : filetime = id;
+ * @param fh_for_return : 查找到的fileheader，值全为0 表示未找到
+ * @return void
+ */
+static void get_fileheader_by_filetime_thread(int mode, char *board, int id, struct fileheader * fh_for_return);
 
 /**
  * @brief 获取文章内容。
@@ -199,6 +214,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	}
 
 	struct bmy_article top_list[listmax];
+	struct fileheader fh;
 	memset(top_list, 0, sizeof(top_list[0]) * listmax);
 
 	htmlDocPtr doc = htmlParseFile(ttfile, "GBK");
@@ -285,6 +301,20 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 			t2=t2+3;
 			snprintf(tmp, 11, "%s", t2);
 			top_list[i].filetime = atoi(tmp);
+		}
+		//根据 board、thread 或 filetime 得到 fileheader 补全所有信息
+		if(top_list[i].type) {
+			get_fileheader_by_filetime_thread(1, top_list[i].board, top_list[i].thread, &fh);
+			if(fh.filetime != 0) {
+				top_list[i].filetime = fh.filetime;
+				strcpy(top_list[i].author, fh.owner);
+			}
+		} else {
+			get_fileheader_by_filetime_thread(0, top_list[i].board, top_list[i].filetime, &fh);
+			if(fh.filetime != 0) {
+				top_list[i].thread = fh.thread;
+				strcpy(top_list[i].author, fh.owner);
+			}
 		}
 
 	}
@@ -472,6 +502,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 			board_list[num].filetime = data[i].filetime;
 			board_list[num].thread = data[i].thread;
 			board_list[num].type = mode;
+			board_list[num].sequence_num = i;
 		
 			strcpy(board_list[num].board, board);
 			strcpy(board_list[num].author, data[i].owner);
@@ -484,7 +515,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		for(i = 0; i < num; ++i){
 			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 		}
-		char *s = bmy_article_array_to_json_string(board_list, num);
+		char *s = bmy_article_with_num_array_to_json_string(board_list, num);
 		api_set_json_header(res);
 		onion_response_write0(res, s);
 		free(s);
@@ -988,6 +1019,35 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
 
 	return r;
 }
+static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count)
+{
+	char buf[512];
+	int i;
+	struct bmy_article *p;
+	struct json_object *jp;
+	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
+	struct json_object *json_array = json_object_object_get(obj, "articlelist");
+
+	for(i=0; i<count; ++i) {
+		p = &(ba_list[i]);
+		memset(buf, 0, 512);
+		sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
+				"\"th_num\":%d, \"mark\":%d ,\"num\":%d }",
+				p->type, p->filetime, p->thread, p->th_num, p->mark, p->sequence_num);
+		jp = json_tokener_parse(buf);
+		if(jp) {
+			json_object_object_add(jp, "board", json_object_new_string(p->board));
+			json_object_object_add(jp, "title", json_object_new_string(p->title));
+			json_object_object_add(jp, "author", json_object_new_string(p->author));
+			json_object_array_add(json_array, jp);
+		}
+	}
+
+	char *r = strdup(json_object_to_json_string(obj));
+	json_object_put(obj);
+
+	return r;
+}
 
 static int get_thread_by_filetime(char *board, int filetime)
 {
@@ -1063,6 +1123,56 @@ static int get_number_of_articles_in_thread(char *board, int thread)
 	}
 	MMAP_END mmapfile(NULL, &mf);
 	return 0;
+}
+
+static void get_fileheader_by_filetime_thread(int mode, char *board, int id, struct fileheader * fh_for_return)
+{
+	char dir[80];
+	int i = 0, num_records = 0;
+	struct mmapfile mf = { ptr:NULL };
+	struct fileheader * p_fh = NULL;
+	if(NULL == fh_for_return)
+		return;
+	memset(fh_for_return, 0, sizeof(struct fileheader));
+	if(NULL == board)
+		return ;
+	sprintf(dir, "boards/%s/.DIR",board);
+	MMAP_TRY
+	{
+		if(-1 == mmapfile(dir, &mf))
+		{
+			MMAP_UNTRY;
+			return;
+		}
+		num_records = mf.size / sizeof(struct fileheader);
+		if(0 != id)
+		{
+			i = Search_Bin(mf.ptr, id, 0, num_records - 1);
+			if(i < 0)
+				i = -(i + 1);
+		}
+		else
+			i = 0;
+		for(; i < num_records; ++i)
+		{
+			p_fh = (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader));
+
+			if((mode == 0 && p_fh->filetime == id) ||
+				       	(mode == 1 && p_fh->thread == id))
+			{
+				memcpy(fh_for_return, (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)), sizeof(struct fileheader));
+				break;
+			}
+		}
+		mmapfile(NULL, &mf);
+		return;
+	}
+	MMAP_CATCH
+	{
+		mmapfile(NULL, &mf);
+	}
+	MMAP_END mmapfile(NULL, &mf);
+	return;
 }
 
 static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *num, int mode)
