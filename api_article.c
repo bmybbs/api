@@ -307,13 +307,13 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 			get_fileheader_by_filetime_thread(1, top_list[i].board, top_list[i].thread, &fh);
 			if(fh.filetime != 0) {
 				top_list[i].filetime = fh.filetime;
-				strcpy(top_list[i].author, fh.owner);
+				strcpy(top_list[i].author, fh2owner(&fh));
 			}
 		} else {
 			get_fileheader_by_filetime_thread(0, top_list[i].board, top_list[i].filetime, &fh);
 			if(fh.filetime != 0) {
 				top_list[i].thread = fh.thread;
-				strcpy(top_list[i].author, fh.owner);
+				strcpy(top_list[i].author, fh2owner(&fh));
 			}
 		}
 
@@ -755,6 +755,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	struct json_object * jp = json_tokener_parse(article_json_str);
 	json_object_object_add(jp, "content", json_object_new_string(article_content_utf8));
+	json_object_object_add(jp, "title", json_object_new_string(title_utf8));
 	if(attach_link_list) {
 		struct json_object * attach_array = json_object_object_get(jp, "attach");
 		char at_buf[320];
