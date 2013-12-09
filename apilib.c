@@ -520,6 +520,7 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 
 	mem_stream = open_memstream(&mem_buf, &mem_buf_len);
 	fseek(article_stream, 0, SEEK_SET);
+	keepoldheader(article_stream, SKIPHEADER);
 
 	while(1) {
 		if(fgets(buf, 500, article_stream) == 0)
