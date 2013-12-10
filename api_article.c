@@ -1072,10 +1072,12 @@ static int get_thread_by_filetime(char *board, int filetime)
 			return 0;
 		}
 		int num = Search_Bin(mf.ptr, filetime, 0, total - 1);
-		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
-		thread = p_fh->thread;
-		mmapfile(NULL, &mf);
-		return thread;
+		if(num >=  0){
+			p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
+			thread = p_fh->thread;
+			mmapfile(NULL, &mf);
+			return thread;
+		}
 	}
 	MMAP_CATCH{
 		mmapfile(NULL, &mf);
