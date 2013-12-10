@@ -155,8 +155,12 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 		if(data == MAP_FAILED)
 			today_num = 0;
 		else {
-			for(i=fsize/sizeof(struct fileheader)-1; data[i].filetime>day_begin; i--)
+			for(i=fsize/sizeof(struct fileheader)-1; data[i].filetime>day_begin; i--) {
+				if(i<=0)
+					break;
+
 				today_num++;
+			}
 
 			munmap(data, fsize);
 		}
