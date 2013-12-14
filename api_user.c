@@ -34,7 +34,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	const char * userid = onion_dict_get(param_dict, "userid");
 	const char * passwd = onion_dict_get(param_dict, "passwd");
 	const char * appkey = onion_dict_get(param_dict, "appkey");
-	const char * fromhost = onion_request_get_client_description(req);
+	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
 	char buf[512];
 	time_t now_t = time(NULL);
@@ -174,7 +174,7 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 	const char * userid = onion_dict_get(param_dict, "userid");
 	const char * sessid = onion_dict_get(param_dict, "sessid");
 	const char * appkey = onion_dict_get(param_dict, "appkey");
-	const char * fromhost = onion_request_get_client_description(req);
+	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 	time_t now_t = time(NULL);
 	char buf[512];
 

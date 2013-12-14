@@ -827,7 +827,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_WRONGSESS);
 	}
 
-	const char * fromhost = onion_request_get_client_description(req);
+	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
 	struct boardmem * bmem = getboardbyname(board);
 	if(bmem==NULL) {

@@ -234,7 +234,7 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 	const char * sessid = onion_request_get_query(req, "sessid");
 	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * sortmode_s = onion_request_get_query(req, "sortmode");
-	const char * fromhost = onion_request_get_client_description(req);
+	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
 	if(!userid || !sessid || !appkey)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -293,7 +293,7 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 	const char * sessid = onion_request_get_query(req, "sessid");
 	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * sortmode_s = onion_request_get_query(req, "sortmode");
-	const char * fromhost = onion_request_get_client_description(req);
+	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 	//const char guest_str[] = "guest";
 	const char sec_array[] = "0123456789GNHAC";
 
@@ -361,9 +361,9 @@ static int api_board_list_sec_guest(ONION_FUNC_PROTO_STR)
 	if(strcasecmp(ui->userid, "guest")!=0)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	char * secstr = onion_request_get_query(req, "secstr");
-	char * sortmode_s = onion_request_get_query(req, "sortmode");
-	char * fromhost = onion_request_get_client_description(req);
+	const char * secstr = onion_request_get_query(req, "secstr");
+	const char * sortmode_s = onion_request_get_query(req, "sortmode");
+	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
 	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
 	int len, hasintro=0, count=0;
