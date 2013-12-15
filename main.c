@@ -28,8 +28,8 @@ int main(int argc, char *argv[])
 	onion_set_max_threads(o, 32);
 
 	onion_set_timeout(o, 5000);
-	onion_set_hostname(o, "0.0.0.0");
-	onion_set_port(o, "8080");
+	onion_set_hostname(o, "127.0.0.1");
+	onion_set_port(o, "8081");
 
 	onion_url *urls=onion_root_url(o);
 	onion_url_add(urls, "", api_error);
