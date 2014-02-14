@@ -18,10 +18,11 @@ struct bmy_article {
  * 相关的异常应该在从 BMY 数据转为 bmy_article 的过程中判断、处理。
  * @param ba_list struct bmy_article 数组
  * @param count 数组长度
+ * @param mode 0:不输出文章所在版面信息, 1:输出每个文章所在的版面信息。
  * @return json 字符串
  * @warning 记得调用完成 free
  */
-static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count);
+static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count, int mode);
 static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count);
 
 /**
@@ -319,7 +320,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 
 	}
 
-	char *s = bmy_article_array_to_json_string(top_list, total);
+	char *s = bmy_article_array_to_json_string(top_list, total, 1);
 
 	xmlXPathFreeObject(r_links);
 	xmlXPathFreeObject(r_nums);
@@ -377,7 +378,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		++count;
 	}
 	fclose(fp);
-	char *s = bmy_article_array_to_json_string(commend_list, count);
+	char *s = bmy_article_array_to_json_string(commend_list, count, 0);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
@@ -648,7 +649,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		for(i = 0; i < num; ++i){
 			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 		}
-		char *s = bmy_article_array_to_json_string(board_list, num);
+		char *s = bmy_article_array_to_json_string(board_list, num, 0);
 		api_set_json_header(res);
 		onion_response_write0(res, s);
 		free(s);
@@ -991,10 +992,11 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	return OCS_NOT_IMPLEMENTED;
 }
 
-static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count)
+static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count, int mode)
 {
 	char buf[512];
 	int i;
+	struct boardmem *b;
 	struct bmy_article *p;
 	struct json_object *jp;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
@@ -1003,9 +1005,16 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
 	for(i=0; i<count; ++i) {
 		p = &(ba_list[i]);
 		memset(buf, 0, 512);
-		sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
+		if(mode==0) {
+			sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
 				"\"th_num\":%d, \"mark\":%d }",
 				p->type, p->filetime, p->thread, p->th_num, p->mark);
+		} else {
+			b = getboardbyname(p->board);
+			sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
+				"\"th_num\":%d, \"mark\":%d, \"secstr\":\"%s\" }",
+				p->type, p->filetime, p->thread, p->th_num, p->mark, b->header.sec1);
+		}
 		jp = json_tokener_parse(buf);
 		if(jp) {
 			json_object_object_add(jp, "board", json_object_new_string(p->board));
