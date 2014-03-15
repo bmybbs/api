@@ -149,7 +149,7 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 		if(ue == 0)
 			return api_error(p, req, res, API_RT_NOSUCHUSER);
 
-		sprintf(buf, "{\"errocde\":0, \"userid\":\"%s\", \"login_counts\":%d,"
+		sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
 				"\"post_counts\":%d, \"job\":\"%s\", \"exp_level\":\"%s\","
 				"\"perf_level\":\"%s\"}", ue->userid, ue->numlogins, ue->numposts,
 				getuserlevelname(ue->userlevel),
