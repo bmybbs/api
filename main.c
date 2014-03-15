@@ -45,6 +45,7 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^article/reply$", api_article_reply);
 	onion_url_add(urls, "^board/list$", api_board_list);
 	onion_url_add(urls, "^board/info$", api_board_info);
+	onion_url_add(urls, "^meta/loginpics", api_meta_loginpics);
 
 	onion_listen(o);
 
