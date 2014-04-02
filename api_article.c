@@ -445,89 +445,93 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	if(0 == fd || 0 == fsize) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
-	MMAP_TRY
+
+	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
+	close(fd);
+	if((void *) -1 == data)
 	{
-		data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
-		close(fd);
-		if((void *) -1 == data)
-		{
-			MMAP_UNTRY;
-			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
-		}
-		total = fsize / sizeof(struct fileheader);
+		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
+	}
+	total = fsize / sizeof(struct fileheader);
+	if(0 == mode)
+	{
+		total_article = total;
+	}
+	else if(1 == mode)
+	{
+		total_article = 0;
+		for(i = 0; i < total; ++i)
+			if(data[i].thread == data[i].filetime)
+				++total_article;
+
+	}
+	if(startnum == 0)
+		startnum = total_article - count + 1;
+	if(startnum <= 0)
+		startnum = 1;
+	int sum = 0, num = 0;
+	for(i = 0; i < total; ++i)
+	{
 		if(0 == mode)
 		{
-			total_article = total;
+			++sum;
 		}
-		else if(1 == mode)
+		else if(1 == mode && data[i].thread == data[i].filetime)
 		{
-			total_article = 0;
-			for(i = 0; i < total; ++i)
-				if(data[i].thread == data[i].filetime)
-					++total_article;
-		
+			++sum;
 		}
-		if(startnum == 0)
-			startnum = total_article - count + 1;
-		if(startnum <= 0)
-			startnum = 1;
-		int sum = 0, num = 0;
-		for(i = 0; i < total; ++i)
+		if(sum < startnum || (1 == mode && data[i].thread != data[i].filetime)){
+			continue;
+		}
+		while (data[i].sizebyte == 0)
 		{
-			if(0 == mode)
-				++sum;
-			else if(1 == mode && data[i].thread == data[i].filetime)
-				++sum;
-			if(sum < startnum || (1 == mode && data[i].thread != data[i].filetime))
-				continue;
-			while (data[i].sizebyte == 0)
+			sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
+			data[i].sizebyte = numbyte(eff_size(filename));
+			fd = open(dir, O_RDWR);
+			if (fd < 0)
+				break;
+			flock(fd, LOCK_EX);
+			lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
+			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime)
 			{
-				sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
-				data[i].sizebyte = numbyte(eff_size(filename));
-				fd = open(dir, O_RDWR);
-				if (fd < 0)
-					break;
-				flock(fd, LOCK_EX);
-				lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
-				if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime)
+				x2.sizebyte = data[i].sizebyte;
+				lseek(fd, -1 * sizeof (x2), SEEK_CUR);
+				if(write(fd, &x2, sizeof (x2)) == -1)
 				{
-					x2.sizebyte = data[i].sizebyte;
-					lseek(fd, -1 * sizeof (x2), SEEK_CUR);
-					write(fd, &x2, sizeof (x2));
+					//TODO: write erroe
+					//printf("Error: Something wrong when write %s.\n", filename);
+					;
 				}
-				flock(fd, LOCK_UN);
-				close(fd);
-				break;
 			}
-			board_list[num].mark = data[i].accessed;
-			board_list[num].filetime = data[i].filetime;
-			board_list[num].thread = data[i].thread;
-			board_list[num].type = mode;
-			board_list[num].sequence_num = i;
-		
-			strcpy(board_list[num].board, board);
-			strcpy(board_list[num].author, data[i].owner);
-			g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
-			++num;
-			if(num >= count)
-				break;
+			flock(fd, LOCK_UN);
+			close(fd);
+			//FIXME: why break?
+			break;
 		}
-		munmap(data, fsize);
-		for(i = 0; i < num; ++i){
-			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
+		board_list[num].mark = data[i].accessed;
+		board_list[num].filetime = data[i].filetime;
+		board_list[num].thread = data[i].thread;
+		board_list[num].type = mode;
+		board_list[num].sequence_num = i;
+
+		strcpy(board_list[num].board, board);
+		strcpy(board_list[num].author, data[i].owner);
+		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
+		++num;
+		if(num >= count)
+		{
+			break;
 		}
-		char *s = bmy_article_with_num_array_to_json_string(board_list, num);
-		api_set_json_header(res);
-		onion_response_write0(res, s);
-		free(s);
-		return OCS_PROCESSED;	
 	}
-	MMAP_CATCH
-	{
-		;
+	munmap(data, fsize);
+	for(i = 0; i < num; ++i){
+		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 	}
-	MMAP_END munmap(data, fsize);
-	return api_error(p, req, res, API_RT_CNTMAPBRDIR);
+	char *s = bmy_article_with_num_array_to_json_string(board_list, num);
+	api_set_json_header(res);
+	onion_response_write0(res, s);
+	free(s);
+	return OCS_PROCESSED;	
 }
 
 static int api_article_list_thread(ONION_FUNC_PROTO_STR)
@@ -581,86 +585,81 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	if(0 == fd || 0 == fsize) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
-	MMAP_TRY
+	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
+	close(fd);
+	if((void *) -1 == data)
 	{
-		data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
-		close(fd);
-		if((void *) -1 == data)
+		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
+	}
+	total = fsize / sizeof(struct fileheader);
+	total_article = 0;
+	for(i = 0; i < total; ++i)
+	{
+		if(data[i].thread == thread)
+			++total_article;
+	}
+	if(count == 0)
+		count = total_article;
+	struct bmy_article board_list[count];
+	memset(board_list, 0, sizeof(board_list[0]) * count);
+	if(startnum == 0)
+		startnum = total_article - count + 1;
+	if(startnum <= 0)
+		startnum = 1;
+	int sum = 0, num = 0;
+	for(i = 0; i < total; ++i)
+	{
+		if(data[i].thread != thread)
+			continue;
+		++sum;
+		if(sum < startnum)
+			continue;
+		while (data[i].sizebyte == 0)
 		{
-			MMAP_UNTRY;
-			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
-		}
-		total = fsize / sizeof(struct fileheader);
-		total_article = 0;
-		for(i = 0; i < total; ++i)
-		{
-			if(data[i].thread == thread)
-				++total_article;
-		}
-		if(count == 0)
-			count = total_article;
-		struct bmy_article board_list[count];
-		memset(board_list, 0, sizeof(board_list[0]) * count);
-		if(startnum == 0)
-			startnum = total_article - count + 1;
-		if(startnum <= 0)
-			startnum = 1;
-		int sum = 0, num = 0;
-		for(i = 0; i < total; ++i)
-		{
-			if(data[i].thread != thread)
-				continue;
-			++sum;
-			if(sum < startnum)
-				continue;
-			while (data[i].sizebyte == 0)
+			sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
+			data[i].sizebyte = numbyte(eff_size(filename));
+			fd = open(dir, O_RDWR);
+			if (fd < 0)
+				break;
+			flock(fd, LOCK_EX);
+			lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
+			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime)
 			{
-				sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
-				data[i].sizebyte = numbyte(eff_size(filename));
-				fd = open(dir, O_RDWR);
-				if (fd < 0)
-					break;
-				flock(fd, LOCK_EX);
-				lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
-				if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime)
+				x2.sizebyte = data[i].sizebyte;
+				lseek(fd, -1 * sizeof (x2), SEEK_CUR);
+				if(write(fd, &x2, sizeof (x2)) == -1)
 				{
-					x2.sizebyte = data[i].sizebyte;
-					lseek(fd, -1 * sizeof (x2), SEEK_CUR);
-					write(fd, &x2, sizeof (x2));
+					//TODO: write error
+					//printf("Error: Something wrong when write %s.\n", filename);
+					;
 				}
-				flock(fd, LOCK_UN);
-				close(fd);
-				break;
 			}
-			board_list[num].mark = data[i].accessed;
-			board_list[num].filetime = data[i].filetime;
-			board_list[num].thread = data[i].thread;
-			board_list[num].type = 0;
-		
-			strcpy(board_list[num].board, board);
-			strcpy(board_list[num].author, data[i].owner);
-			g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
-			++num;
-			if(num >= count)
-				break;
+			flock(fd, LOCK_UN);
+			close(fd);
+			//FIXME: why break? 
+			break;
+		}
+		board_list[num].mark = data[i].accessed;
+		board_list[num].filetime = data[i].filetime;
+		board_list[num].thread = data[i].thread;
+		board_list[num].type = 0;
 
-		}
-		munmap(data, fsize);
-		for(i = 0; i < num; ++i){
-			board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
-		}
-		char *s = bmy_article_array_to_json_string(board_list, num, 0);
-		api_set_json_header(res);
-		onion_response_write0(res, s);
-		free(s);
-		return OCS_PROCESSED;	
+		strcpy(board_list[num].board, board);
+		strcpy(board_list[num].author, data[i].owner);
+		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
+		++num;
+		if(num >= count)
+			break;
 	}
-	MMAP_CATCH
-	{
-		;
+	munmap(data, fsize);
+	for(i = 0; i < num; ++i){
+		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 	}
-	MMAP_END munmap(data, fsize);
-	return api_error(p, req, res, API_RT_CNTMAPBRDIR);
+	char *s = bmy_article_array_to_json_string(board_list, num, 0);
+	api_set_json_header(res);
+	onion_response_write0(res, s);
+	free(s);
+	return OCS_PROCESSED;	
 }
 
 static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
@@ -694,7 +693,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	int uent_index = get_user_utmp_index(sessid);
 	struct user_info *ui = (strcasecmp(userid, "guest")==0) ?
-			NULL : &(shm_utmp->uinfo[uent_index]);
+		NULL : &(shm_utmp->uinfo[uent_index]);
 	if(!check_user_read_perm_x(ui, bmem)) {
 		free(ue);
 		return api_error(p, req, res, API_RT_NOBRDRPERM);
@@ -940,7 +939,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	// TODO: 缺少 nju09/bbssnd.c:143 有关报警的逻辑
 
 	//if(insertattachments(filename, data_gbk, ue->userid))
-		//mark = mark | FH_ATTACHED;
+	//mark = mark | FH_ATTACHED;
 
 	int r;
 	if(is_anony) {
@@ -1067,31 +1066,29 @@ static int get_thread_by_filetime(char *board, int filetime)
 	int thread;
 
 	sprintf(dir, "boards/%s/.DIR", board);
-	MMAP_TRY{
-		if(mmapfile(dir, &mf) == -1)
-		{
-			MMAP_UNTRY;
-			return 0;
-		}
-		int total;
-		total = mf.size / sizeof(struct fileheader);
-		if(total == 0){
-			mmapfile(NULL, &mf);
-			MMAP_UNTRY;
-			return 0;
-		}
-		int num = Search_Bin(mf.ptr, filetime, 0, total - 1);
-		if(num >=  0){
-			p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
-			thread = p_fh->thread;
-			mmapfile(NULL, &mf);
-			return thread;
-		}
+	if(mmapfile(dir, &mf) == -1)
+	{
+		return 0;
 	}
-	MMAP_CATCH{
+	if(mf.size == 0)
+	{
 		mmapfile(NULL, &mf);
+		return 0;
 	}
-	MMAP_END mmapfile(NULL, &mf);
+	int total;
+	total = mf.size / sizeof(struct fileheader);
+	int num = Search_Bin(mf.ptr, filetime, 0, total - 1);
+	if(num >=  0){
+		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
+		if(p_fh == NULL)
+		{
+			mmapfile(NULL, &mf);
+			return 0;
+		}
+		thread = p_fh->thread;
+		mmapfile(NULL, &mf);
+		return thread;
+	}
 	return 0;
 }
 
@@ -1103,38 +1100,34 @@ static int get_number_of_articles_in_thread(char *board, int thread)
 	if(NULL == board)
 		return 0;
 	sprintf(dir, "boards/%s/.DIR",board);
-	MMAP_TRY
+	if(-1 == mmapfile(dir, &mf))
 	{
-		if(-1 == mmapfile(dir, &mf))
-		{
-			MMAP_UNTRY;
-			return 0;
-		}
-		num_records = mf.size / sizeof(struct fileheader);
-		if(0 != thread)
-		{
-			i = Search_Bin(mf.ptr, thread, 0, num_records - 1);
-			if(i < 0)
-				i = -(i + 1);
-		}
-		else
-			i = 0;
-		for(; i < num_records; ++i)
-		{
-			if(((struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)))->thread != thread)
-				continue;
-			else
-				++num_in_thread;
-		}
+		return 0;
+	}
+	if(mf.size == 0)
+	{
 		mmapfile(NULL, &mf);
-		return num_in_thread;
+		return 0;
 	}
-	MMAP_CATCH
+	num_records = mf.size / sizeof(struct fileheader);
+	if(0 != thread)
 	{
-		num_in_thread = 0;
+		i = Search_Bin(mf.ptr, thread, 0, num_records - 1);
+		if(i < 0)
+			i = -(i + 1);
 	}
-	MMAP_END mmapfile(NULL, &mf);
-	return 0;
+	else
+		i = 0;
+	for(; i < num_records; ++i)
+	{
+		if(((struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)))->thread != thread)
+			continue;
+		else
+			++num_in_thread;
+	}
+	mmapfile(NULL, &mf);
+	return num_in_thread;
+
 }
 
 static void get_fileheader_by_filetime_thread(int mode, char *board, int id, struct fileheader * fh_for_return)
@@ -1149,41 +1142,38 @@ static void get_fileheader_by_filetime_thread(int mode, char *board, int id, str
 	if(NULL == board)
 		return ;
 	sprintf(dir, "boards/%s/.DIR",board);
-	MMAP_TRY
-	{
-		if(-1 == mmapfile(dir, &mf))
-		{
-			MMAP_UNTRY;
-			return;
-		}
-		num_records = mf.size / sizeof(struct fileheader);
-		if(0 != id)
-		{
-			i = Search_Bin(mf.ptr, id, 0, num_records - 1);
-			if(i < 0)
-				i = -(i + 1);
-		}
-		else
-			i = 0;
-		for(; i < num_records; ++i)
-		{
-			p_fh = (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader));
 
-			if((mode == 0 && p_fh->filetime == id) ||
-				       	(mode == 1 && p_fh->thread == id))
-			{
-				memcpy(fh_for_return, (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)), sizeof(struct fileheader));
-				break;
-			}
-		}
+	if(-1 == mmapfile(dir, &mf))
+	{
+		return;
+	}
+	if(mf.size == 0)
+	{
 		mmapfile(NULL, &mf);
 		return;
 	}
-	MMAP_CATCH
+	num_records = mf.size / sizeof(struct fileheader);
+	if(0 != id)
 	{
-		mmapfile(NULL, &mf);
+		i = Search_Bin(mf.ptr, id, 0, num_records - 1);
+		if(i < 0)
+			i = -(i + 1);
 	}
-	MMAP_END mmapfile(NULL, &mf);
+	else
+		i = 0;
+	for(; i < num_records; ++i)
+	{
+		p_fh = (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader));
+		if(p_fh == NULL)
+			return;
+		if((mode == 0 && p_fh->filetime == id) ||
+				(mode == 1 && p_fh->thread == id))
+		{
+			memcpy(fh_for_return, (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)), sizeof(struct fileheader));
+			break;
+		}
+	}
+	mmapfile(NULL, &mf);
 	return;
 }
 
