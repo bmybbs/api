@@ -1,6 +1,6 @@
 CC		= gcc
 BSRCPTH	= /home/bmybbs
-FLAGS 	= -O -Wall -g -D_GNU_SOURCE -I$(BSRCPTH)/include -I$(BSRCPTH)/ythtlib -I$(BSRCPTH)/libythtbbs `xml2-config --flags`
+FLAGS 	= -O -Wall -g -D_GNU_SOURCE -I$(BSRCPTH)/include -I$(BSRCPTH)/ythtlib -I$(BSRCPTH)/libythtbbs `xml2-config --cflags`
 BBSLIBS	= -L/home/bbs/bin -lythtbbs -lytht -lmysqlclient -lxml2 -ljson-c
 ONILIBS = -lonion_handlers -lonion_static -lpam -lgnutls -lgcrypt -pthread -lrt
 
