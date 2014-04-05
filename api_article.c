@@ -448,23 +448,20 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 
 	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
 	close(fd);
-	if((void *) -1 == data)
-	{
+	if(MAP_FAILED == data) {
 		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 	}
+
 	total = fsize / sizeof(struct fileheader);
-	if(0 == mode)
-	{
+	if(0 == mode) {				// 一般模式
 		total_article = total;
-	}
-	else if(1 == mode)
-	{
+	} else if(1 == mode) {		// 主题模式
 		total_article = 0;
 		for(i = 0; i < total; ++i)
 			if(data[i].thread == data[i].filetime)
 				++total_article;
-
 	}
+
 	if(startnum == 0)
 		startnum = total_article - count + 1;
 	if(startnum <= 0)
@@ -472,42 +469,38 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	int sum = 0, num = 0;
 	for(i = 0; i < total; ++i)
 	{
+		// TODO: 高亮标题处理
 		if(0 == mode)
-		{
 			++sum;
-		}
 		else if(1 == mode && data[i].thread == data[i].filetime)
-		{
 			++sum;
-		}
-		if(sum < startnum || (1 == mode && data[i].thread != data[i].filetime)){
+
+		if(sum < startnum || (1 == mode && data[i].thread != data[i].filetime)) {
 			continue;
 		}
-		while (data[i].sizebyte == 0)
-		{
+
+		if (data[i].sizebyte == 0) { // 如果内存中数据库记录的 sizebyte 为 0，则修正 .DIR 文件
 			sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
 			data[i].sizebyte = numbyte(eff_size(filename));
+
 			fd = open(dir, O_RDWR);
 			if (fd < 0)
 				break;
+
 			flock(fd, LOCK_EX);
 			lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
-			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime)
-			{
+			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime) {
 				x2.sizebyte = data[i].sizebyte;
 				lseek(fd, -1 * sizeof (x2), SEEK_CUR);
-				if(write(fd, &x2, sizeof (x2)) == -1)
-				{
-					//TODO: write erroe
-					//printf("Error: Something wrong when write %s.\n", filename);
-					;
+				if(write(fd, &x2, sizeof (x2)) == -1) {
+					errlog("write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.\n",
+							dir, (startnum-1+i), filename, errno, strerror(errno));
 				}
 			}
 			flock(fd, LOCK_UN);
 			close(fd);
-			//FIXME: why break?
-			break;
 		}
+
 		board_list[num].mark = data[i].accessed;
 		board_list[num].filetime = data[i].filetime;
 		board_list[num].thread = data[i].thread;
@@ -518,8 +511,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		strcpy(board_list[num].author, data[i].owner);
 		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
 		++num;
-		if(num >= count)
-		{
+		if(num >= count) {
 			break;
 		}
 	}
@@ -587,35 +579,35 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	}
 	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
 	close(fd);
-	if((void *) -1 == data)
-	{
+	if(MAP_FAILED == data)
 		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
-	}
+
 	total = fsize / sizeof(struct fileheader);
 	total_article = 0;
-	for(i = 0; i < total; ++i)
-	{
+	for(i = 0; i < total; ++i) {
 		if(data[i].thread == thread)
 			++total_article;
 	}
+
 	if(count == 0)
 		count = total_article;
+
 	struct bmy_article board_list[count];
 	memset(board_list, 0, sizeof(board_list[0]) * count);
+
 	if(startnum == 0)
 		startnum = total_article - count + 1;
 	if(startnum <= 0)
 		startnum = 1;
+
 	int sum = 0, num = 0;
-	for(i = 0; i < total; ++i)
-	{
+	for(i = 0; i < total; ++i) {
 		if(data[i].thread != thread)
 			continue;
 		++sum;
 		if(sum < startnum)
 			continue;
-		while (data[i].sizebyte == 0)
-		{
+		if (data[i].sizebyte == 0) {
 			sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
 			data[i].sizebyte = numbyte(eff_size(filename));
 			fd = open(dir, O_RDWR);
@@ -623,22 +615,18 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 				break;
 			flock(fd, LOCK_EX);
 			lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
-			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime)
-			{
+			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime) {
 				x2.sizebyte = data[i].sizebyte;
 				lseek(fd, -1 * sizeof (x2), SEEK_CUR);
-				if(write(fd, &x2, sizeof (x2)) == -1)
-				{
-					//TODO: write error
-					//printf("Error: Something wrong when write %s.\n", filename);
-					;
+				if(write(fd, &x2, sizeof (x2)) == -1) {
+					errlog("write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.\n",
+							dir, (startnum-1+i), filename, errno, strerror(errno));
 				}
 			}
 			flock(fd, LOCK_UN);
 			close(fd);
-			//FIXME: why break? 
-			break;
 		}
+
 		board_list[num].mark = data[i].accessed;
 		board_list[num].filetime = data[i].filetime;
 		board_list[num].thread = data[i].thread;
@@ -651,6 +639,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		if(num >= count)
 			break;
 	}
+
 	munmap(data, fsize);
 	for(i = 0; i < num; ++i){
 		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
@@ -939,7 +928,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	// TODO: 缺少 nju09/bbssnd.c:143 有关报警的逻辑
 
 	//if(insertattachments(filename, data_gbk, ue->userid))
-	//mark = mark | FH_ATTACHED;
+		//mark = mark | FH_ATTACHED;
 
 	int r;
 	if(is_anony) {
@@ -1066,25 +1055,26 @@ static int get_thread_by_filetime(char *board, int filetime)
 	int thread;
 
 	sprintf(dir, "boards/%s/.DIR", board);
-	if(mmapfile(dir, &mf) == -1)
-	{
+
+	if(mmapfile(dir, &mf) == MAP_FAILED)
 		return 0;
-	}
-	if(mf.size == 0)
-	{
+
+	if(mf.size == 0) {
 		mmapfile(NULL, &mf);
 		return 0;
 	}
+
 	int total;
 	total = mf.size / sizeof(struct fileheader);
 	int num = Search_Bin(mf.ptr, filetime, 0, total - 1);
 	if(num >=  0){
 		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
-		if(p_fh == NULL)
-		{
+
+		if(p_fh == NULL) {
 			mmapfile(NULL, &mf);
 			return 0;
 		}
+
 		thread = p_fh->thread;
 		mmapfile(NULL, &mf);
 		return thread;
@@ -1100,34 +1090,32 @@ static int get_number_of_articles_in_thread(char *board, int thread)
 	if(NULL == board)
 		return 0;
 	sprintf(dir, "boards/%s/.DIR",board);
-	if(-1 == mmapfile(dir, &mf))
-	{
+
+	if(MAP_FAILED == mmapfile(dir, &mf))
 		return 0;
-	}
-	if(mf.size == 0)
-	{
+
+	if(mf.size == 0) {
 		mmapfile(NULL, &mf);
 		return 0;
 	}
+
 	num_records = mf.size / sizeof(struct fileheader);
-	if(0 != thread)
-	{
+	if(0 != thread) {
 		i = Search_Bin(mf.ptr, thread, 0, num_records - 1);
 		if(i < 0)
 			i = -(i + 1);
-	}
-	else
+	} else
 		i = 0;
-	for(; i < num_records; ++i)
-	{
+
+	for(; i < num_records; ++i) {
 		if(((struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)))->thread != thread)
 			continue;
 		else
 			++num_in_thread;
 	}
+
 	mmapfile(NULL, &mf);
 	return num_in_thread;
-
 }
 
 static void get_fileheader_by_filetime_thread(int mode, char *board, int id, struct fileheader * fh_for_return)
@@ -1143,32 +1131,28 @@ static void get_fileheader_by_filetime_thread(int mode, char *board, int id, str
 		return ;
 	sprintf(dir, "boards/%s/.DIR",board);
 
-	if(-1 == mmapfile(dir, &mf))
-	{
+	if(MAP_FAILED == mmapfile(dir, &mf))
 		return;
-	}
-	if(mf.size == 0)
-	{
+
+	if(mf.size == 0) {
 		mmapfile(NULL, &mf);
 		return;
 	}
+
 	num_records = mf.size / sizeof(struct fileheader);
-	if(0 != id)
-	{
+	if(0 != id) {
 		i = Search_Bin(mf.ptr, id, 0, num_records - 1);
 		if(i < 0)
 			i = -(i + 1);
-	}
-	else
+	} else
 		i = 0;
-	for(; i < num_records; ++i)
-	{
+
+	for(; i < num_records; ++i) {
 		p_fh = (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader));
 		if(p_fh == NULL)
 			return;
 		if((mode == 0 && p_fh->filetime == id) ||
-				(mode == 1 && p_fh->thread == id))
-		{
+				(mode == 1 && p_fh->thread == id)) {
 			memcpy(fh_for_return, (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)), sizeof(struct fileheader));
 			break;
 		}
