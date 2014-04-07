@@ -136,7 +136,7 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	//g2u(bmem->header.keyword, 64, keyword, 128);
 	//g2u(bmem->header.type, 5, type, 16);
 
-	int today_num=0, i;
+	int today_num=0, thread_num=0, i;
 	struct tm tm;
 	memset(&tm, 0, sizeof(tm));
 	time_t now_t = time(NULL);
@@ -162,6 +162,11 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 				today_num++;
 			}
 
+			for(i=0; i<fsize/sizeof(struct fileheader); ++i) {
+				if(data[i].filetime == data[i].thread)
+					++thread_num;
+			}
+
 			munmap(data, fsize);
 		}
 	}
@@ -169,11 +174,11 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	memset(filename, 0, 256);
 	sethomefile(filename, ui->userid, ".goodbrd");
 	sprintf(buf, "{\"errcode\":0, \"bm\":[], \"hot_topic\":[], \"is_fav\":%d,"
-			"\"voting\":%d, \"article_num\":%d, \"score\":%d,"
+			"\"voting\":%d, \"article_num\":%d, \"thread_num\":%d, \"score\":%d,"
 			"\"inboard_num\":%d, \"secstr\":\"%s\", \"today_new\":%d}",
 			seek_in_file(filename, bmem->header.filename),
 			(bmem->header.flag & VOTE_FLAG),
-			bmem->total, bmem->score,
+			bmem->total, thread_num, bmem->score,
 			bmem->inboard, bmem->header.sec1, today_num);
 	struct json_object *jp = json_tokener_parse(buf);
 
