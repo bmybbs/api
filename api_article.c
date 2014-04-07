@@ -391,6 +391,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	const char * str_btype    = onion_request_get_query(req, "btype");
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
+	const char * str_page     = onion_request_get_query(req, "page");
 	const char * userid   = onion_request_get_query(req, "userid");
 	const char * appkey   = onion_request_get_query(req, "appkey");
 	const char * sessid   = onion_request_get_query(req, "sessid");
@@ -462,13 +463,15 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 				++total_article;
 	}
 
+	if(str_page != NULL)		// 如果使用分页参数，则首先依据分页计算
+		startnum = (atoi(str_page) - 1) * count + 1;
+
 	if(startnum == 0)
 		startnum = total_article - count + 1;
 	if(startnum <= 0)
 		startnum = 1;
 	int sum = 0, num = 0;
-	for(i = 0; i < total; ++i)
-	{
+	for(i = 0; i < total; ++i) {
 		// TODO: 高亮标题处理
 		if(0 == mode)
 			++sum;
