@@ -1,4 +1,5 @@
 #include "api.h"
+#include "identify.h"
 
 #define NHASH 67
 /**
@@ -27,6 +28,28 @@ static void remove_uindex(int uid, int utmpent);
 static int cmpfuid(unsigned int *a, unsigned int *b);
 
 static int initfriends(struct user_info *u);
+
+enum activation_code_query_result {
+	ACQR_NOT_EXIST	= -1,	// 激活码不存在
+	ACQR_NORMAL		= 0,	// 激活码正确
+	ACQR_USED		= 1,	// 激活码已使用
+	ACQR_DBERROR	= -2	// 数据库错误
+};
+
+/** 查询激活码是否可用
+ * @param code 激活码
+ * @return 查看 activation_code_query_result
+ */
+static int activation_code_query(char *code);
+
+/** 使用激活码
+ * @brief 变更激活码的状态，同时设定用户 id。
+ * @param code 激活码
+ * @param userid 用户 ID
+ * @return SQL 影响的行数
+ * @warning 可能存在并发，当前应用下不予考虑
+ */
+static int activation_code_set_user(char *code, char *userid);
 
 int api_user_login(ONION_FUNC_PROTO_STR)
 {
@@ -476,4 +499,62 @@ static int initfriends(struct user_info *u)
 static int cmpfuid(unsigned int *a, unsigned int *b)
 {
 	return *a - *b;
+}
+
+static int activation_code_query(char *code)
+{
+	MYSQL *s = NULL;
+	MYSQL_RES *res;
+	MYSQL_ROW *row;
+	int count;
+
+	s = mysql_init(s);
+	if(!my_connect_mysql(s)) {
+		return ACQR_DBERROR;
+	}
+
+	char code_s[10];		// 安全的9位激活码，外加结尾的 '\0'
+	snprintf(code_s, 10, "%s", code);
+	char sql[80];
+	sprintf(sql, "SELECT * FROM activation where code='%s';", code_s);
+	mysql_real_query(s, sql, strlen(sql));
+	res = mysql_store_result(s);
+	row = mysql_fetch_row(res);
+	count = mysql_num_rows(res);
+
+	if(count<1) {
+		mysql_close(s);
+		return ACQR_NOT_EXIST;
+	}
+
+	int is_used = atoi(row[2]);
+	if(is_used) {
+		mysql_close(s);
+		return ACQR_USED;
+	}
+
+	mysql_close(s);
+	return ACQR_NORMAL;
+}
+
+static int activation_code_set_user(char *code, char *userid)
+{
+	MYSQL *s=NULL;
+	int count;
+
+	s = mysql_init(s);
+	if(!my_connect_mysql(s)) {
+		return ACQR_DBERROR;
+	}
+
+	char code_s[10];
+	snprintf(code_s, 10, "%s", code);
+	char sql[80];
+	sprintf(sql, "UPDATE activation SET is_used=1 AND userid='%s' WHERE code='%s'",
+			userid, code_s);
+	mysql_real_query(s, sql, strlen(sql));
+	count = mysql_affected_rows(s);
+
+	mysql_close(s);
+	return count;
 }
