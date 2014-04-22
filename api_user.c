@@ -58,6 +58,8 @@ static int activation_code_set_user(char *code, char *userid);
  */
 static int adduser_with_activation_code(struct userec *x, char *code);
 
+static void api_newcomer(struct userec *x, char *fromhost, char *words);
+
 int api_user_login(ONION_FUNC_PROTO_STR)
 {
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
@@ -281,7 +283,70 @@ int api_user_check_session(ONION_FUNC_PROTO_STR)
 
 int api_user_register(ONION_FUNC_PROTO_STR)
 {
-	return OCS_NOT_IMPLEMENTED;
+	const char *userid = onion_request_get_query(req, "userid");
+	const char *passwd = onion_request_get_query(req, "passwd");
+	const char *active = onion_request_get_query(req, "activation");	// 激活码，仅供测试使用
+	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
+
+	if(userid == NULL || passwd == NULL || active == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	if(id_with_num(userid) || strlen(userid)<2 || strlen(passwd)<4 || strlen(active)!=9) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	if(badstr(passwd) || badstr(userid)) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	if(is_bad_id(userid)) {
+		return api_error(p, req, res, API_RT_FBDUSERNAME);
+	}
+
+	struct userec ue = getuser(userid);
+	if(ue) {
+		free(ue);
+		return api_error(p, req, res, API_RT_USEREXSITED);
+	}
+
+	if(activation_code_query(active) != ACQR_NORMAL) {
+		return api_error(p, req, res, API_RT_WRONGACTIVE);
+	}
+
+	struct userec x;
+	memset(&x, 0, sizeof(x));
+	strsncpy(x.userid, userid, 13);
+
+	char salt[3];
+	getsalt(salt);
+	strsncpy(x.passwd, crypt1(passwd, salt), 14);
+
+	x.userlevel = PERM_BASIC;
+
+	time_t now_t;
+	time(&now_t);
+	x.firstlogin = now_t;
+	x.lastlogin = now_t - 3600;
+	x.userdefine = 01;
+	x.flags[0] = CURSOR_FLAG | PAGER_FLAG;
+
+	adduser_with_activation_code(&x, active);
+
+	char filename[80];
+	sethomepath(filename, userid);
+	mkdir(filename, 0755);
+
+	api_newcomer(&x, fromhost, "");
+
+	char buf[256];
+	sprintf(buf, "%s newaccount %d %s api", x.userid, getusernum(x.userid), fromhost);
+	newtrace(buf);
+
+	api_set_json_header(res);
+	onion_response_write0(res, "{\"errcode\":0}");
+
+	return OCS_PROCESSED;
 }
 
 static int api_do_login(struct userec *ue, const char *fromhost, const char *appkey, time_t login_time, int *utmp_pos)
@@ -465,7 +530,6 @@ static void remove_uindex(int uid, int utmpent)
 	}
 }
 
-
 static int initfriends(struct user_info *u)
 {
 	int i, fnum=0;
@@ -600,4 +664,21 @@ static int adduser_with_activation_code(struct userec *x, char *code)
 	flock(fileno(fp), LOCK_UN);
 	fclose(fp);
 	return (rt == 1) ? ACQR_NORMAL : ACQR_DBERROR;
+}
+
+static void api_newcomer(struct userec *x,char *fromhost, char *words)
+{
+	FILE *fp;
+	char filename[80];
+	sprintf(filename, "bbstmpfs/tmp/%s.tmp", x->userid);
+	fp = fopen(filename, "w");
+	fprintf(fp, "大家好, \n\n");
+	fprintf(fp, "我是 %s(%s), 来自 %s\n", x->userid, x->username, fromhost);
+	fprintf(fp, "今天初来此地报到, 请大家多多指教.\n\n");
+	fprintf(fp, "自我介绍:\n\n");
+	fprintf(fp, "%s", words);
+	fclose(fp);
+	post_article("newcomers", "WWW新手上路", filename, x->userid,
+		     x->username, fromhost, -1, 0, 0, x->userid, -1);
+	unlink(filename);
 }
