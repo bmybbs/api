@@ -190,6 +190,28 @@ int finduseridhash(struct useridhashitem *ptr, int size, const char *userid)
 	return -1;
 }
 
+int insertuseridhash(struct useridhashitem *ptr, int size, char *userid, int num)
+{
+	int h, s, i, j=0;
+	if(!*userid)
+		return -1;
+	h = useridhash(userid);
+	s = size / 26 / 26;
+	i = h * s;
+
+	while (j<s*5 && ptr[i].num>0 && ptr[i].num!=num) {
+		++i;
+		if(i>=size)
+			i%= size;
+	}
+	if(j==s*5)
+		return -1;
+
+	ptr[i].num = num;
+	strcpy(ptr[i].userid, userid);
+	return 0;
+}
+
 /** 依据用户权限位获取本站职位名称
  *
  * @param userlevel
