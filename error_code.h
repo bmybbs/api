@@ -12,6 +12,7 @@ enum api_error_code {
 	API_RT_NOGDBRDFILE	= 7,		///< 没有用户的收藏夹文件
 	API_RT_CNTMAPBRDIR	= 8,		///< 不能 MMAP 版面 .DIR 文件
 	API_RT_ATCLINNERR	= 9,		///< 发文遇到内部错误
+	API_RT_WRONGACTIVE	= 10,		///< 激活码有误
 	API_RT_WRONGPARAM	= 1000,		///< 接口参数错误
 	API_RT_WRONGSESS	= 1001,		///< 错误的session
 	API_RT_NOTLOGGEDIN	= 1002,		///< 没有登录
@@ -25,6 +26,8 @@ enum api_error_code {
 	API_RT_FBDNUSER		= 100004,	///< 用户没有登录权限
 	API_RT_INVSESSID	= 100005,	///< 用户session已失效
 	API_RT_WRONGTOKEN	= 100006,	///< 错误的用户 token
+	API_RT_USEREXSITED	= 100007,	///< 用户已存在
+	API_RT_FBDUSERNAME	= 100008,	///< 非法的用户名
 	API_RT_NOSUCHBRD	= 110000,	///< 没有此版面
 	API_RT_NOBRDRPERM	= 110001,	///< 没有该版面的阅读权限
 	API_RT_EMPTYBRD		= 110002,	///< 版面没有文章
