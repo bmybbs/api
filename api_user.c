@@ -51,6 +51,13 @@ static int activation_code_query(char *code);
  */
 static int activation_code_set_user(char *code, char *userid);
 
+/** 使用激活码注册用户
+ *
+ * @param x
+ * @param code
+ */
+static int adduser_with_activation_code(struct userec *x, char *code);
+
 int api_user_login(ONION_FUNC_PROTO_STR)
 {
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
@@ -270,6 +277,11 @@ int api_user_check_session(ONION_FUNC_PROTO_STR)
 	free(ue);
 
 	return OCS_PROCESSED;
+}
+
+int api_user_register(ONION_FUNC_PROTO_STR)
+{
+	return OCS_NOT_IMPLEMENTED;
 }
 
 static int api_do_login(struct userec *ue, const char *fromhost, const char *appkey, time_t login_time, int *utmp_pos)
@@ -557,4 +569,35 @@ static int activation_code_set_user(char *code, char *userid)
 
 	mysql_close(s);
 	return count;
+}
+
+static int adduser_with_activation_code(struct userec *x, char *code)
+{
+	int i, rt;
+	FILE *fp;
+	fp = fopen(PASSFILE, "r+");
+	flock(fileno(fp), LOCK_EX);
+
+	rt = activation_code_query(code);
+	if(rt!=ACQR_NORMAL) {
+		flock(fileno(fp), LOCK_UN);
+		fclose(fp);
+		return rt;
+	}
+
+	for(i=0; i<MAXUSERS; i++) {
+		if(shm_ucache->userid[i][0]==0) {
+			if((i+1) > shm_ucache->number)
+				shm_ucache->number = i+1;
+			strncpy(shm_ucache->userid[i], x->userid, 13);
+			insertuseridhash(shm_uidhash->uhi, UCACHE_HASH_SIZE, x->userid, i+1);
+			save_user_data(x);
+			break;
+		}
+	}
+
+	rt = activation_code_set_user(code, x->userid);
+	flock(fileno(fp), LOCK_UN);
+	fclose(fp);
+	return (rt == 1) ? ACQR_NORMAL : ACQR_DBERROR;
 }

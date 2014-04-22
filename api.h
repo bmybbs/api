@@ -20,6 +20,7 @@ int api_user_login(ONION_FUNC_PROTO_STR);
 int api_user_query(ONION_FUNC_PROTO_STR);
 int api_user_logout(ONION_FUNC_PROTO_STR);
 int api_user_check_session(ONION_FUNC_PROTO_STR);
+int api_user_register(ONION_FUNC_PROTO_STR);
 
 int api_article_list(ONION_FUNC_PROTO_STR);
 
