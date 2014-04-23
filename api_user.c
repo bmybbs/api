@@ -626,7 +626,7 @@ static int activation_code_set_user(char *code, char *userid)
 	char code_s[10];
 	snprintf(code_s, 10, "%s", code);
 	char sql[160];
-	sprintf(sql, "UPDATE activation SET is_used=1 AND userid='%s' WHERE code='%s'",
+	sprintf(sql, "UPDATE activation SET is_used=1, userid='%s' WHERE code='%s'",
 			userid, code_s);
 	mysql_real_query(s, sql, strlen(sql));
 	count = mysql_affected_rows(s);
