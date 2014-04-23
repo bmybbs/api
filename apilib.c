@@ -861,7 +861,7 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 		char *nickname, char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
 {
 	FILE *fp, *fp1, *fp2;
-	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_utf8;
+	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_gbk;
 	size_t content_utf8_buf_len;
 	struct fileheader header;
 	memset(&header, 0, sizeof(header));
@@ -880,7 +880,6 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 		return -1;
 
 	header.filetime = t;
-	strsncpy(header.title, title, sizeof(header.title));
 	header.accessed |= mark;
 
 	if(outgoing)
@@ -889,16 +888,16 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 	fp1 = fopen(buf3, "w");
 	if(NULL == fp1)
 		return -1;
-	title_utf8 = (char *)malloc(strlen(title)*2);
-	memset(title_utf8, 0, strlen(title)*2);
-	g2u(title, strlen(title), title_utf8, strlen(title)*2);
-
+	title_gbk = (char *)malloc(strlen(title)*2);
+	memset(title_gbk, 0, strlen(title)*2);
+	u2g(title, strlen(title), title_gbk, strlen(title)*2);
+	strsncpy(header.title, title, sizeof(header.title));
 	fp = open_memstream(&content_utf8_buf, &content_utf8_buf_len);
 	fprintf(fp,
 			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n",
-			id, nickname, board, title_utf8, Ctime(now_t),
+			id, nickname, board, title, Ctime(now_t),
 			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
-	free(title_utf8);
+	free(title_gbk);
 	fp2 = fopen(filename, "r");
 	if(fp2!=0) {
 		while(1) {  // 将 bbstmpfs 中文章主体的内容写到 content_utf8_buf 中

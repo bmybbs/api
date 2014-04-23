@@ -177,7 +177,7 @@ char * calc_perf_str_utf8(int perf);
  * @brief 实际处理发文的函数。
  * 该函数来自 nju09。
  * @param board 版面名称
- * @param title 文章标题
+ * @param title 文章标题, utf8 编码
  * @param filename 位于 bbstmpfs 中的文章内容
  * @param id 用于显示的作者 id
  * @param nickname 作者昵称
