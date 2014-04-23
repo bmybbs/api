@@ -172,4 +172,24 @@ char * calc_exp_str_utf8(int exp);
  * @return
  */
 char * calc_perf_str_utf8(int perf);
+
+/**
+ * @brief 实际处理发文的函数。
+ * 该函数来自 nju09。
+ * @param board 版面名称
+ * @param title 文章标题
+ * @param filename 位于 bbstmpfs 中的文章内容
+ * @param id 用于显示的作者 id
+ * @param nickname 作者昵称
+ * @param ip 来自 ip
+ * @param sig 选用的签名档数字
+ * @param mark fileheader 的标记
+ * @param outgoing 是否转信
+ * @param realauthor 实际的作者 id
+ * @param thread 主题编号
+ * @return 返回文件名中实际使用的时间戳
+ */
+static int do_article_post(char *board, char *title, char *filename, char *id,
+		char *nickname, char *ip, int sig, int mark,
+		int outgoing, char *realauthor, int thread);
 #endif

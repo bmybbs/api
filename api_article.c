@@ -77,26 +77,6 @@ enum API_POST_TYPE {
 static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode);
 
 /**
- * @brief 实际处理发文的函数。
- * 该函数来自 nju09。
- * @param board 版面名称
- * @param title 文章标题
- * @param filename 位于 bbstmpfs 中的文章内容
- * @param id 用于显示的作者 id
- * @param nickname 作者昵称
- * @param ip 来自 ip
- * @param sig 选用的签名档数字
- * @param mark fileheader 的标记
- * @param outgoing 是否转信
- * @param realauthor 实际的作者 id
- * @param thread 主题编号
- * @return 返回文件名中实际使用的时间戳
- */
-static int do_article_post(char *board, char *title, char *filename, char *id,
-		char *nickname, char *ip, int sig, int mark,
-		int outgoing, char *realauthor, int thread);
-
-/**
  * @brief 通过版面名，文章ID，查找对应主题ID
  * @param board : board name 
  * @param filetime : file id
@@ -1196,91 +1176,4 @@ static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *
 	}
 
 	return NULL;
-}
-
-static int do_article_post(char *board, char *title, char *filename, char *id,
-		char *nickname, char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
-{
-	FILE *fp, *fp1, *fp2;
-	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_utf8;
-	size_t content_utf8_buf_len;
-	struct fileheader header;
-	memset(&header, 0, sizeof(header));
-	int t;
-
-	if(strcasecmp(id, "Anonymous") != 0)
-		fh_setowner(&header, id, 0);
-	else
-		fh_setowner(&header, realauthor, 1);
-
-	sprintf(buf3, "boards/%s/", board);
-
-	time_t now_t = time(NULL);
-	t = trycreatefile(buf3, "M.%d.A", now_t, 100);
-	if(t<0)
-		return -1;
-
-	header.filetime = t;
-	strsncpy(header.title, title, sizeof(header.title));
-	header.accessed |= mark;
-
-	if(outgoing)
-		header.accessed |= FH_INND;
-
-	fp1 = fopen(buf3, "w");
-	if(NULL == fp1)
-		return -1;
-	title_utf8 = (char *)malloc(strlen(title)*2);
-	memset(title_utf8, 0, strlen(title)*2);
-	g2u(title, strlen(title), title_utf8, strlen(title)*2);
-
-	fp = open_memstream(&content_utf8_buf, &content_utf8_buf_len);
-	fprintf(fp,
-			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n",
-			id, nickname, board, title_utf8, Ctime(now_t),
-			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
-	free(title_utf8);
-	fp2 = fopen(filename, "r");
-	if(fp2!=0) {
-		while(1) {  // 将 bbstmpfs 中文章主体的内容写到 content_utf8_buf 中
-			int retv = fread(buf3, 1, sizeof(buf3), fp2);
-			if(retv<=0)
-				break;
-			fwrite(buf3, 1, retv, fp);
-		}
-
-		fclose(fp2);
-	}
-
-	// TODO: QMD
-	fprintf(fp, "\n--\n");
-	// sig_append
-
-	fprintf(fp, "\033[1;%dm※ 来源:．兵马俑BBS %s [FROM: %.20s]\033[0m\n",
-			31+rand()%7, MY_BBS_DOMAIN " API", ip);
-
-	fflush(fp);
-	fclose(fp);
-
-	content_gbk_buf = (char *)malloc(content_utf8_buf_len *2);
-	memset(content_gbk_buf, 0, content_utf8_buf_len *2);
-	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len*2);
-	fprintf(fp1, "%s", content_gbk_buf);
-	fclose(fp1);
-
-	sprintf(buf3, "boards/%s/M.%d.A", board, t);
-	header.sizebyte = numbyte(eff_size(buf3));
-
-	if(thread == -1)
-		header.thread = header.filetime;
-	else
-		header.thread = thread;
-
-	sprintf(buf3, "boards/%s/.DIR", board);
-	append_record(buf3, &header, sizeof(header));
-
-	//if(outgoing)
-
-	//updatelastpost(board);  //TODO:
-	return t;
 }

@@ -304,7 +304,7 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_FBDUSERNAME);
 	}
 
-	struct userec ue = getuser(userid);
+	struct userec *ue = getuser(userid);
 	if(ue) {
 		free(ue);
 		return api_error(p, req, res, API_RT_USEREXSITED);
@@ -678,7 +678,7 @@ static void api_newcomer(struct userec *x,char *fromhost, char *words)
 	fprintf(fp, "自我介绍:\n\n");
 	fprintf(fp, "%s", words);
 	fclose(fp);
-	post_article("newcomers", "WWW新手上路", filename, x->userid,
+	do_article_post("newcomers", "WWW新手上路", filename, x->userid,
 		     x->username, fromhost, -1, 0, 0, x->userid, -1);
 	unlink(filename);
 }
