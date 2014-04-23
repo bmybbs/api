@@ -189,7 +189,7 @@ char * calc_perf_str_utf8(int perf);
  * @param thread 主题编号
  * @return 返回文件名中实际使用的时间戳
  */
-static int do_article_post(char *board, char *title, char *filename, char *id,
-		char *nickname, char *ip, int sig, int mark,
-		int outgoing, char *realauthor, int thread);
+int do_article_post(char *board, char *title, char *filename, char *id,
+					char *nickname, char *ip, int sig, int mark,
+					int outgoing, char *realauthor, int thread);
 #endif
