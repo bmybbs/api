@@ -638,14 +638,13 @@ static int activation_code_set_user(char *code, char *userid)
 static int adduser_with_activation_code(struct userec *x, char *code)
 {
 	int i, rt;
-	FILE *fp;
-	fp = fopen(PASSFILE, "r+");
-	flock(fileno(fp), LOCK_EX);
+	int fd = open(PASSFILE ".lock", O_RDONLY | O_CREAT, 0600);
+	flock(fd, LOCK_EX);
 
 	rt = activation_code_query(code);
 	if(rt!=ACQR_NORMAL) {
-		flock(fileno(fp), LOCK_UN);
-		fclose(fp);
+		flock(fd, LOCK_UN);
+		close(fd);
 		return rt;
 	}
 
@@ -661,8 +660,8 @@ static int adduser_with_activation_code(struct userec *x, char *code)
 	}
 
 	rt = activation_code_set_user(code, x->userid);
-	flock(fileno(fp), LOCK_UN);
-	fclose(fp);
+	flock(fd, LOCK_UN);
+	fclose(fd);
 	return (rt == 1) ? ACQR_NORMAL : ACQR_DBERROR;
 }
 
@@ -678,7 +677,7 @@ static void api_newcomer(struct userec *x,char *fromhost, char *words)
 	fprintf(fp, "自我介绍:\n\n");
 	fprintf(fp, "%s", words);
 	fclose(fp);
-	do_article_post("newcomers", "WWW新手上路", filename, x->userid,
+	do_article_post("newcomers", "API 新手上路", filename, x->userid,
 		     x->username, fromhost, -1, 0, 0, x->userid, -1);
 	unlink(filename);
 }
