@@ -891,7 +891,7 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 	title_gbk = (char *)malloc(strlen(title)*2);
 	memset(title_gbk, 0, strlen(title)*2);
 	u2g(title, strlen(title), title_gbk, strlen(title)*2);
-	strsncpy(header.title, title, sizeof(header.title));
+	strsncpy(header.title, title_gbk, sizeof(header.title));
 	fp = open_memstream(&content_utf8_buf, &content_utf8_buf_len);
 	fprintf(fp,
 			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n",
