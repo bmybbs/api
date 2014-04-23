@@ -661,7 +661,7 @@ static int adduser_with_activation_code(struct userec *x, char *code)
 
 	rt = activation_code_set_user(code, x->userid);
 	flock(fd, LOCK_UN);
-	fclose(fd);
+	close(fd);
 	return (rt == 1) ? ACQR_NORMAL : ACQR_DBERROR;
 }
 
