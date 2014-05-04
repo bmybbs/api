@@ -653,6 +653,9 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	const char * sessid = onion_request_get_query(req, "sessid");
 	const char * appkey = onion_request_get_query(req, "appkey");
 
+	if(!userid || !sessid || !appkey)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
 	struct userec *ue = getuser(userid);
 	if(ue == 0)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
