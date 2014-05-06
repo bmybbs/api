@@ -322,13 +322,13 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 	getsalt(salt);
 	strsncpy(x.passwd, crypt1(passwd, salt), 14);
 
-	x.userlevel = PERM_BASIC;
+	x.userlevel = PERM_DEFAULT;
 
 	time_t now_t;
 	time(&now_t);
 	x.firstlogin = now_t;
 	x.lastlogin = now_t - 3600;
-	x.userdefine = 01;
+	x.userdefine = -1;
 	x.flags[0] = CURSOR_FLAG | PAGER_FLAG;
 
 	adduser_with_activation_code(&x, active);
