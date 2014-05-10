@@ -918,11 +918,11 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	int r;
 	if(is_anony) {
-		r = do_article_post(bmem->header.filename, title_gbk, filename, "Anonymous",
+		r = do_article_post(bmem->header.filename, title, filename, "Anonymous",
 				"我是匿名天使", "匿名天使的家", 0, mark,
 				0, ui->userid, thread);
 	} else {
-		r = do_article_post(bmem->header.filename, title_gbk, filename, ui->userid,
+		r = do_article_post(bmem->header.filename, title, filename, ui->userid,
 				ui->username, fromhost, 0, mark,
 				0, ui->userid, thread);
 	}
