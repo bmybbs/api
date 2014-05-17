@@ -548,6 +548,11 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 		if(fgets(buf, 500, article_stream) == 0)
 			break;
 
+		// RAW 模式下跳过qmd
+		if(mode == ARTICLE_PARSE_WITHOUT_ANSICOLOR
+				&& strncmp(buf, "--\n", 3) == 0)
+			break;
+
 		// 附件处理
 		if(!strncmp(buf, "begin 644", 10)) {
 			// TODO: 老方式暂不实现
