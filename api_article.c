@@ -358,7 +358,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		++count;
 	}
 	fclose(fp);
-	char *s = bmy_article_array_to_json_string(commend_list, count, 0);
+	char *s = bmy_article_array_to_json_string(commend_list, count, 1);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
@@ -627,7 +627,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	for(i = 0; i < num; ++i){
 		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 	}
-	char *s = bmy_article_array_to_json_string(board_list, num, 0);
+	char *s = bmy_article_array_to_json_string(board_list, num, 1);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
