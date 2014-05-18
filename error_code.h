@@ -13,6 +13,7 @@ enum api_error_code {
 	API_RT_CNTMAPBRDIR	= 8,		///< 不能 MMAP 版面 .DIR 文件
 	API_RT_ATCLINNERR	= 9,		///< 发文遇到内部错误
 	API_RT_WRONGACTIVE	= 10,		///< 激活码有误
+	API_RT_NOBRDTPFILE	= 11,		///< 没有版面置顶文件
 	API_RT_WRONGPARAM	= 1000,		///< 接口参数错误
 	API_RT_WRONGSESS	= 1001,		///< 错误的session
 	API_RT_NOTLOGGEDIN	= 1002,		///< 没有登录

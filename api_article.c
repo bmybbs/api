@@ -63,6 +63,8 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR);
  */
 static int api_article_list_thread(ONION_FUNC_PROTO_STR);
 
+static int api_article_list_boardtop(ONION_FUNC_PROTO_STR);
+
 enum API_POST_TYPE {
 	API_POST_TYPE_POST,		///< 发帖模式
 	API_POST_TYPE_REPLY		///< 回帖模式
@@ -168,6 +170,8 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 
 	} else if(strcasecmp(type, "thread")==0) { // 同主题列表
 		return api_article_list_thread(p, req, res);
+	} else if(strcasecmp(type, "boardtop")==0) {
+		return api_article_list_boardtop(p, req, res);
 	} else
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 }
@@ -632,6 +636,77 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	onion_response_write0(res, s);
 	free(s);
 	return OCS_PROCESSED;	
+}
+
+static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
+{
+	const char * board	= onion_request_get_query(req, "board");
+	const char * userid	= onion_request_get_query(req, "userid");
+	const char * appkey	= onion_request_get_query(req, "appkey");
+	const char * sessid	= onion_request_get_query(req, "sessid");
+	//判断必要参数
+	if(!(board && userid && appkey && sessid))
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	//TODO: 签名检查
+	//...
+	//判断版面访问权
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL){
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	if(ue != NULL)
+		free(ue);
+
+	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct boardmem *b   = getboardbyname(board);
+	if(b == NULL)
+		return api_error(p, req, res, API_RT_NOSUCHBRD);
+
+	if(!check_user_read_perm_x(ui, b))
+		return api_error(p, req, res, API_RT_NOBRDRPERM);
+
+	char topdir[80];
+	FILE *fp;
+	struct fileheader x;
+	sprintf(topdir, "boards/%s/.TOPFILE", b->header.filename);
+	fp = fopen(topdir, "r");
+	if(fp == 0)
+		return api_error(p, req, res, API_RT_NOBRDTPFILE);
+
+	int count = file_size(topdir) / sizeof(struct fileheader);
+	struct bmy_article board_list[count];
+	memset(board_list, 0, sizeof(struct bmy_article) * count);
+
+	int i;
+	for(i = 0; i<count; ++i) {
+		fread(&x, sizeof(x), 1, fp);
+
+		board_list[i].filetime = x.filetime;
+		board_list[i].mark = x.accessed;
+		board_list[i].sequence_num = 0;
+		board_list[i].thread = x.thread;
+		board_list[i].th_num = get_number_of_articles_in_thread(b->header.filename, x.thread);
+
+		strcpy(board_list[i].board, b->header.filename);
+		strcpy(board_list[i].author, fh2owner(&x));
+		g2u(x.title, strlen(x.title), board_list[i].title, 80);
+	}
+
+	fclose(fp);
+
+	char *s = bmy_article_array_to_json_string(board_list, count, 1);
+	api_set_json_header(res);
+	onion_response_write0(res, s);
+	free(s);
+
+	return OCS_PROCESSED;
 }
 
 static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
