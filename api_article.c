@@ -1,17 +1,5 @@
 #include "api.h"
 
-struct bmy_article {
-	int type;				///< 类型，1表示主题，0表示一般文章
-	char title[80];			///< 标题
-	char board[24];			///< 版面id
-	char author[16];		///< 作者id
-	int filetime;			///< fileheader.filetime，可以理解为文章id
-	int thread;				///< 主题id
-	int th_num;				///< 参与主题讨论的人数
-	unsigned int mark; 		///< 文章标记，fileheader.accessed
-	int sequence_num;		///< 文章在版面的序号
-};
-
 /**
  * @brief 将 struct bmy_article 数组序列化为 json 字符串。
  * 这个方法不考虑异常，因此方法里确定了 errcode 为 0，也就是 API_RT_SUCCESSFUL，

@@ -28,6 +28,18 @@ enum article_parse_mode {
 	ARTICLE_PARSE_WITHOUT_ANSICOLOR		///< 将 \033 字符转换为 [ESC]
 };
 
+struct bmy_article {
+	int type;				///< 类型，1表示主题，0表示一般文章
+	char title[80];			///< 标题
+	char board[24];			///< 版面id
+	char author[16];		///< 作者id
+	int filetime;			///< fileheader.filetime，可以理解为文章id
+	int thread;				///< 主题id
+	int th_num;				///< 参与主题讨论的人数
+	unsigned int mark; 		///< 文章标记，fileheader.accessed
+	int sequence_num;		///< 文章在版面的序号
+};
+
 struct attach_link {
 	char link[256];
 	unsigned int size;
