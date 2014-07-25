@@ -33,6 +33,14 @@ int api_article_reply(ONION_FUNC_PROTO_STR);			// 回帖
 int api_board_list(ONION_FUNC_PROTO_STR);
 int api_board_info(ONION_FUNC_PROTO_STR);
 
+int api_mail_list(ONION_FUNC_PROTO_STR);
+
+int api_mail_getHTMLContent(ONION_FUNC_PROTO_STR);
+int api_mail_getRAWContent(ONION_FUNC_PROTO_STR);
+
+int api_mail_send(ONION_FUNC_PROTO_STR);
+int api_mail_reply(ONION_FUNC_PROTO_STR);
+
 int api_meta_loginpics(ONION_FUNC_PROTO_STR);			// 进站画面
 
 /**
