@@ -14,6 +14,7 @@ enum api_error_code {
 	API_RT_ATCLINNERR	= 9,		///< 发文遇到内部错误
 	API_RT_WRONGACTIVE	= 10,		///< 激活码有误
 	API_RT_NOBRDTPFILE	= 11,		///< 没有版面置顶文件
+	API_RT_NOTENGMEM	= 12,		///< 没有足够的内存
 	API_RT_WRONGPARAM	= 1000,		///< 接口参数错误
 	API_RT_WRONGSESS	= 1001,		///< 错误的session
 	API_RT_NOTLOGGEDIN	= 1002,		///< 没有登录
@@ -38,6 +39,9 @@ enum api_error_code {
 	API_RT_ATCLDELETED	= 120001,	///< 文章已被删除
 	API_RT_ATCLNOTITLE	= 120002,	///< 文章缺少标题
 	API_RT_ATCLFBDREPLY	= 120003,	///< 文章禁止回复
+	API_RT_MAILDIRERR	= 130000,	///< 用户邮箱索引错误
+	API_RT_MAILEMPTY	= 130001,	///< 用户没有邮件
+	API_RT_MAILATTERR	= 130002,	///< 邮件附件错误
 };
 
 #endif
