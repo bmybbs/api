@@ -83,7 +83,10 @@ static void output_binary_attach(onion_response *res, char *filename, char *atta
 		return ;
 	}
 
-	onion_response_set_header(res, "Content-Type: %s\nContent-Length: %d\n\n", get_mime_type(filename), size);
+	char size_str[16];
+	sprintf(size_str, "%d", size);
+	onion_response_set_header(res, "Content-Type", get_mime_type(filename));
+	onion_response_set_header(res, "Content-Length", size_str);
 	onion_response_write(res, mf.ptr+attachpos+4, size);
 
 	mmapfile(NULL, &mf);
