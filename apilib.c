@@ -538,7 +538,7 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 	FILE *mem_stream, *html_stream;
 	char buf[512], link[256], *tmp_buf, *mem_buf, *html_buf, *attach_filename;
 	size_t mem_buf_len, html_buf_len, attach_file_size;
-	int attach_no;
+	int attach_no = 0;
 
 	mem_stream = open_memstream(&mem_buf, &mem_buf_len);
 	fseek(article_stream, 0, SEEK_SET);
