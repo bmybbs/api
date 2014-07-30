@@ -429,11 +429,11 @@ char *string_replace(char *ori, const char *old, const char *new)
 	return ori;
 }
 
-void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size)
+void add_attach_link(struct attach_link **attach_link_list, const char *str_link, const unsigned int size)
 {
 	struct attach_link *a = (struct attach_link *)malloc(sizeof(struct attach_link));
 	memset(a, 0, sizeof(*a));
-	strncpy(a->link, link, 256);
+	strncpy(a->link, str_link, 256);
 	a->size = size;
 
 	if(!(*attach_link_list))
@@ -536,7 +536,7 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 		return NULL;
 
 	FILE *mem_stream, *html_stream;
-	char buf[512], link[256], *tmp_buf, *mem_buf, *html_buf, *attach_filename;
+	char buf[512], attach_link[256], *tmp_buf, *mem_buf, *html_buf, *attach_filename;
 	size_t mem_buf_len, html_buf_len, attach_file_size;
 	int attach_no = 0;
 
@@ -564,10 +564,10 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 			attach_no++;
 			attach_filename = buf + 18;
 			fprintf(mem_stream, "#attach %s\n", attach_filename);
-			memset(link, 0, 256);
-			snprintf(link, 256, "http://%s:8080/%s/%s/%d/%s", MY_BBS_DOMAIN,
+			memset(attach_link, 0, 256);
+			snprintf(attach_link, 256, "http://%s:8080/%s/%s/%d/%s", MY_BBS_DOMAIN,
 					bname, fname, -4+(int)ftell(article_stream), attach_filename);
-			add_attach_link(attach_link_list, link, attach_file_size);
+			add_attach_link(attach_link_list, attach_link, attach_file_size);
 			fseek(article_stream, attach_file_size, SEEK_CUR);
 			continue;
 		}
