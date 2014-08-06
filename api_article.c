@@ -53,11 +53,6 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR);
 
 static int api_article_list_boardtop(ONION_FUNC_PROTO_STR);
 
-enum API_POST_TYPE {
-	API_POST_TYPE_POST,		///< 发帖模式
-	API_POST_TYPE_REPLY		///< 回帖模式
-};
-
 /**
  * @brief 实际处理发文的接口。
  * 使用 api_article_post 和 api_article_reply 封装。

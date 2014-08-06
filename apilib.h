@@ -28,6 +28,11 @@ enum article_parse_mode {
 	ARTICLE_PARSE_WITHOUT_ANSICOLOR		///< 将 \033 字符转换为 [ESC]
 };
 
+enum API_POST_TYPE {
+	API_POST_TYPE_POST,		///< 发帖模式
+	API_POST_TYPE_REPLY		///< 回帖模式
+};
+
 struct bmy_article {
 	int type;				///< 类型，1表示主题，0表示一般文章
 	char title[80];			///< 标题
