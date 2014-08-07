@@ -42,6 +42,9 @@ enum api_error_code {
 	API_RT_MAILDIRERR	= 130000,	///< 用户邮箱索引错误
 	API_RT_MAILEMPTY	= 130001,	///< 用户没有邮件
 	API_RT_MAILATTERR	= 130002,	///< 邮件附件错误
+	API_RT_MAILNOPPERM	= 130003,	///< 用户没有发邮件的权限
+	API_RT_MAILFULL		= 130004,	///< 邮箱已满
+	API_RT_INUSERBLIST	= 130005,	///< 在对方黑名单中
 };
 
 #endif
