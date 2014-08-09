@@ -2,9 +2,9 @@
 
 static int api_attach_show_mail(ONION_FUNC_PROTO_STR);
 
-static void output_binary_attach(onion_response *res, char *filename, char *attachname, int *attachpos);
+static void output_binary_attach(onion_response *res, const char *filename, const char *attachname, int attachpos);
 
-static char * get_mime_type(char *name);
+static char * get_mime_type(const char *name);
 
 int api_attach_show(ONION_FUNC_PROTO_STR)
 {
@@ -41,13 +41,14 @@ static int api_attach_show_mail(ONION_FUNC_PROTO_STR)
 	char mailfilename[STRLEN];
 	sprintf(mailfilename, MY_BBS_HOME "/mail/%c/%s/M.%s.A", mytoupper(ue->userid[0]), ue->userid, str_mid);
 
+
 	output_binary_attach(res, mailfilename, attname, atoi(str_pos));
 
 	free(ue);
 	return OCS_PROCESSED;
 }
 
-static void output_binary_attach(onion_response *res, char *filename, char *attachname, int *attachpos)
+static void output_binary_attach(onion_response *res, const char *filename, const char *attachname, int attachpos)
 {
 	struct mmapfile mf = {ptr:NULL};
 
@@ -92,7 +93,7 @@ static void output_binary_attach(onion_response *res, char *filename, char *atta
 	mmapfile(NULL, &mf);
 }
 
-static char * get_mime_type(char *name)
+static char * get_mime_type(const char *name)
 {
 	char * dot = strrchr(name, '.');
 
