@@ -209,4 +209,12 @@ char * calc_perf_str_utf8(int perf);
 int do_article_post(char *board, char *title, char *filename, char *id,
 					char *nickname, char *ip, int sig, int mark,
 					int outgoing, char *realauthor, int thread);
+
+/**
+ * @brief 将 ansi 颜色控制转换成 HTML 标记
+ * 该方法来自 theZiz/aha。略作修改。
+ * @param in_stream 读入的流
+ * @param out_stream 输出的流
+ */
+void aha_convert(FILE *in_stream, FILE *out_stream);
 #endif
