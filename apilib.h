@@ -211,6 +211,23 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 					int outgoing, char *realauthor, int thread);
 
 /**
+ * @brief 实际处理发站内信的函数。
+ * 该函数参考 nju09。其中 filename 指向的文件需为 gbk 编码。本函数仅用于对站内用户发信。
+ * @warning 需要提前做好用户是否可用的验证。
+ * @param to_userid 指向的用户
+ * @param title 站内信标题，utf8 编码
+ * @param filename 位于 bbstmpfs 中的文章内容
+ * @param id 用于显示的作者 id
+ * @param nickname 作者昵称
+ * @param ip 来自 ip
+ * @param sig 选用的签名档数字
+ * @param mark fileheader 的标记
+ * @return 返回文件名中实际使用的时间戳
+ */
+int do_mail_post(char *to_userid, char *title, char *filename, char *id,
+				 char *nickname, char *ip, int sig, int mark);
+
+/**
  * @brief 将 ansi 颜色控制转换成 HTML 标记
  * 该方法来自 theZiz/aha。略作修改。
  * @param in_stream 读入的流
