@@ -43,6 +43,8 @@ int api_mail_reply(ONION_FUNC_PROTO_STR);
 
 int api_meta_loginpics(ONION_FUNC_PROTO_STR);			// 进站画面
 
+int api_attach_show(ONION_FUNC_PROTO_STR);				// 显示附件
+
 /**
  * @brief 为 onion_response 添加 json 的 MIME 信息
  * @param res
