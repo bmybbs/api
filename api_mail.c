@@ -82,7 +82,6 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 	fclose(fp);
 
-	//struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	char *s = bmy_mail_array_to_json_string(mail_list, count, 0, ue);
 
 	api_set_json_header(res);
