@@ -47,6 +47,12 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^board/list$", api_board_list);
 	onion_url_add(urls, "^board/info$", api_board_info);
 	onion_url_add(urls, "^meta/loginpics", api_meta_loginpics);
+	onion_url_add(urls, "^mail/list$", api_mail_list);
+	onion_url_add(urls, "^mail/getHTMLContent$", api_mail_getHTMLContent);
+	onion_url_add(urls, "^mail/getRAWContent$", api_mail_getRAWContent);
+	onion_url_add(urls, "^mail/post$", api_mail_send);
+	onion_url_add(urls, "^mail/reply$", api_mail_reply);
+	onion_url_add(urls, "^attach/show$", api_attach_show);
 
 	onion_listen(o);
 
