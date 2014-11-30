@@ -53,6 +53,7 @@ int api_attach_show(ONION_FUNC_PROTO_STR);				// 显示附件
 static inline void api_set_json_header(onion_response *res)
 {
 	onion_response_set_header(res, "Content-Type", "application/json; charset=utf-8");
+	onion_response_set_header(res, "access-control-allow-origin", "*");
 }
 
 #endif
