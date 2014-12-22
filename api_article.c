@@ -431,7 +431,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	}
 
 	if(str_page != NULL)		// 如果使用分页参数，则首先依据分页计算
-		startnum = (atoi(str_page) - 1) * count + 1;
+		startnum = total_article - count * (atoi(str_page)) + 1;
 
 	if(startnum == 0)
 		startnum = total_article - count + 1;
