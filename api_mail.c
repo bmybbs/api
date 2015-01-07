@@ -1,5 +1,10 @@
 #include "api.h"
 
+enum api_mail_box_type {
+	API_MAIL_RECIEVE_BOX,
+	API_MAIL_SENT_BOX
+};
+
 /** 获取用户的邮箱大小
  *
  * @param
