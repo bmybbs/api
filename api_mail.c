@@ -31,6 +31,7 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 	const char * userid   = onion_request_get_query(req, "userid");
 	const char * appkey   = onion_request_get_query(req, "appkey");
 	const char * sessid   = onion_request_get_query(req, "sessid");
+	const char * box_type  = onion_request_get_query(req, "box_type");
 
 	if(!userid || !appkey || !sessid)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -50,7 +51,12 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 	char mail_dir[80];
 
-	setmailfile(mail_dir, ue->userid, ".DIR");
+	int box_type_i = (box_type != NULL && box_type[0] == '1') ? API_MAIL_SENT_BOX : API_MAIL_RECIEVE_BOX;
+	if(box_type_i == API_MAIL_RECIEVE_BOX)
+		setmailfile(mail_dir, ue->userid, ".DIR");
+	else
+		setsentmailfile(mail_dir, ue->userid, ".DIR");
+
 	int total = file_size(mail_dir) / sizeof(struct fileheader);
 
 	if(!total) {
