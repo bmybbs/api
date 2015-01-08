@@ -228,6 +228,22 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 				 char *nickname, char *ip, int sig, int mark);
 
 /**
+ * @brief 保存邮件到发件箱
+ * 该函数参考 nju09 的实现。为 2014.12 新增的功能
+ * @param userid 发件人 ID
+ * @param title
+ * @param filename
+ * @param id 收件人 ID
+ * @param nickname
+ * @param ip
+ * @param sig
+ * @param mark
+ * @return
+ */
+int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
+		 char *nickname, char *ip, int sig, int mark)
+
+/**
  * @brief 将 ansi 颜色控制转换成 HTML 标记
  * 该方法来自 theZiz/aha。略作修改。
  * @param in_stream 读入的流

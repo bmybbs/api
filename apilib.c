@@ -999,3 +999,63 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 	append_record(buf, &header, sizeof(header));
 	return 0;
 }
+
+int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
+				 char *nickname, char *ip, int sig, int mark)
+{
+	FILE *fp, *fp2;
+	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];
+	struct fileheader header;
+	int t;
+
+	memset(&header, 0, sizeof(header));
+	fh_setowner(&header, id, 0);
+	setsentmailfile(buf, userid, "");
+
+	time_t now_t = time(NULL);
+	t = trycreatefile(buf, "M.%d.A", now_t, 100);
+
+	if(t<0)
+		return -1;
+
+	header.filetime = t;
+	header.thread = t;
+	u2g(title, strlen(title), header.title, sizeof(header.title));
+	header.accessed |= mark;
+
+	fp = fopen(buf, "w");
+	if(fp == 0)
+		return -2;
+
+	fp2 = fopen(filename, "r");
+
+	sprintf(tmp_utf_buf, "收信人: %s (%s)\n标  题: %s\n发信站: 兵马俑BBS (%s)\n来  源: %s\n\n",
+			id, nickname, title, Ctime(now_t), ip);
+	u2g(tmp_utf_buf, 1024, tmp_gbk_buf, 1024);
+	fwrite(tmp_gbk_buf, 1, strlen(tmp_gbk_buf), fp);
+
+	if(fp2) {
+		int retv;
+		while(1) {
+			retv = fread(buf, 1, sizeof(buf), fp2);
+			if(retv<=0)
+				break;
+			fwrite(buf, 1, retv, fp);
+		}
+		fclose(fp2);
+	}
+
+	fprintf(fp, "\n--\n");
+	// TODO QMD
+	// sig_append();
+
+	sprintf(tmp_utf_buf, "\033[1;%dm※ 来源:．兵马俑BBS %s [FROM: %.20s]\033[0m\n",
+			31+rand()%7, MY_BBS_DOMAIN " API", ip);
+	u2g(tmp_utf_buf, 1024, tmp_gbk_buf, 1024);
+	fwrite(tmp_gbk_buf, 1, strlen(tmp_gbk_buf), fp);
+	fclose(fp);	// 输出完成
+
+	setsentmailfile(buf, userid, ".DIR");
+	append_record(buf, &header, sizeof(header));
+	return 0;
+}
