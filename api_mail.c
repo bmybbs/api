@@ -194,6 +194,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	const char * sessid = onion_request_get_query(req, "sessid");
 	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * str_num = onion_request_get_query(req, "num");
+	const char * box_type  = onion_request_get_query(req, "box_type");
 
 	if(!userid || !sessid || !appkey || !str_num)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -209,7 +210,13 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	char mail_dir[80];
 	struct fileheader fh;
-	setmailfile(mail_dir, ue->userid, ".DIR");
+
+	int box_type_i = (box_type != NULL && box_type[0] == '1') ? API_MAIL_SENT_BOX : API_MAIL_RECIEVE_BOX;
+	if(box_type_i == API_MAIL_RECIEVE_BOX)
+		setmailfile(mail_dir, ue->userid, ".DIR");
+	else
+		setsentmailfile(mail_dir, ue->userid, ".DIR");
+
 	FILE *fp = fopen(mail_dir, "r");
 	if(fp==0) {
 		free(ue);
