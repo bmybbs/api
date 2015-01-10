@@ -426,7 +426,7 @@ static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode)
 	r = do_mail_post(to_user->userid, title, filename, currentuser.userid,
 			currentuser.username, fromhost, 0, mark);
 	if(backup && strcasecmp(backup, "true")==0) {
-		do_mail_post(currentuser.userid, title_tmp2, filename, currentuser.userid,
+		do_mail_post_to_sent_box(currentuser.userid, title_tmp2, filename, currentuser.userid,
 			currentuser.username, fromhost, 0, mark);
 	}
 
