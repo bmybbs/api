@@ -296,10 +296,6 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	json_object_put(jp);
 
 	api_set_json_header(res);
-	char size_str[16];
-	/*sprintf(size_str, "%d", strlen(api_output));
-	onion_response_set_header(res, "Content-Length", size_str);
-	onion_response_write_headers(res);*/
 	onion_response_write0(res, api_output);
 	free(api_output);
 
