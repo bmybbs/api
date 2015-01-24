@@ -38,8 +38,8 @@ struct bmy_article {
 	char title[80];			///< 标题
 	char board[24];			///< 版面id
 	char author[16];		///< 作者id
-	int filetime;			///< fileheader.filetime，可以理解为文章id
-	int thread;				///< 主题id
+	time_t filetime;		///< fileheader.filetime，可以理解为文章id
+	time_t thread;			///< 主题id
 	int th_num;				///< 参与主题讨论的人数
 	unsigned int mark; 		///< 文章标记，fileheader.accessed
 	int sequence_num;		///< 文章在版面的序号
