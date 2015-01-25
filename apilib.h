@@ -250,4 +250,22 @@ int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id
  * @param out_stream 输出的流
  */
 void aha_convert(FILE *in_stream, FILE *out_stream);
+
+/**
+ * @brief 依据用户名、标题关键字搜索用户一段时间内的发帖情况
+ * 参考 nju09/bbsfind.c search() 实现
+ * @param articles_array 存放查询结果的数组，使用前请先初始化
+ * @param max_searchnum 最多的查询条数
+ * @param ui_currentuser 当前用户的 struct user_info 信息
+ * @param query_userid 查询的用户 id
+ * @param title_keyword1 标题关键字1
+ * @param title_keyword2 标题关键字2
+ * @param title_keyword3 标题关键字3
+ * @param searchtime 和当前时间相比，搜索的时间段，单位秒
+ * @return 包含的记录条数
+ */
+int search_user_article_with_title_keywords(struct bmy_article *articles_array,
+		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
+		char *title_keyword1, char *title_keyword2, char *title_keyword3,
+		int searchtime);
 #endif
