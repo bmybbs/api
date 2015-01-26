@@ -349,6 +349,102 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
+int api_user_articlequery(ONION_FUNC_PROTO_STR)
+{
+	const char *userid = onion_request_get_query(req, "userid");
+	const char *sessid = onion_request_get_query(req, "sessid");
+	const char *appkey = onion_request_get_query(req, "appkey");
+	const char *qryuid = onion_request_get_query(req, "query_user");
+	const char *qryday_str = onion_request_get_query(req, "query_day");
+
+	if(userid == NULL || sessid == NULL || appkey == NULL || qryuid == NULL)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0) {
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
+	struct userec *query_ue = getuser(qryuid);
+	if(query_ue == 0) {
+		// 查询的对方用户不存在
+		free(ue);
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		free(query_ue);
+		return api_error(p, req, res, r);
+	}
+
+	const int MAX_SEARCH_NUM = 1000;
+	struct bmy_article * articles = (struct bmy_article*)malloc(sizeof(struct bmy_article) * MAX_SEARCH_NUM);
+	memset(articles, 0, sizeof(struct bmy_article) * MAX_SEARCH_NUM);
+
+	int qryday = 3; // 默认为3天
+	if(qryday_str!=NULL && atoi(qryday)>0)
+		qryday = atoi(qryday);
+
+	int num = search_user_article_with_title_keywords(articles, MAX_SEARCH_NUM, ue,
+			query_ue->userid, NULL, NULL, NULL, qryday * 86400);
+
+	// 输出
+	char * tmp_buf = NULL;
+	asprintf(&tmp_buf, "{\"errcode\":0, \"userid\":\"%s\", \"total\":%d, \"articles\":[]}",
+			query_ue->userid, num);
+	struct json_object *output_obj = json_tokener_parse(tmp_buf);
+	free(tmp_buf);
+
+	struct json_object *output_array = json_object_object_get(output_obj, "articles");
+	struct json_object *json_board_obj=NULL, *json_articles_array=NULL, *json_article_obj=NULL;
+
+	int i;
+	char * curr_board = NULL;	// 判断版面名
+	struct bmy_article *ap;
+	struct boardmem *b;
+	for(i=0; i<num; ++i) {
+		ap = &articles[i];
+
+		if(strcmp(curr_board, ap->board) != 0) {
+			// 新的版面
+			curr_board = ap->board;
+			b = getboardbyname(curr_board);
+
+			asprintf(&tmp_buf, "{\"board\":\"%s\", \"secstr\":\"%s\", \"articles\":[]}", curr_board, b->header.sec1);
+			json_board_obj = json_tokener_parse(tmp_buf);
+			free(tmp_buf);
+
+			json_object_array_add(output_array, json_board_obj);
+
+			json_articles_array = json_object_object_get(json_board_obj, "articles");
+		}
+
+		// 添加实体，因为此时 json_articles_array 指向了正确的数组
+		asprintf(&tmp_buf, "{\"aid\":%d, \"tid\":%d, \"mark\":%d, \"num\":%d}",
+				ap->filetime, ap->thread, ap->mark, ap->sequence_num);
+		json_article_obj = json_tokener_parse(tmp_buf);
+		free(tmp_buf);
+		json_object_object_add(json_article_obj, "title", json_object_new_string(ap->title));
+
+		json_object_array_add(json_articles_array, json_article_obj);
+	}
+
+	char *s = strdup(json_object_to_json_string(output_obj));
+
+	api_set_json_header(res);
+	onion_response_write0(res, s);
+
+	free(s);
+	json_object_put(output_obj);
+	free(articles);
+	free(query_ue);
+	free(ue);
+
+	return OCS_PROCESSED;
+}
+
 static int api_do_login(struct userec *ue, const char *fromhost, const char *appkey, time_t login_time, int *utmp_pos)
 {
 	*utmp_pos = 0;
