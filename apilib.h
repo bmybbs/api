@@ -17,6 +17,7 @@
 #include "libxml/tree.h"
 #include "libxml/xmlmemory.h"
 #include "libxml/xmlsave.h"
+#include <hiredis/hiredis.h>
 
 #include "bbs.h"
 #include "ythtlib.h"

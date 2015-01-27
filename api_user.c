@@ -379,6 +379,47 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
+	// 通过权限检验，从 redis 中寻找缓存，若成功则使用缓存中的内容
+	redisContext * rContext;
+	redisReply * rReplyOut, rReplyTime;
+	rContext = redisConnect((char *)"127.0.0.1", 6379);
+
+	time_t now_t = time(NULL);
+	if(rContext!=NULL && rContext->err ==0) {
+		// 连接成功的情况下才执行
+
+		rReplyTime = redisCommand(rContext, "GET useractivities-%s-%s-timestamp",
+				ue->userid, query_ue->userid);
+
+		if(rReplyTime->str != NULL) {
+			// 存在缓存
+			time_t cache_time = atol(rReplyTime->str);
+			freeReplyObject(rReplyTime);
+
+			if(abs(now_t - cache_time) < 300) {
+				// 缓存时间小于 5min 才使用缓存
+				rReplyOut = redisCommand(rContext, "GET useractivities-%s-%s",
+						ue->userid, query_ue->userid);
+
+				// 输出
+				api_set_json_header(res);
+				onion_response_write0(res, rReplyOut->str);
+
+				// 释放资源并结束
+				freeReplyObject(rReplyOut);
+				redisFree(rContext);
+				free(query_ue);
+				free(ue);
+
+				return OCS_PROCESSED;
+			}
+		}
+	}
+
+	if(rContext) {
+		redisFree(rContext);
+	}
+
 	const int MAX_SEARCH_NUM = 1000;
 	struct bmy_article * articles = (struct bmy_article*)malloc(sizeof(struct bmy_article) * MAX_SEARCH_NUM);
 	memset(articles, 0, sizeof(struct bmy_article) * MAX_SEARCH_NUM);
@@ -435,6 +476,27 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 
 	api_set_json_header(res);
 	onion_response_write0(res, s);
+
+	// 缓存到 redis
+	rContext = redisConnect((char *)"127.0.0.1", 6379);
+	if(rContext!=NULL && rContext->err ==0) {
+		// 连接成功的情况下才执行
+		rReplyTime = redisCommand(rContext, "SET useractivities-%s-%s-timestamp %d",
+				ue->userid, query_ue->userid, now_t);
+		rReplyOut = redisCommand(rContext, "SET useractivities-%s-%s %s",
+				ue->userid, query_ue->userid, s);
+
+		asprintf(&tmp_buf, "[redis] SET %s and %s", rReplyTime->str, rReplyOut->str);
+		newtrace(tmp_buf);
+
+		freeReplyObject(rReplyTime);
+		freeReplyObject(rReplyOut);
+		free(tmp_buf);
+	}
+
+	if(rContext) {
+		redisFree(rContext);
+	}
 
 	free(s);
 	json_object_put(output_obj);
