@@ -22,6 +22,12 @@ int api_user_logout(ONION_FUNC_PROTO_STR);
 int api_user_check_session(ONION_FUNC_PROTO_STR);
 int api_user_register(ONION_FUNC_PROTO_STR);
 int api_user_articlequery(ONION_FUNC_PROTO_STR);
+int api_user_friend_list(ONION_FUNC_PROTO_STR);
+int api_user_friend_add(ONION_FUNC_PROTO_STR);
+int api_user_friend_del(ONION_FUNC_PROTO_STR);
+int api_user_block_list(ONION_FUNC_PROTO_STR);
+int api_user_block_add(ONION_FUNC_PROTO_STR);
+int api_user_block_del(ONION_FUNC_PROTO_STR);
 
 int api_article_list(ONION_FUNC_PROTO_STR);
 

@@ -40,6 +40,12 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^user/checksession$", api_user_check_session);
 	onion_url_add(urls, "^user/register$", api_user_register);
 	onion_url_add(urls, "^user/articlequery$", api_user_articlequery);
+	onion_url_add(urls, "^user/friend/list$", api_user_friend_list);
+	onion_url_add(urls, "^user/friend/add$", api_user_friend_add);
+	onion_url_add(urls, "^user/friend/del$", api_user_friend_del);
+	onion_url_add(urls, "^user/block/list$", api_user_block_list);
+	onion_url_add(urls, "^user/block/add$", api_user_block_add);
+	onion_url_add(urls, "^user/block/del$", api_user_block_del);
 	onion_url_add(urls, "^article/list$", api_article_list);
 	onion_url_add(urls, "^article/getHTMLContent$", api_article_getHTMLContent);
 	onion_url_add(urls, "^article/getRAWContent$", api_article_getRAWContent);
