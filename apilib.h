@@ -242,7 +242,7 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
  * @return
  */
 int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
-		 char *nickname, char *ip, int sig, int mark)
+		 char *nickname, char *ip, int sig, int mark);
 
 /**
  * @brief 将 ansi 颜色控制转换成 HTML 标记
