@@ -1127,3 +1127,23 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 	}
 	return 0;
 }
+
+int load_user_X_File(struct override *array, int size, const char *userid, int mode)
+{
+	memset(array, 0, sizeof(struct override) * size);
+
+	FILE *fp;
+	char file[256];
+	if(mode == UFT_FRIEND)
+		sethomefile(file, userid, "friends");
+	else
+		sethomefile(file, userid, "rejects");
+
+	fp = fopen(file, "r");
+	if(fp) {
+		int num = fread(array, sizeof(array[0]), size, fp);
+		fclose(fp);
+	}
+
+	return 0;
+}

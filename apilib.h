@@ -269,4 +269,21 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime);
+
+/**
+ * 区分好友、黑名单操作
+ */
+enum user_X_file_type {
+	UFT_FRIEND,				//! 好友文件
+	UFT_BLOCK				//! 黑名单
+};
+
+/**
+ * @brief 加载好友、黑名单文件
+ * @param array 预先分配好空间
+ * @param userid 用户 id
+ * @param mode 模式，参见 @see enum user_X_file_type
+ * @return
+ */
+int load_user_X_File(struct override *array, int size, const char *userid, int mode);
 #endif
