@@ -283,7 +283,7 @@ enum user_X_file_type {
  * @param array 预先分配好空间
  * @param userid 用户 id
  * @param mode 模式，参见 @see enum user_X_file_type
- * @return
+ * @return 成功返回列表中的用户数
  */
 int load_user_X_File(struct override *array, int size, const char *userid, int mode);
 #endif

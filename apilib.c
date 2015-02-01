@@ -1134,6 +1134,7 @@ int load_user_X_File(struct override *array, int size, const char *userid, int m
 
 	FILE *fp;
 	char file[256];
+	int num = 0;
 	if(mode == UFT_FRIENDS)
 		sethomefile(file, userid, "friends");
 	else
@@ -1141,9 +1142,9 @@ int load_user_X_File(struct override *array, int size, const char *userid, int m
 
 	fp = fopen(file, "r");
 	if(fp) {
-		int num = fread(array, sizeof(array[0]), size, fp);
+		num = fread(array, sizeof(array[0]), size, fp);
 		fclose(fp);
 	}
 
-	return 0;
+	return num;
 }
