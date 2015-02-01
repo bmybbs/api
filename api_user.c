@@ -60,6 +60,30 @@ static int adduser_with_activation_code(struct userec *x, char *code);
 
 static void api_newcomer(struct userec *x, char *fromhost, char *words);
 
+/** 好友、黑名单的显示
+ *
+ * @param ONION_FUNC_PROTO_STR
+ * @param mode
+ * @return
+ */
+static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode);
+
+/** 好友、黑名单的用户添加
+ *
+ * @param ONION_FUNC_PROTO_STR
+ * @param mode
+ * @return
+ */
+static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode);
+
+/** 好友、黑名单的用户删除
+ *
+ * @param ONION_FUNC_PROTO_STR
+ * @param mode
+ * @return
+ */
+static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode);
+
 int api_user_login(ONION_FUNC_PROTO_STR)
 {
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
@@ -507,6 +531,36 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
+int api_user_friends_list(ONION_FUNC_PROTO_STR)
+{
+	return api_user_X_File_list(p, req, res, UFT_FRIENDS);
+}
+
+int api_user_rejects_list(ONION_FUNC_PROTO_STR)
+{
+	return api_user_X_File_list(p, req, res, UFT_REJECTS);
+}
+
+int api_user_friends_add(ONION_FUNC_PROTO_STR)
+{
+	return api_user_X_File_add(p, req, res, UFT_FRIENDS);
+}
+
+int api_user_rejects_add(ONION_FUNC_PROTO_STR)
+{
+	return api_user_X_File_add(p, req, res, UFT_REJECTS);
+}
+
+int api_user_friends_del(ONION_FUNC_PROTO_STR)
+{
+	return api_user_X_File_del(p, req, res, UFT_FRIENDS);
+}
+
+int api_user_rejects_del(ONION_FUNC_PROTO_STR)
+{
+	return api_user_X_File_del(p, req, res, UFT_REJECTS);
+}
+
 static int api_do_login(struct userec *ue, const char *fromhost, const char *appkey, time_t login_time, int *utmp_pos)
 {
 	*utmp_pos = 0;
@@ -838,4 +892,52 @@ static void api_newcomer(struct userec *x,char *fromhost, char *words)
 	do_article_post("newcomers", "API 新手上路", filename, x->userid,
 		     x->username, fromhost, -1, 0, 0, x->userid, -1);
 	unlink(filename);
+}
+
+static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
+{
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+
+	if(!userid || !sessid || !appkey)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	struct override * array;
+	int size=0;
+	if(mode == UFT_FRIENDS) {
+		array = (struct override *)malloc(sizeof(struct override) * MAXFRIENDS);
+		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
+	} else {
+		array = (struct override *)malloc(sizeof(struct override) * MAXREJECTS);
+		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
+	}
+
+	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"users\":[], \"explains\":[]}");
+	struct json_object * json_array_users = json_object_object_get(obj, "users");
+	struct json_object * json_array_exps = json_object_object_get(obj, "explains");
+	int i;
+	for(i=0; i<size; ++i) {
+		json_object_array_add(json_array_users, json_object_new_string(array[i].id));
+		json_object_array_add(json_array_exps, json_object_new_string(array[i].exp));
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(obj));
+
+	json_object_put(obj);
+	free(array);
+	free(ue);
+
+	return OCS_PROCESSED;
 }
