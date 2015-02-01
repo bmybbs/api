@@ -274,8 +274,8 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
  * 区分好友、黑名单操作
  */
 enum user_X_file_type {
-	UFT_FRIEND,				//! 好友文件
-	UFT_BLOCK				//! 黑名单
+	UFT_FRIENDS,			//! 好友文件
+	UFT_REJECTS				//! 黑名单
 };
 
 /**

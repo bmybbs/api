@@ -1134,7 +1134,7 @@ int load_user_X_File(struct override *array, int size, const char *userid, int m
 
 	FILE *fp;
 	char file[256];
-	if(mode == UFT_FRIEND)
+	if(mode == UFT_FRIENDS)
 		sethomefile(file, userid, "friends");
 	else
 		sethomefile(file, userid, "rejects");
