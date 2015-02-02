@@ -1148,3 +1148,13 @@ int load_user_X_File(struct override *array, int size, const char *userid, int m
 
 	return num;
 }
+
+int is_queryid_in_user_X_File(const char *queryid, const struct override *array, const int size)
+{
+	int i=0, pos=-1;
+	for(;i<size; ++i) {
+		if(strcasecmp(queryid, array[i].id) == 0)
+			pos = i;
+	}
+	return pos;
+}

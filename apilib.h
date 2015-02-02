@@ -286,4 +286,13 @@ enum user_X_file_type {
  * @return 成功返回列表中的用户数
  */
 int load_user_X_File(struct override *array, int size, const char *userid, int mode);
+
+/**
+ * @brief 判断某用户名是否在用户的好友、黑名单中
+ * @param queryid 查询的用户
+ * @param array 已加载的好友、黑名单列表
+ * @param size 已加载的好友、黑名单长度
+ * @return 若存在，返回索引位置。不存在则返回 -1。
+ */
+int is_queryid_in_user_X_File(const char *queryid, const struct override *array, const int size);
 #endif
