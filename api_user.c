@@ -941,3 +941,92 @@ static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
 
 	return OCS_PROCESSED;
 }
+
+static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
+{
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+	const char * queryid = onion_request_get_query(req, "queryid");
+	const char * exp_utf = onion_request_get_query(req, "explain");
+
+	if(!userid || !sessid || !appkey || !queryid)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	struct userec *query_ue = getuser(queryid);
+	if(query_ue == 0) {
+		free(ue);
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		free(query_ue);
+		return api_error(p, req, res, r);
+	}
+
+	struct override * array;
+	int size=0;
+	if(mode == UFT_FRIENDS) {
+		array = (struct override *)malloc(sizeof(struct override) * MAXFRIENDS);
+		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
+
+		if(size >= MAXFRIENDS-1) {
+			free(array);
+			free(ue);
+			free(query_ue);
+			return api_error(p, req, res, API_RT_REACHMAXRCD);
+		}
+	} else {
+		array = (struct override *)malloc(sizeof(struct override) * MAXREJECTS);
+		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
+
+		if(size >= MAXREJECTS-1) {
+			free(array);
+			free(ue);
+			free(query_ue);
+			return api_error(p, req, res, API_RT_REACHMAXRCD);
+		}
+	}
+
+	int pos = is_queryid_in_user_X_File(queryid, array, size);
+	if(pos>=0) {
+		// queryid 已存在
+		free(array);
+		free(ue);
+		free(query_ue);
+		return api_error(p, req, res, API_RT_ALRDYINRCD);
+	}
+
+	strcpy(array[size].id, ue->userid);
+	strncpy(array[size].exp, exp_utf, sizeof(array[size].exp) - 1);
+	size++;
+
+	char path[256];
+	if(mode == UFT_FRIENDS)
+		sethomefile(path, "friends");
+	else
+		sethomefile(path, "rejects");
+	FILE *fp = fopen(path, "w");
+	if(fp) {
+		flockfile(fp);
+		fwrite(array, sizeof(struct override), size, fp);
+		funlockfile(fp);
+		fclose(fp);
+
+		free(array);
+		free(ue);
+		free(query_ue);
+		return api_error(p, req, res, API_RT_SUCCESSFUL);
+	} else {
+		free(array);
+		free(ue);
+		free(query_ue);
+		return api_error(p, req, res, API_RT_NOSUCHFILE);
+	}
+}
