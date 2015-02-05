@@ -31,6 +31,9 @@ enum api_error_code {
 	API_RT_WRONGTOKEN	= 100006,	///< 错误的用户 token
 	API_RT_USEREXSITED	= 100007,	///< 用户已存在
 	API_RT_FBDUSERNAME	= 100008,	///< 非法的用户名
+	API_RT_REACHMAXRCD	= 100009,	///< 达到最大记录数
+	API_RT_ALRDYINRCD	= 100010,	///< 已存在记录中
+	API_RT_NOTINRCD		= 100011,	///< 不存在记录中
 	API_RT_NOSUCHBRD	= 110000,	///< 没有此版面
 	API_RT_NOBRDRPERM	= 110001,	///< 没有该版面的阅读权限
 	API_RT_EMPTYBRD		= 110002,	///< 版面没有文章
