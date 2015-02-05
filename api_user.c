@@ -923,13 +923,16 @@ static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
 		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
 	}
 
+	char exp_utf[2*sizeof(array[0].exp)];
 	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"users\":[], \"explains\":[]}");
 	struct json_object * json_array_users = json_object_object_get(obj, "users");
 	struct json_object * json_array_exps = json_object_object_get(obj, "explains");
 	int i;
 	for(i=0; i<size; ++i) {
 		json_object_array_add(json_array_users, json_object_new_string(array[i].id));
-		json_object_array_add(json_array_exps, json_object_new_string(array[i].exp));
+		memset(exp_utf, 0, sizeof(exp_utf));
+		g2u(array[i].exp, strlen(array[i].exp), exp_utf, sizeof(exp_utf));
+		json_object_array_add(json_array_exps, json_object_new_string(exp_utf));
 	}
 
 	api_set_json_header(res);
@@ -1004,7 +1007,7 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	strcpy(array[size].id, ue->userid);
-	strncpy(array[size].exp, exp_utf, sizeof(array[size].exp) - 1);
+	u2g(exp_utf, strlen(exp_utf), array[size].exp, sizeof(array[size].exp));
 	size++;
 
 	char path[256];
