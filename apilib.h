@@ -99,6 +99,16 @@ int count_uindex(int uid);
  */
 int check_user_session(struct userec *x, const char *sessid, const char *appkey);
 
+/**
+ * @brief 检查用户 session 是否有效，并变更用户状态
+ * @param x
+ * @param sessid
+ * @param appkey
+ * @param mode 参阅 libythtbbs/modes.h 中的定义
+ * @return
+ */
+int check_user_session_with_mode_change(struct userec *x, const char *sessid, const char *appkey, int mode);
+
 int setbmhat(struct boardmanager *bm, int *online);
 int setbmstatus(struct userec *ue, int online);
 

@@ -366,6 +366,11 @@ int count_uindex(int uid)
 
 int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 {
+	return check_user_session_with_mode_change(x, sessid, appkey, -1);
+}
+
+int check_user_session_with_mode_change(struct userec *x, const char *sessid, const char *appkey, int mode)
+{
 	if(!x || !sessid || !appkey)
 		return API_RT_WRONGSESS;
 
@@ -390,9 +395,12 @@ int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 	if(ui->pid == APPPID
 			&& strcasecmp(ui->userid, x->userid)==0
 			&& strcasecmp(ui->sessionid, ssid)==0
-			&& strcasecmp(ui->appkey, appkey)==0)
+			&& strcasecmp(ui->appkey, appkey)==0) {
+		if(mode > 0) {
+			ui->mode = mode;
+		}
 		return API_RT_SUCCESSFUL;
-	else
+	} else
 		return API_RT_WRONGSESS;
 }
 
