@@ -39,6 +39,8 @@ int api_article_reply(ONION_FUNC_PROTO_STR);			// 回帖
 
 int api_board_list(ONION_FUNC_PROTO_STR);
 int api_board_info(ONION_FUNC_PROTO_STR);
+int api_board_fav_add(ONION_FUNC_PROTO_STR);
+int api_board_fav_del(ONION_FUNC_PROTO_STR);
 
 int api_mail_list(ONION_FUNC_PROTO_STR);
 
