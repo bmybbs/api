@@ -1017,9 +1017,9 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 		sethomefile(path, "rejects");
 	FILE *fp = fopen(path, "w");
 	if(fp) {
-		flockfile(fp);
+		flock(fileno(fp), LOCK_EX);
 		fwrite(array, sizeof(struct override), size, fp);
-		funlockfile(fp);
+		flock(fileno(fp), LOCK_UN);
 		fclose(fp);
 
 		free(array);
@@ -1093,9 +1093,9 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 		sethomefile(path, "rejects");
 	FILE *fp = fopen(path, "w");
 	if(fp) {
-		flockfile(fp);
+		flock(fileno(fp), LOCK_EX);
 		fwrite(array, sizeof(struct override), size, fp);
-		funlockfile(fp);
+		flock(fileno(fp), LOCK_UN);
 		fclose(fp);
 
 		free(array);
