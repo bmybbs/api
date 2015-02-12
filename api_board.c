@@ -301,6 +301,65 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 
+int api_board_fav_del(ONION_FUNC_PROTO_STR)
+{
+	const char *board = onion_request_get_query(req, "board");
+	const char *userid = onion_request_get_query(req, "userid");
+	const char *appkey = onion_request_get_query(req, "appkey");
+	const char *sessid = onion_request_get_query(req, "sessid");
+
+	if(!board || !userid || !appkey || !sessid)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	if(strcasecmp(userid, "guest")==0)
+		return api_error(p, req, res, API_RT_NOTLOGGEDIN);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	int r = check_user_session(ue, sessid, appkey);
+	free(ue);
+	if(r != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, r);
+	}
+
+	struct user_info *ui = *(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+
+	char mybrd[GOOD_BRC_NUM][STRLEN];
+	int mybrdnum;
+	r = readmybrd(mybrd, &mybrdnum, ui->userid);
+
+	if(mybrdnum == 0) {
+		return api_error(p, req, res, API_RT_NOTINRCD);
+	}
+
+	if(!ismybrd(board, mybrd, mybrdnum)) {
+		return api_error(p, req, res, API_RT_NOTINRCD);
+	}
+
+	// 所有校验通过，写入用户文件
+	char file[200];
+	sethomefile(file, ui->userid, ".goodbrd");
+	FILE *fp = fopen(file, "w");
+	if(!fp) {
+		return api_error(p, req, res, API_RT_NOSUCHFILE);
+	}
+
+	flock(fileno(fp), LOCK_EX);
+	int i;
+	for(i=0; i<mybrdnum; i++) {
+		if(strcasecmp(mybrd[i], board))
+			continue;
+
+		fprintf(fp, "%s\n", mybrd[i]);
+	}
+	flock(fileno(fp), LOCK_UN);
+
+	fclose(fp);
+	return api_error(p, req, res, API_RT_SUCCESSFUL);
+}
+
 static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 {
 	const char * userid = onion_request_get_query(req, "userid");
