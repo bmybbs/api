@@ -360,6 +360,62 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 
+int api_board_fav_list(ONION_FUNC_PROTO_STR)
+{
+	const char *userid = onion_request_get_query(req, "userid");
+	const char *appkey = onion_request_get_query(req, "appkey");
+	const char *sessid = onion_request_get_query(req, "sessid");
+
+	if(!userid || !appkey || !sessid)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	if(strcasecmp(userid, "guest")==0)
+		return api_error(p, req, res, API_RT_NOTLOGGEDIN);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	int r = check_user_session(ue, sessid, appkey);
+	free(ue);
+	if(r != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, r);
+	}
+
+	struct user_info *ui = *(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+
+	char mybrd[GOOD_BRC_NUM][STRLEN];
+	int mybrdnum;
+	r = readmybrd(mybrd, &mybrdnum, ui->userid);
+
+	// 输出
+	char buf[512];
+	sprintf(buf, "{\"errcode\":0, \"board_num\":%d, \"board_array\":[], \"accessable_array\":[]}", mybrdnum);
+	struct json_object * obj = json_tokener_parse(buf);
+	struct json_object * json_array_board = json_object_object_get(obj, "board_array");
+	struct json_object * json_array_accessable = json_object_object_get(obj, "accessable_array");
+
+	int i=0;
+	struct boardmem * b = NULL;
+	for(i=0; i<mybrdnum; ++i) {
+		json_object_array_add(json_array_board, json_object_new_string(mybrd[i]));
+
+		b = getboardbyname(mybrd[i]);
+		if(b == NULL) {
+			json_object_array_add(json_array_accessable, json_object_new_int(0));
+			continue;
+		}
+
+		json_object_array_add(json_array_accessable, json_object_new_int(check_user_read_perm_x(ui, b)));
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(obj));
+
+	json_object_put(obj);
+	return OCS_PROCESSED;
+}
+
 static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 {
 	const char * userid = onion_request_get_query(req, "userid");

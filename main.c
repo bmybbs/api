@@ -55,6 +55,7 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^board/info$", api_board_info);
 	onion_url_add(urls, "^board/fav/add$", api_board_fav_add);
 	onion_url_add(urls, "^board/fav/del$", api_board_fav_del);
+	onion_url_add(urls, "^board/fav/list$", api_board_fav_list);
 	onion_url_add(urls, "^meta/loginpics", api_meta_loginpics);
 	onion_url_add(urls, "^mail/list$", api_mail_list);
 	onion_url_add(urls, "^mail/getHTMLContent$", api_mail_getHTMLContent);
