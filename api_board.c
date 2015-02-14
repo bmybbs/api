@@ -416,6 +416,53 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
+int api_board_autocomplete(ONION_FUNC_PROTO_STR)
+{
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+	const char * search_str = onion_request_get_query(req, "search_str");
+
+	if(!userid || !sessid || !appkey || !search_str)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	if(strcmp(search_str, "") == 0)
+		return api_error(p, req, res, API_RT_SUCCESSFUL);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	int r = check_user_session(ue, sessid, appkey);
+	free(ue);
+	if(r != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, r);
+	}
+
+	int i;
+	struct user_info *ui = *(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct boardmem *p_brdmem = NULL;
+	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"board_array\":[]}");
+	struct json_object *json_array_board = json_object_object_get(obj, "board_array");
+
+	for(i=0; i<MAXBOARD && i<shm_bcache->number; ++i) {
+		p_brdmem = &(shm_bcache->bcache[i]);
+		if(p_brdmem->header.filename[0]<=32 || p_brdmem->header.filename[0]>'z')
+			continue;
+		if(!check_user_read_perm_x(ui, p_brdmem))
+			continue;
+		if(strcasestr(p_brdmem->header.filename, search_str))
+			json_object_array_add(json_array_board, json_object_new_string(p_brdmem->header.filename));
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(obj));
+
+	json_object_put(obj);
+
+	return OCS_PROCESSED;
+}
+
 static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 {
 	const char * userid = onion_request_get_query(req, "userid");

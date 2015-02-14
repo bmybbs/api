@@ -42,6 +42,7 @@ int api_board_info(ONION_FUNC_PROTO_STR);
 int api_board_fav_add(ONION_FUNC_PROTO_STR);
 int api_board_fav_del(ONION_FUNC_PROTO_STR);
 int api_board_fav_list(ONION_FUNC_PROTO_STR);			// 收藏夹列表，精简模式
+int api_board_autocomplete(ONION_FUNC_PROTO_STR);
 
 int api_mail_list(ONION_FUNC_PROTO_STR);
 
