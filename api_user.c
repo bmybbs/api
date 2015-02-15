@@ -561,6 +561,46 @@ int api_user_rejects_del(ONION_FUNC_PROTO_STR)
 	return api_user_X_File_del(p, req, res, UFT_REJECTS);
 }
 
+int api_user_autocomplete(ONION_FUNC_PROTO_STR)
+{
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+	const char * search_str = onion_request_get_query(req, "search_str");
+
+	if(!userid || !sessid || !appkey || !search_str)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	if(strcmp(search_str, "") == 0)
+		return api_error(p, req, res, API_RT_SUCCESSFUL);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+
+	int r = check_user_session(ue, sessid, appkey);
+	free(ue);
+	if(r != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, r);
+	}
+
+	int i;
+	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"user_array\":[]}");
+	struct json_object *json_array_user = json_object_object_get(obj, "user_array");
+
+	for(i=0; i<MAXUSERS && i<shm_ucache->number; ++i) {
+		if(strcasestr(shm_ucache->userid[i], search_str))
+			json_object_array_add(json_array_user, json_object_new_string(shm_ucache->userid[i]));
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(obj));
+
+	json_object_put(obj);
+
+	return OCS_PROCESSED;
+}
+
 static int api_do_login(struct userec *ue, const char *fromhost, const char *appkey, time_t login_time, int *utmp_pos)
 {
 	*utmp_pos = 0;

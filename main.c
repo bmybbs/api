@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^user/rejects/list$", api_user_rejects_list);
 	onion_url_add(urls, "^user/rejects/add$", api_user_rejects_add);
 	onion_url_add(urls, "^user/rejects/del$", api_user_rejects_del);
+	onion_url_add(urls, "^user/autocomplete$", api_user_autocomplete);
 	onion_url_add(urls, "^article/list$", api_article_list);
 	onion_url_add(urls, "^article/getHTMLContent$", api_article_getHTMLContent);
 	onion_url_add(urls, "^article/getRAWContent$", api_article_getRAWContent);
