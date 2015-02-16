@@ -571,7 +571,7 @@ int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 	if(!userid || !sessid || !appkey || !search_str)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	if(strcmp(search_str, "") == 0)
+	if(strlen(search_str) < 2)
 		return api_error(p, req, res, API_RT_SUCCESSFUL);
 
 	struct userec *ue = getuser(userid);
@@ -589,7 +589,7 @@ int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 	struct json_object *json_array_user = json_object_object_get(obj, "user_array");
 
 	for(i=0; i<MAXUSERS && i<shm_ucache->number; ++i) {
-		if(strcasestr(shm_ucache->userid[i], search_str))
+		if(strcasestr(shm_ucache->userid[i], search_str) == shm_ucache->userid[i])
 			json_object_array_add(json_array_user, json_object_new_string(shm_ucache->userid[i]));
 	}
 
