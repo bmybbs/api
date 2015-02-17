@@ -426,7 +426,7 @@ int api_board_autocomplete(ONION_FUNC_PROTO_STR)
 	if(!userid || !sessid || !appkey || !search_str)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	if(strcmp(search_str, "") == 0)
+	if(strlen(search_str) < 2)
 		return api_error(p, req, res, API_RT_SUCCESSFUL);
 
 	struct userec *ue = getuser(userid);
