@@ -57,7 +57,7 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 	else
 		setsentmailfile(mail_dir, ue->userid, ".DIR");
 
-	int total = file_size(mail_dir) / sizeof(struct fileheader);
+	int total = file_size_s(mail_dir) / sizeof(struct fileheader);
 
 	if(!total) {
 		free(ue);
@@ -147,15 +147,15 @@ static int get_user_mail_size(char * userid)
 
 	sethomefile(tmpmail, userid, "msgindex");
 	if(file_time(tmpmail))
-		currsize += file_size(tmpmail);
+		currsize += file_size_s(tmpmail);
 
 	sethomefile(tmpmail, userid, "msgindex2");
 	if(file_time(tmpmail))
-		currsize += file_size(tmpmail);
+		currsize += file_size_s(tmpmail);
 
 	sethomefile(tmpmail, userid, "msgcontent");
 	if(file_time(tmpmail))
-		currsize += file_size(tmpmail);
+		currsize += file_size_s(tmpmail);
 
 	sprintf(currmaildir, "mail/%c/%s/%s", mytoupper(userid[0]), userid, DOT_DIR);
 	t = file_time(currmaildir);
@@ -168,7 +168,7 @@ static int get_user_mail_size(char * userid)
 
 	while(fread(&tmpfh, 1, sizeof(tmpfh), fp) == sizeof(tmpfh)) {
 		setmailfile(tmpmail, userid, fh2fname(&tmpfh));
-		currsize += file_size(tmpmail);
+		currsize += file_size_s(tmpmail);
 	}
 
 	fclose(fp);
@@ -223,7 +223,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_MAILINNERR);
 	}
 
-	int total = file_size(mail_dir) / sizeof(struct fileheader);
+	int total = file_size_s(mail_dir) / sizeof(struct fileheader);
 	int num = atoi(str_num);
 
 	if(num<=0)

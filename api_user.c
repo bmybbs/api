@@ -789,7 +789,7 @@ static int initfriends(struct user_info *u)
 	FILE *fp;
 	memset(u->friend, 0, sizeof(u->friend));
 	sethomefile(buf, u->userid, "friends");
-	u->fnum = file_size(buf) / sizeof(struct override);
+	u->fnum = file_size_s(buf) / sizeof(struct override);
 	if(u->fnum <=0)
 		return 0;
 

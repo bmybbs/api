@@ -1166,3 +1166,12 @@ int is_queryid_in_user_X_File(const char *queryid, const struct override *array,
 	}
 	return pos;
 }
+
+int file_size_s(const char *filepath)
+{
+	struct stat buf;
+	if(stat(filepath, &buf) == -1)
+		memset(&buf, 0, sizeof(buf));
+
+	return buf.st_size;
+}

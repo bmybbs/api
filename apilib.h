@@ -305,4 +305,13 @@ int load_user_X_File(struct override *array, int size, const char *userid, int m
  * @return 若存在，返回索引位置。不存在则返回 -1。
  */
 int is_queryid_in_user_X_File(const char *queryid, const struct override *array, const int size);
+
+/**
+ * @brief 获取文件的大小
+ * 参考 ythtlib.h/file_size 宏，本方法线程安全。
+ * @param filepath 文件路径
+ * @return 文件大小
+ */
+int file_size_s(const char *filepath);
+
 #endif

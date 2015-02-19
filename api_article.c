@@ -63,7 +63,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode);
 
 /**
  * @brief 通过版面名，文章ID，查找对应主题ID
- * @param board : board name 
+ * @param board : board name
  * @param filetime : file id
  * @return thread id; return 0 means not find the thread id
  */
@@ -77,7 +77,7 @@ static int get_thread_by_filetime(char *board, int filetime);
 static int get_number_of_articles_in_thread(char *board, int thread);
 
 /**
- * @brief 
+ * @brief
  * @param mode
  * mode = 1 : 通过 boardname 和 主题ID 查找该主题第一篇文章 fileheader
  * mode = 0 : 通过 boardname 和 filetime 查找该文章的 fileheader
@@ -136,7 +136,7 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 			start = atoi(str_start);
 		if(NULL != str_number)
 			number = atoi(str_number);
-		return api_article_list_commend(p, req, res, 0, start, number); 
+		return api_article_list_commend(p, req, res, 0, start, number);
 
 	} else if(strcasecmp(type, "announce")==0) { // 通知公告
 		const char *str_start = onion_request_get_query(req, "startnum");
@@ -315,7 +315,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		strcpy(dir, ".COMMEND");
 	else if(1 == mode)
 		strcpy(dir, ".COMMEND2");
-	int fsize = file_size(dir);
+	int fsize = file_size_s(dir);
 	int total = fsize / sizeof(struct commend);
 	fp = fopen(dir, "r");
 
@@ -408,7 +408,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	int i = 0, total = 0, total_article = 0;
 
 	sprintf(dir, "boards/%s/.DIR", board);
-	int fsize = file_size(dir);
+	int fsize = file_size_s(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
@@ -493,7 +493,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
-	return OCS_PROCESSED;	
+	return OCS_PROCESSED;
 }
 
 static int api_article_list_thread(ONION_FUNC_PROTO_STR)
@@ -542,7 +542,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	char dir[80], filename[80];
 	int i = 0, total = 0, total_article = 0;
 	sprintf(dir, "boards/%s/.DIR", board);
-	int fsize = file_size(dir);
+	int fsize = file_size_s(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
@@ -618,7 +618,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
-	return OCS_PROCESSED;	
+	return OCS_PROCESSED;
 }
 
 static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
@@ -663,7 +663,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 	if(fp == 0)
 		return api_error(p, req, res, API_RT_NOBRDTPFILE);
 
-	int count = file_size(topdir) / sizeof(struct fileheader);
+	int count = file_size_s(topdir) / sizeof(struct fileheader);
 	struct bmy_article board_list[count];
 	memset(board_list, 0, sizeof(struct bmy_article) * count);
 
