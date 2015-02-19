@@ -15,6 +15,64 @@ int api_attach_show(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 }
 
+int api_attach_list(ONION_FUNC_PROTO_STR)
+{
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+
+	if(!userid || !sessid || !appkey)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	char userattachpath[256];
+	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ue->userid);
+	mkdir(userattachpath, 0760);
+	free(ue);
+
+	DIR *pdir;
+	struct dirent *pdent;
+	char fname[1024];
+
+	pdir = opendir(userattachpath);
+	if(!pdir)
+		return api_error(p, req, res, API_RT_NOSUCHFILE);
+
+	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"attach_array\":[]}");
+	struct json_array_attach * aa = json_object_object_get(obj, "attach_array");
+
+	while((pdent = readdir(pdir))) {
+		if(!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
+			continue;
+
+		if(strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname)) {
+			break;
+		}
+
+		sprintf(fname, "%s/%s", userattachpath, pdent->d_name);
+
+		struct json_object * attach_obj = json_object_new_object();
+		json_object_object_add(attach_obj, "file_name", json_object_new_string(pdent->d_name));
+		json_object_object_add(attach_obj, "size", json_object_new_int(file_size_s(fname)));
+		json_object_array_add(aa, attach_obj);
+	}
+
+	closedir(pdir);
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(obj));
+	json_object_put(obj);
+
+	return OCS_PROCESSED;
+}
 
 static int api_attach_show_mail(ONION_FUNC_PROTO_STR)
 {
