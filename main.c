@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^mail/reply$", api_mail_reply);
 	onion_url_add(urls, "^attach/show$", api_attach_show);
 	onion_url_add(urls, "^attach/list$", api_attach_list);
+	onion_url_add(urls, "^attach/upload$", api_attach_upload);
 
 	onion_listen(o);
 
