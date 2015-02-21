@@ -49,6 +49,9 @@ enum api_error_code {
 	API_RT_MAILNOPPERM	= 130003,	///< 用户没有发邮件的权限
 	API_RT_MAILFULL		= 130004,	///< 邮箱已满
 	API_RT_INUSERBLIST	= 130005,	///< 在对方黑名单中
+	API_RT_ATTITNERR	= 140000,	///< 附件区内部错误（例如文件名）
+	API_RT_ATTNOSPACE	= 140001,	///< 附件区没有足够控件
+	API_RT_ATTTOOBIG	= 140002,	///< 附件过大
 };
 
 #endif
