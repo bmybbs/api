@@ -74,6 +74,85 @@ int api_attach_list(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
+int api_attach_upload(ONION_FUNC_PROTO_STR)
+{
+	if(!(onion_request_get_flags(req) & OR_POST))
+		return api_error(p, req, res, API_RT_FUNCNOTIMPL);
+
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * sessid = onion_request_get_query(req, "sessid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+
+	struct userec *ue = getuser(userid);
+	if(ue == 0)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	int r = check_user_session(ue, sessid, appkey);
+	if(r != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	char userattachpath[256], finalname[1024];
+	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ue->userid);
+	mkdir(userattachpath, 0760);
+	free(ue);
+
+	const char * name=onion_request_get_post(req,"file");
+	const char * filename=onion_request_get_file(req,"file");
+	const char * length_str = onion_request_get_headerer(req, "Content-Length");
+
+	if(!name || !filename || !length_str)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	if(strlen(userattachpath) + strlen(name) > 1022)	// 1024 - '\0' - '/'
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	sprintf(filename, "%s/%s", userattachpath, name);
+	char * ext_name = name + strlen(name);
+	int upload_size = atoi(length_str);
+	if (upload_size <= 0 || upload_size > 5000000)
+		return api_error(p, req, res, API_RT_ATTTOOBIG);
+	if (!strcasecmp(ext_name - 4, ".gif") || !strcasecmp(ext_name - 4, ".jpg") ||
+		!strcasecmp(ext_name - 4, ".bmp") || !strcasecmp(ext_name - 4, ".png") ||
+		!strcasecmp(ext_name - 4, ".jpeg")) {
+		if (upload_size > MAXPICSIZE) {
+			return api_error(p, req, res, API_RT_ATTTOOBIG);
+		}
+	}
+
+	int current_size = 0;
+	DIR *pdir;
+	struct dirent *pdent;
+	char fname[1024];
+
+	pdir = opendir(userattachpath);
+	if(!pdir)
+		return api_error(p, req, res, API_RT_NOSUCHFILE);
+
+	while((pdent = readdir(pdir))) {
+		if(!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
+			continue;
+
+		if(strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
+			closedir(pdir);
+			return api_error(p, req, res, API_RT_ATTITNERR);
+		}
+
+		sprintf(fname, "%s/%s", userattachpath, pdent->d_name);
+		current_size += file_size_s(fname);
+	}
+
+	closedir(pdir);
+
+	if(current_size > MAXATTACHSIZE || current_size + upload_size > MAXATTACHSIZE)
+		return api_error(p, req, res, API_RT_ATTNOSPACE);
+
+	onion_shortcut_rename(filename, finalname);
+
+	return api_error(p, req, res, API_RT_SUCCESSFUL);
+}
+
 static int api_attach_show_mail(ONION_FUNC_PROTO_STR)
 {
 	const char * userid = onion_request_get_query(req, "userid");
