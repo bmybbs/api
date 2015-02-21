@@ -54,7 +54,7 @@ int api_attach_list(ONION_FUNC_PROTO_STR)
 		if(!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
 			continue;
 
-		if(strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname)) {
+		if(strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
 			break;
 		}
 
