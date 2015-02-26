@@ -405,7 +405,7 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 
 	// 通过权限检验，从 redis 中寻找缓存，若成功则使用缓存中的内容
 	redisContext * rContext;
-	redisReply * rReplyOut, rReplyTime;
+	redisReply * rReplyOut, * rReplyTime;
 	rContext = redisConnect((char *)"127.0.0.1", 6379);
 
 	time_t now_t = time(NULL);
