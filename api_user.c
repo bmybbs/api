@@ -1053,9 +1053,9 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 
 	char path[256];
 	if(mode == UFT_FRIENDS)
-		sethomefile(path, "friends");
+		sethomefile(path, ue->userid, "friends");
 	else
-		sethomefile(path, "rejects");
+		sethomefile(path, ue->userid, "rejects");
 	FILE *fp = fopen(path, "w");
 	if(fp) {
 		flock(fileno(fp), LOCK_EX);
@@ -1129,9 +1129,9 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 
 	char path[256];
 	if(mode == UFT_FRIENDS)
-		sethomefile(path, "friends");
+		sethomefile(path, ue->userid, "friends");
 	else
-		sethomefile(path, "rejects");
+		sethomefile(path, ue->userid, "rejects");
 	FILE *fp = fopen(path, "w");
 	if(fp) {
 		flock(fileno(fp), LOCK_EX);
