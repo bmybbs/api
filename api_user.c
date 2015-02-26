@@ -452,7 +452,8 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	if(qryday_str!=NULL && atoi(qryday)>0)
 		qryday = atoi(qryday);
 
-	int num = search_user_article_with_title_keywords(articles, MAX_SEARCH_NUM, ue,
+	struct user_info * ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	int num = search_user_article_with_title_keywords(articles, MAX_SEARCH_NUM, ui,
 			query_ue->userid, NULL, NULL, NULL, qryday * 86400);
 
 	// 输出
