@@ -1088,7 +1088,7 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 		if(article_sum >= max_searchnum)
 			break;
 
-		if(!checkuser_user_read_perm(ui_currentuser, shm_bcache->bcache[board_counter]))
+		if(!check_user_read_perm_x(ui_currentuser, &(shm_bcache->bcache[board_counter])))
 			continue;
 
 		sprintf(dir, "boards/%s/.DIR", shm_bcache->bcache[board_counter].header.filename);
