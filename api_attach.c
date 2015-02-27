@@ -100,7 +100,7 @@ int api_attach_upload(ONION_FUNC_PROTO_STR)
 
 	const char * name=onion_request_get_post(req,"file");
 	const char * filename=onion_request_get_file(req,"file");
-	const char * length_str = onion_request_get_headerer(req, "Content-Length");
+	const char * length_str = onion_request_get_header(req, "Content-Length");
 
 	if(!name || !filename || !length_str)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
