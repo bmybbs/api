@@ -256,7 +256,7 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	struct user_info *ui = *(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 
 	char mybrd[GOOD_BRC_NUM][STRLEN];
 	int mybrdnum;
@@ -324,7 +324,7 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	struct user_info *ui = *(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 
 	char mybrd[GOOD_BRC_NUM][STRLEN];
 	int mybrdnum;
@@ -382,7 +382,7 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	struct user_info *ui = *(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 
 	char mybrd[GOOD_BRC_NUM][STRLEN];
 	int mybrdnum;
@@ -440,7 +440,7 @@ int api_board_autocomplete(ONION_FUNC_PROTO_STR)
 	}
 
 	int i;
-	struct user_info *ui = *(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
 	struct boardmem *p_brdmem = NULL;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"board_array\":[]}");
 	struct json_object *json_array_board = json_object_object_get(obj, "board_array");
