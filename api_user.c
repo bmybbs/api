@@ -1050,7 +1050,7 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_ALRDYINRCD);
 	}
 
-	strcpy(array[size].id, ue->userid);
+	strcpy(array[size].id, query_ue->userid);
 	u2g(exp_utf, strlen(exp_utf), array[size].exp, sizeof(array[size].exp));
 	size++;
 
