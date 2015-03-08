@@ -965,15 +965,18 @@ static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	char exp_utf[2*sizeof(array[0].exp)];
-	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"users\":[], \"explains\":[]}");
+	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"users\":[]}");
 	struct json_object * json_array_users = json_object_object_get(obj, "users");
-	struct json_object * json_array_exps = json_object_object_get(obj, "explains");
+
 	int i;
 	for(i=0; i<size; ++i) {
-		json_object_array_add(json_array_users, json_object_new_string(array[i].id));
+		struct json_object * user = json_object_new_object();
+		json_object_object_add(user, "userid", json_object_new_string(array[i].id));
+
 		memset(exp_utf, 0, sizeof(exp_utf));
 		g2u(array[i].exp, strlen(array[i].exp), exp_utf, sizeof(exp_utf));
-		json_object_array_add(json_array_exps, json_object_new_string(exp_utf));
+		json_object_object_add(user, "explain", json_object_new_string(exp_utf));
+		json_object_array_add(json_array_users, user);
 	}
 
 	api_set_json_header(res);
