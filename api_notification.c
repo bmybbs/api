@@ -26,6 +26,7 @@ int api_notification_list(ONION_FUNC_PROTO_STR)
 	NotifyItemList allNotifyItems = parse_notification(ue->userid);
 	struct json_object * item = NULL;
 	struct NotifyItem * currItem;
+	struct boardmem *b;
 	for (currItem = (struct NotifyItem *)allNotifyItems; currItem != NULL; currItem = currItem->next) {
 		item = json_object_new_object();
 		json_object_object_add(item, "board", json_object_new_string(currItem->board));
@@ -33,6 +34,8 @@ int api_notification_list(ONION_FUNC_PROTO_STR)
 		json_object_object_add(item, "from_userid", json_object_new_string(currItem->from_userid));
 		json_object_object_add(item, "title", json_object_new_string(currItem->title_utf));
 		json_object_object_add(item, "type", json_object_new_int(currItem->type));
+		b = getboardbyname(currItem->board);
+		json_object_object_add(item, "secstr", json_object_new_string(b->header.sec1));
 
 		json_object_array_add(noti_array, item);
 	}
