@@ -64,7 +64,7 @@ int api_notification_del(ONION_FUNC_PROTO_STR)
 	const char * board = onion_request_get_query(req, "board");
 	const char * aid_str = onion_request_get_query(req, "aid");
 
-	if (type == NULL || (board == 0 || aid_str == NULL)) {
+	if (type == NULL && (board == NULL || aid_str == NULL)) {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
@@ -79,7 +79,7 @@ int api_notification_del(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	if (strcasecmp(type, "delall") == 0) {
+	if ((type != NULL) && (strcasecmp(type, "delall") == 0)) {
 		del_all_notification(ue->userid);
 	} else {
 		del_post_notification(ue->userid, board, atoi(aid_str));
