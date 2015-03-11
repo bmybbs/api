@@ -390,23 +390,24 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 
 	// 输出
 	char buf[512];
-	sprintf(buf, "{\"errcode\":0, \"board_num\":%d, \"board_array\":[], \"accessable_array\":[]}", mybrdnum);
+	sprintf(buf, "{\"errcode\":0, \"board_num\":%d, \"board_array\":[]}", mybrdnum);
 	struct json_object * obj = json_tokener_parse(buf);
 	struct json_object * json_array_board = json_object_object_get(obj, "board_array");
-	struct json_object * json_array_accessable = json_object_object_get(obj, "accessable_array");
 
 	int i=0;
 	struct boardmem * b = NULL;
 	for(i=0; i<mybrdnum; ++i) {
-		json_object_array_add(json_array_board, json_object_new_string(mybrd[i]));
+		struct json_object * item = json_object_new_object();
+		json_object_object_add(item, "name", json_object_new_string(mybrd[i]));
 
 		b = getboardbyname(mybrd[i]);
 		if(b == NULL) {
-			json_object_array_add(json_array_accessable, json_object_new_int(0));
-			continue;
+			json_object_object_add(item, "accessible", json_object_new_int(0));
+		} else {
+			json_object_object_add(item, "accessible", json_object_new_int(check_user_read_perm_x(ui, b)));
 		}
 
-		json_object_array_add(json_array_accessable, json_object_new_int(check_user_read_perm_x(ui, b)));
+		json_object_array_add(json_array_board, item);
 	}
 
 	api_set_json_header(res);
