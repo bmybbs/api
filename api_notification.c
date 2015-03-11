@@ -49,5 +49,39 @@ int api_notification_list(ONION_FUNC_PROTO_STR)
 
 int api_notification_del(ONION_FUNC_PROTO_STR)
 {
-	return OCS_NOT_PROCESSED;
+	const char * userid = onion_request_get_query(req, "userid");
+	const char * appkey = onion_request_get_query(req, "appkey");
+	const char * sessid = onion_request_get_query(req, "sessid");
+
+	if (userid == NULL || sessid == NULL || appkey == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	const char * type = onion_request_get_query(req, "type");
+	const char * board = onion_request_get_query(req, "board");
+	const char * aid_str = onion_request_get_query(req, "aid");
+
+	if (type == NULL || (board == 0 || aid_str == NULL)) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	struct userec *ue = getuser(userid);
+	if (ue == 0) {
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
+	int r = check_user_session(ue, sessid, appkey);
+	if (r != API_RT_SUCCESSFUL) {
+		free(ue);
+		return api_error(p, req, res, r);
+	}
+
+	if (strcasecmp(type, "delall") == 0) {
+		del_all_notification(ue->userid);
+	} else {
+		del_post_notification(ue->userid, board, atoi(aid_str));
+	}
+
+	free(ue);
+	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
