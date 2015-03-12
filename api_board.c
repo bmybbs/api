@@ -353,7 +353,7 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 	flock(fileno(fp), LOCK_EX);
 	int i;
 	for(i=0; i<mybrdnum; i++) {
-		if(strcasecmp(mybrd[i], board))
+		if(strcasecmp(mybrd[i], board) == 0)
 			continue;
 
 		fprintf(fp, "%s\n", mybrd[i]);
