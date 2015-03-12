@@ -298,7 +298,11 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 	flock(fileno(fp), LOCK_UN);
 
 	fclose(fp);
-	return api_error(p, req, res, API_RT_SUCCESSFUL);
+
+	api_set_json_header(res);
+	onion_response_printf(res, "{\"errcode\": 0, \"board\": \"%s\"}", b->header.filename);
+
+	return OCS_PROCESSED;
 }
 
 int api_board_fav_del(ONION_FUNC_PROTO_STR)
@@ -357,7 +361,11 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 	flock(fileno(fp), LOCK_UN);
 
 	fclose(fp);
-	return api_error(p, req, res, API_RT_SUCCESSFUL);
+
+	api_set_json_header(res);
+	onion_response_printf(res, "{\"errcode\": 0, \"board\": \"%s\"}", board);
+
+	return OCS_PROCESSED;
 }
 
 int api_board_fav_list(ONION_FUNC_PROTO_STR)
