@@ -1066,10 +1066,14 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 		flock(fileno(fp), LOCK_UN);
 		fclose(fp);
 
+		api_set_json_header(res);
+		onion_response_printf(res, "{ \"errcode\": 0, \"userid\": \"%s\" }", query_ue->userid);
+
 		free(array);
 		free(ue);
 		free(query_ue);
-		return api_error(p, req, res, API_RT_SUCCESSFUL);
+
+		return OCS_PROCESSED;
 	} else {
 		free(array);
 		free(ue);
@@ -1142,10 +1146,13 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 		flock(fileno(fp), LOCK_UN);
 		fclose(fp);
 
+		api_set_json_header(res);
+		onion_response_printf(res, "{ \"errcode\": 0, \"userid\": \"%s\" }", query_ue->userid);
+
 		free(array);
 		free(ue);
 		free(query_ue);
-		return api_error(p, req, res, API_RT_SUCCESSFUL);
+		return OCS_PROCESSED;
 	} else {
 		free(array);
 		free(ue);
