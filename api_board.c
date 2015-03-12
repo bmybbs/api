@@ -300,7 +300,7 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 	fclose(fp);
 
 	api_set_json_header(res);
-	onion_response_printf(res, "{\"errcode\": 0, \"board\": \"%s\"}", b->header.filename);
+	onion_response_printf(res, "{\"errcode\": 0, \"board\": \"%s\", \"secstr\":\"%s\"}", b->header.filename, b->header.sec1);
 
 	return OCS_PROCESSED;
 }
@@ -414,6 +414,7 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 		} else {
 			json_object_object_add(item, "accessible", json_object_new_int(check_user_read_perm_x(ui, b)));
 		}
+		json_object_object_add(item, "secstr", json_object_new_string(b->header.sec1));
 
 		json_object_array_add(json_array_board, item);
 	}
