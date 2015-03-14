@@ -461,8 +461,12 @@ int api_board_autocomplete(ONION_FUNC_PROTO_STR)
 			continue;
 		if(!check_user_read_perm_x(ui, p_brdmem))
 			continue;
-		if(strcasestr(p_brdmem->header.filename, search_str))
-			json_object_array_add(json_array_board, json_object_new_string(p_brdmem->header.filename));
+		if(strcasestr(p_brdmem->header.filename, search_str)) {
+			struct json_object * b_o = json_object_new_object();
+			json_object_object_add(b_o, "name", json_object_new_string(p_brdmem->header.filename));
+			json_object_object_add(b_o, "secstr", json_object_new_string(p_brdmem->header.sec1));
+			json_object_array_add(json_array_board, b_o);
+		}
 	}
 
 	api_set_json_header(res);
