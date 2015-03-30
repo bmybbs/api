@@ -1,5 +1,7 @@
 该项目是 [bmybbs](https://github.com/bmybbs/bmybbs) 项目的 API 部分。
 
+[![Documentation Status](https://readthedocs.org/projects/bmybbs-api-docs/badge/?version=latest)](http://bmybbs-api-docs.readthedocs.org/)
+
 ## 技术概要
 
 API 是一个纯 C 编写的 HTTP 服务器，并采用 JSON 格式输出。其依赖如下的库
@@ -26,6 +28,8 @@ $ ./bmyapi > api.log 2>&1 &
 ```
 
 ## 其他及支持
+
+接口文档托管在 readthedocs.org，请访问 http://bmybbs-api-docs.readthedocs.org/
 
 若接口返回的 `errcode` 字段不为 0，请参见 **错误码列表**。使用中若有其他问题，请至 bmybbs BMY_Dev 版面或者 Issue 列表提出。
 
