@@ -24,6 +24,8 @@
 #include "ythtbbs.h"
 #include "api_brc.h"
 
+#define MAX_COMMENTER_COUNT 10
+
 enum article_parse_mode {
 	ARTICLE_PARSE_WITH_ANSICOLOR,		///< 将颜色转换为 HTML 样式
 	ARTICLE_PARSE_WITHOUT_ANSICOLOR		///< 将 \033 字符转换为 [ESC]
@@ -44,6 +46,9 @@ struct bmy_article {
 	int th_num;				///< 参与主题讨论的人数
 	unsigned int mark; 		///< 文章标记，fileheader.accessed
 	int sequence_num;		///< 文章在版面的序号
+	int th_size;			///< 整个主题的文件大小
+	int th_commenter_count;	///< 评论用户计数
+	char th_commenter[MAX_COMMENTER_COUNT][16];	///< 参与评论的用户id，仅适用于主题模式
 };
 
 struct attach_link {

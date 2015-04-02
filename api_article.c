@@ -70,6 +70,13 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode);
 static int get_thread_by_filetime(char *board, int filetime);
 
 /**
+ * @brief 通过同主题ID查找同主题文章的帖子数、总大小，以及参与评论的用户 ID
+ * @param board 版面名
+ * @param ba struct bmy_article，API 中缓存帖子信息的结构体
+ */
+static void parse_thread_info(char *board, struct bmy_article *ba);
+
+/**
  * @brief 通过主题ID查找同主题文章数量
  * @param thread : the thread id
  * @return the nubmer of articles in the thread
@@ -1124,6 +1131,67 @@ static int get_thread_by_filetime(char *board, int filetime)
 		return thread;
 	}
 	return 0;
+}
+
+static void parse_thread_info(char *board, struct bmy_article *ba)
+{
+	// TODO
+	char dir[80];
+	int i = 0, j = 0, num_records = 0, is_in_commenter_list = 0;
+	struct fileheader * curr_article = NULL;
+	char * curr_userid = NULL;
+	struct mmapfile mf = { ptr:NULL };
+	if(NULL == board)
+		return ;
+	sprintf(dir, "boards/%s/.DIR",board);
+
+	if(MAP_FAILED == mmapfile(dir, &mf))
+		return ;
+
+	if(mf.size == 0) {
+		mmapfile(NULL, &mf);
+		return ;
+	}
+
+	num_records = mf.size / sizeof(struct fileheader);
+	if(0 != ba->thread) {
+		i = Search_Bin(mf.ptr, ba->thread, 0, num_records - 1);
+		if(i < 0)
+			i = -(i + 1);
+	} else
+		i = 0;
+
+	for(; i < num_records; ++i) {
+		curr_article = (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader));
+		if(curr_article->thread != ba->thread)
+			continue;
+		else {
+			++ba->th_num;
+			ba->th_size += bytenum(curr_article->sizebyte);
+			char * curr_userid = curr_article->owner;
+			// 判断是否在参与评论的人之中
+			if(ba->th_commenter_count < MAX_COMMENTER_COUNT) {
+				is_in_commenter_list = 0;	// 对于每一篇帖子重置判断状态
+
+				if(strcasecmp(curr_userid, ba->author) == 0) {
+					continue;	// 主题作者自己不参与统计
+				} else {
+					for(j=0; j<ba->th_commenter_count; ++j) {
+						if(strcasecmp(curr_userid, ba->th_commenter[j]) == 0) {
+							// 已统计过
+							is_in_commenter_list = 1;
+							break;	// 跳出循环，否则继续
+						}
+					}
+
+					if(is_in_commenter_list == 0) {
+						strcpy(ba->th_commenter[ba->th_commenter_count], curr_userid);
+						ba->th_commenter_count++;
+					}
+				}
+			}
+		}
+	}
 }
 
 static int get_number_of_articles_in_thread(char *board, int thread)
