@@ -11,7 +11,7 @@
  * @warning 记得调用完成 free
  */
 static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count, int mode);
-static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count);
+static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count, int mode);
 
 /**
  * @brief 将十大、分区热门话题转为 JSON 数据输出
@@ -71,10 +71,9 @@ static int get_thread_by_filetime(char *board, int filetime);
 
 /**
  * @brief 通过同主题ID查找同主题文章的帖子数、总大小，以及参与评论的用户 ID
- * @param board 版面名
  * @param ba struct bmy_article，API 中缓存帖子信息的结构体
  */
-static void parse_thread_info(char *board, struct bmy_article *ba);
+static void parse_thread_info(struct bmy_article *ba);
 
 /**
  * @brief 通过主题ID查找同主题文章数量
@@ -494,9 +493,9 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	}
 	munmap(data, fsize);
 	for(i = 0; i < num; ++i){
-		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
+		parse_thread_info(&board_list[i]);
 	}
-	char *s = bmy_article_with_num_array_to_json_string(board_list, num);
+	char *s = bmy_article_with_num_array_to_json_string(board_list, num, mode);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
@@ -1068,10 +1067,10 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
 
 	return r;
 }
-static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count)
+static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count, int mode)
 {
 	char buf[512];
-	int i;
+	int i, j;
 	struct bmy_article *p;
 	struct json_object *jp;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
@@ -1081,13 +1080,24 @@ static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_li
 		p = &(ba_list[i]);
 		memset(buf, 0, 512);
 		sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
-				"\"th_num\":%d, \"mark\":%d ,\"num\":%d }",
-				p->type, p->filetime, p->thread, p->th_num, p->mark, p->sequence_num);
+				"\"th_num\":%d, \"mark\":%d ,\"num\":%d, \"th_size\":%d, \"th_commenter\":[] }",
+				p->type, p->filetime, p->thread, p->th_num, p->mark, p->sequence_num, p->th_size);
 		jp = json_tokener_parse(buf);
 		if(jp) {
 			json_object_object_add(jp, "board", json_object_new_string(p->board));
 			json_object_object_add(jp, "title", json_object_new_string(p->title));
 			json_object_object_add(jp, "author", json_object_new_string(p->author));
+
+			if(mode == 1) {
+				// 主题模式下输出评论者
+				struct json_object *json_array_commenter = json_object_object_get(jp, "th_commenter");
+				for(j = 0; j < p->th_commenter_count; ++j) {
+					if(p->th_commenter[j][0] == 0)
+						break;
+					json_object_array_add(json_array_commenter, json_object_new_string(p->th_commenter[j]));
+				}
+			}
+
 			json_object_array_add(json_array, jp);
 		}
 	}
@@ -1133,7 +1143,7 @@ static int get_thread_by_filetime(char *board, int filetime)
 	return 0;
 }
 
-static void parse_thread_info(char *board, struct bmy_article *ba)
+static void parse_thread_info(struct bmy_article *ba)
 {
 	// TODO
 	char dir[80];
@@ -1141,9 +1151,9 @@ static void parse_thread_info(char *board, struct bmy_article *ba)
 	struct fileheader * curr_article = NULL;
 	char * curr_userid = NULL;
 	struct mmapfile mf = { ptr:NULL };
-	if(NULL == board)
+	if(NULL == ba->board)
 		return ;
-	sprintf(dir, "boards/%s/.DIR",board);
+	sprintf(dir, "boards/%s/.DIR", ba->board);
 
 	if(MAP_FAILED == mmapfile(dir, &mf))
 		return ;
