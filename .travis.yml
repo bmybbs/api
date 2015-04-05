@@ -14,3 +14,18 @@ before_script:
 - (cd onion-0.7; mkdir build; cd build; cmake .. -DCMAKE_C_FLAGS="-Werror" -DCMAKE_CXX_FLAGS="-Werror"; make VERBOSE=1; sudo make install)
 - git clone https://github.com/json-c/json-c.git
 - (cd json-c; sh autogen.sh; ./configure; make; sudo make install)
+
+env:
+  global:
+   - secure: "U3QvhmX28dckrJK5jB8v36Z2IJA6TeJmCf7ZZ34Dxhkb4dbYJYPHthuL8nvVrofb/m8v0qezX96mlpbGjdfIqnCVq75PwaUib+jOisaqeeNW7VL1Mviakg7x8MrTgSzCdIQfl8hiauAB7gICAUXkyp4oMf/kmJlm7Xic0koHFl4="
+
+addons:
+  coverity_scan:
+    project:
+      name: "bmybbs/api"
+      description: "Build submitted via Travis CI"
+    notification_email:
+      secure: "KQl4G+qtZ1U/VFCOIADdzBzpMwOT1yQUlYzrnPAYItGRMRSgT2I+QKEF4aU7cWpip1ltj8y0nDrZOIAa5fKmy4aRCJI7bHKkq+Al2wX5DPEz3+xSWegFck9/GpEUhvzWK4lQ7pbV/ySAX/2U2rUNqoS8EVQjDFICPTwGXGLahvE="
+    build_command_prepend: "make clean"
+    build_command: "make"
+    branch_pattern: master
