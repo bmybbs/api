@@ -1,3 +1,6 @@
+# BMYBBS API
+[![Build Status](https://travis-ci.org/bmybbs/api.svg)](https://travis-ci.org/bmybbs/api)
+
 该项目是 [bmybbs](https://github.com/bmybbs/bmybbs) 项目的 API 部分。
 
 [![Documentation Status](https://readthedocs.org/projects/bmybbs-api-docs/badge/?version=latest)](http://bmybbs-api-docs.readthedocs.org/)
