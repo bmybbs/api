@@ -2,11 +2,11 @@ language: c
 compiler: gcc
 script: make
 before_script:
+- sudo apt-get update -qq
+- sudo apt-get install -qq cmake libhiredis-dev libxml2-dev libmysqlclient-dev
 - git clone https://github.com/bmybbs/bmybbs.git
 - sudo mkdir -p /home/bbs/bin
-- (cd bmybbs; git checkout feature/bmyapp; cd ythtlib; sudo make install; cd ../libythtbbs; sudo make install)
-- sudo apt-get update -qq
-- sudo apt-get install -qq cmake libhiredis-dev
+- (cd bmybbs; git checkout feature/bmyapp; cd ythtlib; sudo make install; cd ../libythtbbs; sudo make install; cd ../software; tar zxf libghthash-0.5.0-x86_64.tar.gz; cd libghthash-0.5.0-x86_64; ./configure; make; sudo make install)
 - wget https://github.com/davidmoreno/onion/archive/v0.7.tar.gz -O onion-v0.7.tar.gz
 - tar zxf onion-v0.7.tar.gz
 - (cd onion-0.7; mkdir build; cd build; cmake .. -DCMAKE_C_FLAGS="-Werror" -DCMAKE_CXX_FLAGS="-Werror"; make VERBOSE=1; sudo make install)
