@@ -86,6 +86,9 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode);
 
 int api_user_login(ONION_FUNC_PROTO_STR)
 {
+	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
+		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
+
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
 	const char * userid = onion_dict_get(param_dict, "userid");
 	const char * passwd = onion_dict_get(param_dict, "passwd");
@@ -226,6 +229,9 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 
 int api_user_logout(ONION_FUNC_PROTO_STR)
 {
+	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
+		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
+	
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
 	const char * userid = onion_dict_get(param_dict, "userid");
 	const char * sessid = onion_dict_get(param_dict, "sessid");
