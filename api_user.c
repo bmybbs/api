@@ -836,62 +836,14 @@ static int cmpfuid(unsigned int *a, unsigned int *b)
 	return *a - *b;
 }
 
-static int activation_code_query(char *code)
+__attribute__((deprecated)) static int activation_code_query(char *code)
 {
-	MYSQL *s = NULL;
-	MYSQL_RES *res;
-	MYSQL_ROW *row;
-	int count;
-
-	s = mysql_init(s);
-	if(!my_connect_mysql(s)) {
-		return ACQR_DBERROR;
-	}
-
-	char code_s[10];		// 安全的9位激活码，外加结尾的 '\0'
-	snprintf(code_s, 10, "%s", code);
-	char sql[80];
-	sprintf(sql, "SELECT * FROM activation where code='%s';", code_s);
-	mysql_real_query(s, sql, strlen(sql));
-	res = mysql_store_result(s);
-	row = mysql_fetch_row(res);
-	count = mysql_num_rows(res);
-
-	if(count<1) {
-		mysql_close(s);
-		return ACQR_NOT_EXIST;
-	}
-
-	int is_used = atoi(row[2]);
-	if(is_used) {
-		mysql_close(s);
-		return ACQR_USED;
-	}
-
-	mysql_close(s);
 	return ACQR_NORMAL;
 }
 
-static int activation_code_set_user(char *code, char *userid)
+__attribute__((deprecated)) static int activation_code_set_user(char *code, char *userid)
 {
-	MYSQL *s=NULL;
-	int count;
-
-	s = mysql_init(s);
-	if(!my_connect_mysql(s)) {
-		return ACQR_DBERROR;
-	}
-
-	char code_s[10];
-	snprintf(code_s, 10, "%s", code);
-	char sql[160];
-	sprintf(sql, "UPDATE activation SET is_used=1, userid='%s' WHERE code='%s'",
-			userid, code_s);
-	mysql_real_query(s, sql, strlen(sql));
-	count = mysql_affected_rows(s);
-
-	mysql_close(s);
-	return count;
+	return 0;
 }
 
 static int adduser_with_activation_code(struct userec *x, char *code)
