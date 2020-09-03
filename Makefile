@@ -1,8 +1,8 @@
 CC		= gcc
 BSRCPTH	= /home/bmybbs
 FLAGS 	= -O -Wall -g -D_GNU_SOURCE -I$(BSRCPTH)/include -I$(BSRCPTH)/ythtlib -I$(BSRCPTH)/libythtbbs `xml2-config --cflags`
-BBSLIBS	= -L/home/bbs/bin -lythtbbs -lytht -lmysqlclient_r -lxml2 -ljson-c -lpcre -lm -lhiredis
-ONILIBS = -lonion_handlers -lonion_static -pthread -lrt
+BBSLIBS	= -L/home/bbs/bin -lythtbbs -lytht -lmysqlclient -lxml2 -ljson-c -lpcre -lm -lhiredis
+ONILIBS = -lonion -pthread -lrt
 
 PROGNAME = bmyapi
 CFILES	:= main.c api_error.c api_template.c api_user.c \
