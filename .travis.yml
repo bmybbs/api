@@ -5,7 +5,6 @@ dist: focal
 before_script:
 - sudo apt-get update -qq
 - sudo apt-get install -qq cmake libhiredis-dev libxml2-dev libmysqlclient-dev cmake
-- sudo apt-get remove libgnutls-dev
 - git clone https://github.com/bmybbs/bmybbs.git
 - sudo mkdir -p /home/bbs/bin
 - sudo mv bmybbs /home/bmybbs
@@ -13,7 +12,7 @@ before_script:
 - git clone https://github.com/davidmoreno/onion
 - (mkdir onion-build; cd onion-build; cmake ../onion; make; cd src/onion; sudo make install)
 - git clone https://github.com/json-c/json-c.git
-- (make json-c-build; cd json-c-build; cmake ../json-c; make; sudo make install)
+- (mkdir json-c-build; cd json-c-build; cmake ../json-c; make; sudo make install)
 
 env:
   global:
