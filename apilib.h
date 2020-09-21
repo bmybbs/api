@@ -20,7 +20,6 @@
 #include <hiredis/hiredis.h>
 
 #include "bbs.h"
-#include "ythtbbs.h"
 #include "api_brc.h"
 
 #define MAX_COMMENTER_COUNT 10

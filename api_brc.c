@@ -1,5 +1,4 @@
 #include "bbs.h"
-#include "ythtbbs.h"
 
 //static struct allbrc allbrc;
 //static char allbrcuser[STRLEN];
