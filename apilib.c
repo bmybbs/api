@@ -4,11 +4,31 @@
  *  Created on: 2012-10-29
  *      Author: shenyang
  */
+#include <ctype.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
+#include "config.h"
 #include "apilib.h"
 #include "error_code.h"
 #include "ytht/strlib.h"
 #include "ytht/timeop.h"
+#include "ytht/shmop.h"
+#include "ytht/fileop.h"
+#include "ytht/numbyte.h"
+#include "ythtbbs/cache.h"
+#include "ythtbbs/permissions.h"
+#include "ythtbbs/user.h"
+#include "ythtbbs/record.h"
+#include "ythtbbs/article.h"
+#include "ythtbbs/misc.h"
+#include "ythtbbs/binaryattach.h"
+#include "ythtbbs/docutil.h"
+
 char *ummap_ptr = NULL;
 int ummap_size = 0;
 

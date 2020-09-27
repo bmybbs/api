@@ -1,26 +1,11 @@
 #ifndef __BMYBBS_APILIB_H
 #define __BMYBBS_APILIB_H
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <ght_hash_table.h>
-#include <json-c/json.h>
-#include <libxml/HTMLparser.h>
-#include <libxml/HTMLtree.h>
-#include <libxml/xpath.h>
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-#include <libxml/xmlmemory.h>
-#include <libxml/xmlsave.h>
-#include <hiredis/hiredis.h>
+#include <time.h>
+#include <stdio.h>
 
-#include "bbs.h"
-#include "api_brc.h"
+#include "ythtbbs/cache.h"
+#include "ythtbbs/user.h"
 
 #define MAX_COMMENTER_COUNT 10
 

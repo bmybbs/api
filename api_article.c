@@ -1,5 +1,25 @@
-#include "api.h"
+#include <ctype.h>
+#include <string.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/file.h>
+#include <sys/mman.h>
+#include <libxml/HTMLtree.h>
+#include <libxml/xpath.h>
+#include <json-c/json.h>
 
+#include "bbs.h"
+#include "ytht/numbyte.h"
+#include "ytht/common.h"
+#include "ytht/fileop.h"
+#include "ythtbbs/docutil.h"
+#include "ythtbbs/article.h"
+#include "ythtbbs/misc.h"
+#include "ythtbbs/notification.h"
+
+#include "api.h"
+#include "apilib.h"
 /**
  * @brief 将 struct bmy_article 数组序列化为 json 字符串。
  * 这个方法不考虑异常，因此方法里确定了 errcode 为 0，也就是 API_RT_SUCCESSFUL，

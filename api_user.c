@@ -1,5 +1,22 @@
-#include "api.h"
+#include <time.h>
+#include <string.h>
+#include <sys/file.h>
+#include <json-c/json.h>
+#include <hiredis/hiredis.h>
+#include <onion/dict.h>
+
+#include "bbs.h"
+#include "ytht/crypt.h"
+#include "ytht/strlib.h"
+#include "ytht/common.h"
 #include "ythtbbs/identify.h"
+#include "ythtbbs/misc.h"
+#include "ythtbbs/user.h"
+#include "ythtbbs/notification.h"
+#include "ythtbbs/permissions.h"
+
+#include "api.h"
+#include "apilib.h"
 
 #define NHASH 67
 /**

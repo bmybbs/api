@@ -1,3 +1,10 @@
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include "apilib.h"
 
 api_template_t api_template_create(const char *filename)

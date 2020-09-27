@@ -1,4 +1,13 @@
+#include <string.h>
+#include <json-c/json.h>
+
+#include "bbs.h"
+#include "ythtbbs/article.h"
+#include "ythtbbs/misc.h"
+#include "ythtbbs/permissions.h"
+
 #include "api.h"
+#include "apilib.h"
 
 enum api_mail_box_type {
 	API_MAIL_RECIEVE_BOX,

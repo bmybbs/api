@@ -1,3 +1,8 @@
+#include <unistd.h>
+#include <signal.h>
+#include <onion/onion.h>
+#include "config.h"
+#include "apilib.h"
 #include "api.h"
 
 static onion *o = NULL;

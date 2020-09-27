@@ -1,4 +1,13 @@
+#include <string.h>
+#include <sys/mman.h>
+#include <libxml/HTMLtree.h>
+#include <libxml/xpath.h>
+#include <json-c/json.h>
+
+#include "bbs.h"
 #include "api.h"
+#include "apilib.h"
+#include "api_brc.h"
 
 /**
  * @brief 将 boardmem 数组输出为 json 字符串

@@ -1,14 +1,8 @@
 #ifndef __BMYBBS_API_H
 #define __BMYBBS_API_H
-#include "apilib.h"
+#include <onion/request.h>
+#include <onion/response.h>
 #include "error_code.h"
-
-#include <onion/onion.h>
-#include <onion/dict.h>
-#include <onion/log.h>
-#include <onion/block.h>
-#include <signal.h>
-#include <netdb.h>
 
 #define ONION_FUNC_PROTO_STR void *p, onion_request *req, onion_response *res
 

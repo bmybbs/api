@@ -1,4 +1,18 @@
+#include <string.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+
+#include <json-c/json.h>
+#include <onion/shortcuts.h>
+
+#include "config.h"
+#include "ytht/fileop.h"
+#include "ythtbbs/user.h"
+
 #include "api.h"
+#include "apilib.h"
 
 static int api_attach_show_mail(ONION_FUNC_PROTO_STR);
 

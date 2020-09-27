@@ -1,4 +1,9 @@
+#include <string.h>
+#include <json-c/json.h>
+#include "ythtbbs/notification.h"
+
 #include "api.h"
+#include "apilib.h"
 
 int api_notification_list(ONION_FUNC_PROTO_STR)
 {
