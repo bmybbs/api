@@ -1,6 +1,6 @@
 #include "api.h"
 
-onion *o=NULL;
+static onion *o = NULL;
 
 static void shutdown_server(int _)
 {
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	signal(SIGINT, shutdown_server);
 	signal(SIGTERM, shutdown_server);
 
-	o=onion_new(O_POOL);
+	o = onion_new(O_POOL);
 	onion_set_max_threads(o, 32);
 
 	onion_set_timeout(o, 5000);

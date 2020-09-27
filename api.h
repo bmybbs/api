@@ -10,8 +10,6 @@
 #include <signal.h>
 #include <netdb.h>
 
-extern onion *o;
-
 #define ONION_FUNC_PROTO_STR void *p, onion_request *req, onion_response *res
 
 int api_error(ONION_FUNC_PROTO_STR, enum api_error_code errcode);
