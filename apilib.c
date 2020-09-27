@@ -7,6 +7,8 @@
 
 #include "apilib.h"
 #include "error_code.h"
+#include "ytht/strlib.h"
+#include "ytht/timeop.h"
 char *ummap_ptr = NULL;
 int ummap_size = 0;
 
@@ -896,11 +898,11 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 	title_gbk = (char *)malloc(strlen(title)*2);
 	memset(title_gbk, 0, strlen(title)*2);
 	u2g(title, strlen(title), title_gbk, strlen(title)*2);
-	strsncpy(header.title, title_gbk, sizeof(header.title));
+	ytht_strsncpy(header.title, title_gbk, sizeof(header.title));
 	fp = open_memstream(&content_utf8_buf, &content_utf8_buf_len);
 	fprintf(fp,
 			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n",
-			id, nickname, board, title, Ctime(now_t),
+			id, nickname, board, title, ytht_ctime(now_t),
 			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
 	free(title_gbk);
 	fp2 = fopen(filename, "r");
@@ -932,7 +934,7 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 	fclose(fp1);
 
 	sprintf(buf3, "boards/%s/M.%d.A", board, t);
-	header.sizebyte = numbyte(eff_size(buf3));
+	header.sizebyte = ytht_num2byte(eff_size(buf3));
 
 	if(thread == -1)
 		header.thread = header.filetime;
@@ -978,7 +980,7 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 	fp2 = fopen(filename, "r");
 
 	sprintf(tmp_utf_buf, "寄信人: %s (%s)\n标  题: %s\n发信站: 兵马俑BBS (%s)\n来  源: %s\n\n",
-			id, nickname, title, Ctime(now_t), ip);
+			id, nickname, title, ytht_ctime(now_t), ip);
 	u2g(tmp_utf_buf, 1024, tmp_gbk_buf, 1024);
 	fwrite(tmp_gbk_buf, 1, strlen(tmp_gbk_buf), fp);
 
@@ -1038,7 +1040,7 @@ int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id
 	fp2 = fopen(filename, "r");
 
 	sprintf(tmp_utf_buf, "收信人: %s (%s)\n标  题: %s\n发信站: 兵马俑BBS (%s)\n来  源: %s\n\n",
-			id, nickname, title, Ctime(now_t), ip);
+			id, nickname, title, ytht_ctime(now_t), ip);
 	u2g(tmp_utf_buf, 1024, tmp_gbk_buf, 1024);
 	fwrite(tmp_gbk_buf, 1, strlen(tmp_gbk_buf), fp);
 

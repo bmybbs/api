@@ -117,7 +117,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 			return api_error(p, req, res, API_RT_SITEFBDIP);
 		} else if(userbansite(ue->userid, fromhost)) {
 			return api_error(p, req, res, API_RT_FORBIDDENIP);
-		} else if(!checkpasswd(ue->passwd, passwd)) {
+		} else if(!ytht_crypt_checkpasswd(ue->passwd, passwd)) {
 			logattempt(ue->userid, fromhost, "API", now_t);
 			return api_error(p, req, res, API_RT_ERRORPWD);
 		} else if(!(check_user_perm(ue, PERM_BASIC))) {
@@ -145,7 +145,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 		if(t<dt.tm_mday && ue->numdays<800)
 			ue->numdays++;
 		ue->numlogins++;
-		strsncpy(ue->lasthost, fromhost, 16);
+		ytht_strsncpy(ue->lasthost, fromhost, 16);
 		save_user_data(ue);
 	}
 
@@ -261,7 +261,7 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 
 	sprintf(buf, "%s exitbbs api", ue->userid);
 	newtrace(buf);
-	strsncpy(ue->lasthost, fromhost, 16);
+	ytht_strsncpy(ue->lasthost, fromhost, 16);
 	ue->lastlogout = now_t;
 	save_user_data(ue);
 
@@ -346,11 +346,11 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 
 	struct userec x;
 	memset(&x, 0, sizeof(x));
-	strsncpy(x.userid, userid, 13);
+	ytht_strsncpy(x.userid, userid, 13);
 
 	char salt[3];
 	getsalt(salt);
-	strsncpy(x.passwd, crypt1(passwd, salt), 14);
+	ytht_strsncpy(x.passwd, ytht_crypt_crypt1(passwd, salt), 14);
 
 	x.userlevel = PERM_DEFAULT;
 
@@ -731,10 +731,10 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char *app
 
 	u->pager = 0;
 
-	strsncpy(u->from, fromhost, 24);
-	strsncpy(u->username, ue->username, NAMELEN);
-	strsncpy(u->userid, ue->userid, IDLEN+1);
-	strsncpy(u->appkey, appkey, APPKEYLENGTH);
+	ytht_strsncpy(u->from, fromhost, 24);
+	ytht_strsncpy(u->username, ue->username, NAMELEN);
+	ytht_strsncpy(u->userid, ue->userid, IDLEN+1);
+	ytht_strsncpy(u->appkey, appkey, APPKEYLENGTH);
 	getrandomstr(u->sessionid);
 	getrandomstr_r(u->token, TOKENLENGTH+1);
 

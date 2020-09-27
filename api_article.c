@@ -457,7 +457,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 
 		if (data[i].sizebyte == 0) { // 如果内存中数据库记录的 sizebyte 为 0，则修正 .DIR 文件
 			sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
-			data[i].sizebyte = numbyte(eff_size(filename));
+			data[i].sizebyte = ytht_num2byte(eff_size(filename));
 
 			fd = open(dir, O_RDWR);
 			if (fd < 0)
@@ -585,7 +585,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 			continue;
 		if (data[i].sizebyte == 0) {
 			sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
-			data[i].sizebyte = numbyte(eff_size(filename));
+			data[i].sizebyte = ytht_num2byte(eff_size(filename));
 			fd = open(dir, O_RDWR);
 			if (fd < 0)
 				break;
@@ -1177,7 +1177,7 @@ static void parse_thread_info(struct bmy_article *ba)
 			continue;
 		else {
 			++ba->th_num;
-			ba->th_size += bytenum(curr_article->sizebyte);
+			ba->th_size += ytht_num2byte(curr_article->sizebyte);
 			char * curr_userid = curr_article->owner;
 			// 判断是否在参与评论的人之中
 			if(ba->th_commenter_count < MAX_COMMENTER_COUNT) {
