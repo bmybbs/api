@@ -187,7 +187,7 @@ static int get_user_mail_size(char * userid)
 static int check_user_maxmail(struct userec currentuser)
 {
 	int currsize, maxsize;
-	if(HAS_PERM(PERM_SYSOP|PERM_OBOARDS))
+	if(HAS_PERM(PERM_SYSOP|PERM_OBOARDS, currentuser))
 		return 0;
 
 	currsize = 0;
@@ -370,7 +370,7 @@ static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	if(HAS_PERM(PERM_DENYMAIL)) {
+	if(HAS_PERM(PERM_DENYMAIL, currentuser)) {
 		return api_error(p, req, res, API_RT_MAILNOPPERM);
 	}
 
@@ -381,7 +381,7 @@ static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	// 更新 token 和来源 IP
-	getrandomstr_r(ui->token, TOKENLENGTH+1);
+	ytht_get_random_str_r(ui->token, TOKENLENGTH+1);
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 	memset(ui->from, 0, 20);
 	strncpy(ui->from, fromhost, 20);

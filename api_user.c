@@ -248,7 +248,7 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 {
 	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
-	
+
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
 	const char * userid = onion_dict_get(param_dict, "userid");
 	const char * sessid = onion_dict_get(param_dict, "sessid");
@@ -366,7 +366,7 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 	ytht_strsncpy(x.userid, userid, 13);
 
 	char salt[3];
-	getsalt(salt);
+	ytht_get_salt(salt);
 	ytht_strsncpy(x.passwd, ytht_crypt_crypt1(passwd, salt), 14);
 
 	x.userlevel = PERM_DEFAULT;
@@ -752,8 +752,8 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char *app
 	ytht_strsncpy(u->username, ue->username, NAMELEN);
 	ytht_strsncpy(u->userid, ue->userid, IDLEN+1);
 	ytht_strsncpy(u->appkey, appkey, APPKEYLENGTH);
-	getrandomstr(u->sessionid);
-	getrandomstr_r(u->token, TOKENLENGTH+1);
+	ytht_get_random_str(u->sessionid);
+	ytht_get_random_str_r(u->token, TOKENLENGTH+1);
 
 	if(strcasecmp(ue->userid, "guest"))
 		initfriends(u);

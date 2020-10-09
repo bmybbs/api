@@ -13,6 +13,7 @@
 #include "ytht/numbyte.h"
 #include "ytht/common.h"
 #include "ytht/fileop.h"
+#include "ythtbbs/commend.h"
 #include "ythtbbs/docutil.h"
 #include "ythtbbs/article.h"
 #include "ythtbbs/misc.h"
@@ -1040,7 +1041,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	free(ue);
 	free(title_gbk);
-	getrandomstr_r(ui->token, TOKENLENGTH+1);
+	ytht_get_random_str_r(ui->token, TOKENLENGTH+1);
 	memset(ui->from, 0, 20);
 	strncpy(ui->from, fromhost, 20);
 	api_set_json_header(res);
