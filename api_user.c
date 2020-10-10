@@ -133,15 +133,14 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	api_template_t tpl = api_template_create("templates/api_user_login.json");
-	api_template_set(&tpl, "userid", ue.userid);
-	api_template_set(&tpl, "sessid", ui.sessionid);
-	api_template_set(&tpl, "token", "");
+	struct json_object *obj = json_object_new_object();
+	json_object_object_add(obj, "userid", json_object_new_string(ue.userid));
+	json_object_object_add(obj, "sessid", json_object_new_string(ui.sessionid));
 
 	api_set_json_header(res);
-	onion_response_write0(res, tpl);
+	onion_response_write0(res, json_object_to_json_string(obj));
 
-	api_template_free(tpl);
+	json_object_put(obj);
 	return OCS_PROCESSED;
 }
 
