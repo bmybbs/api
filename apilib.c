@@ -28,6 +28,7 @@
 #include "ythtbbs/misc.h"
 #include "ythtbbs/binaryattach.h"
 #include "ythtbbs/docutil.h"
+#include "ythtbbs/override.h"
 
 char *ummap_ptr = NULL;
 int ummap_size = 0;
@@ -1158,9 +1159,9 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 	return 0;
 }
 
-int load_user_X_File(struct override *array, int size, const char *userid, int mode)
+int load_user_X_File(struct ythtbbs_override *array, int size, const char *userid, int mode)
 {
-	memset(array, 0, sizeof(struct override) * size);
+	memset(array, 0, sizeof(struct ythtbbs_override) * size);
 
 	FILE *fp;
 	char file[256];
@@ -1179,7 +1180,7 @@ int load_user_X_File(struct override *array, int size, const char *userid, int m
 	return num;
 }
 
-int is_queryid_in_user_X_File(const char *queryid, const struct override *array, const int size)
+int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override *array, const int size)
 {
 	int i=0, pos=-1;
 	for(;i<size; ++i) {
