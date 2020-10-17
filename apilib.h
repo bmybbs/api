@@ -155,16 +155,6 @@ int f_write(char *filename, char *buf);
 int f_append(char *filename, char *buf);
 
 /**
- * @brief 向指定的文件中追加记录。
- * 该方法来自 nju09。
- * @param filename 文件名
- * @param record 需要存放的记录
- * @param size 需要存放的记录长度
- * @return
- */
-int append_record(char *filename, void *record, int size);
-
-/**
  * @brief 计算某个id的站内信封数。
  * 该方法来自 nju09/bbsfoot.c int mails()。该函数不包含用户id有效性校验，需要在逻辑
  * 中预先校验权限。
