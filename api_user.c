@@ -13,6 +13,7 @@
 #include "ythtbbs/identify.h"
 #include "ythtbbs/misc.h"
 #include "ythtbbs/user.h"
+#include "ythtbbs/override.h"
 #include "ythtbbs/notification.h"
 #include "ythtbbs/permissions.h"
 #include "ythtbbs/session.h"
@@ -619,17 +620,17 @@ static int initfriends(struct user_info *u)
 	FILE *fp;
 	memset(u->friend, 0, sizeof(u->friend));
 	sethomefile(buf, u->userid, "friends");
-	u->fnum = file_size_s(buf) / sizeof(struct override);
+	u->fnum = file_size_s(buf) / sizeof(struct ythtbbs_override);
 	if(u->fnum <=0)
 		return 0;
 
 	u->fnum = (u->fnum>=MAXFRIENDS) ? MAXFRIENDS : u->fnum;
 
-	struct override *fff = (struct override *)malloc(MAXFRIENDS * sizeof(struct override));
+	struct ythtbbs_override *fff = (struct ythtbbs_override *)malloc(MAXFRIENDS * sizeof(struct ythtbbs_override));
 	// TODO: 判断 malloc 调用失败
-	memset(fff, 0, MAXFRIENDS*sizeof(struct override));
+	memset(fff, 0, MAXFRIENDS*sizeof(struct ythtbbs_override));
 	fp = fopen(buf, "r");
-	fread(fff, sizeof(struct override), MAXFRIENDS, fp);
+	fread(fff, sizeof(struct ythtbbs_override), MAXFRIENDS, fp);
 
 	for(i=0; i<u->fnum; ++i) {
 		u->friend[i] = getusernum(fff[i].id) + 1;
@@ -644,7 +645,7 @@ static int initfriends(struct user_info *u)
 		fseek(fp, 0, SEEK_SET);
 		for(i=0; i<u->fnum; ++i)
 			if(fff[i].id[0])
-				fwrite(&(fff[i]), sizeof(struct override), 1, fp);
+				fwrite(&(fff[i]), sizeof(struct ythtbbs_override), 1, fp);
 	}
 
 	u->fnum = fnum;
@@ -735,13 +736,13 @@ static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	struct override * array;
+	struct ythtbbs_override * array;
 	int size=0;
 	if(mode == UFT_FRIENDS) {
-		array = (struct override *)malloc(sizeof(struct override) * MAXFRIENDS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
 		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
 	} else {
-		array = (struct override *)malloc(sizeof(struct override) * MAXREJECTS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
 		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
 	}
 
@@ -798,10 +799,10 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	struct override * array;
+	struct ythtbbs_override * array;
 	int size=0;
 	if(mode == UFT_FRIENDS) {
-		array = (struct override *)malloc(sizeof(struct override) * MAXFRIENDS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
 		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
 
 		if(size >= MAXFRIENDS-1) {
@@ -811,7 +812,7 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 			return api_error(p, req, res, API_RT_REACHMAXRCD);
 		}
 	} else {
-		array = (struct override *)malloc(sizeof(struct override) * MAXREJECTS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
 		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
 
 		if(size >= MAXREJECTS-1) {
@@ -843,7 +844,7 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 	FILE *fp = fopen(path, "w");
 	if(fp) {
 		flock(fileno(fp), LOCK_EX);
-		fwrite(array, sizeof(struct override), size, fp);
+		fwrite(array, sizeof(struct ythtbbs_override), size, fp);
 		flock(fileno(fp), LOCK_UN);
 		fclose(fp);
 
@@ -890,13 +891,13 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	struct override * array;
+	struct ythtbbs_override * array;
 	int size=0;
 	if(mode == UFT_FRIENDS) {
-		array = (struct override *)malloc(sizeof(struct override) * MAXFRIENDS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
 		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
 	} else {
-		array = (struct override *)malloc(sizeof(struct override) * MAXREJECTS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
 		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
 	}
 
@@ -911,7 +912,7 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 
 	int i;
 	for(i=pos; i<size-1; ++i) {
-		memcpy(&array[i], &array[i+1], sizeof(struct override));
+		memcpy(&array[i], &array[i+1], sizeof(struct ythtbbs_override));
 	}
 	size--;
 
@@ -923,7 +924,7 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 	FILE *fp = fopen(path, "w");
 	if(fp) {
 		flock(fileno(fp), LOCK_EX);
-		fwrite(array, sizeof(struct override), size, fp);
+		fwrite(array, sizeof(struct ythtbbs_override), size, fp);
 		flock(fileno(fp), LOCK_UN);
 		fclose(fp);
 
