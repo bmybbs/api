@@ -1,3 +1,4 @@
+#include <onion/response.h>
 #include <time.h>
 #include <string.h>
 #include <sys/file.h>
@@ -14,6 +15,8 @@
 #include "ythtbbs/user.h"
 #include "ythtbbs/notification.h"
 #include "ythtbbs/permissions.h"
+#include "ythtbbs/session.h"
+#include "bmy/cookie.h"
 
 #include "api.h"
 #include "apilib.h"
@@ -112,7 +115,6 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	const char * appkey = onion_dict_get(param_dict, "appkey");
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
-	char buf[512];
 	time_t now_t = time(NULL);
 	time_t dtime;
 	struct tm dt;
@@ -137,7 +139,15 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	json_object_object_add(obj, "userid", json_object_new_string(ue.userid));
 	json_object_object_add(obj, "sessid", json_object_new_string(ui.sessionid));
 
+	struct bmy_cookie cookie = {
+		.userid = ui.userid,
+		.sessid = ui.sessionid,
+		.token  = ""
+	};
+	char buf[60];
+	bmy_cookie_gen(buf, sizeof(buf), &cookie);
 	api_set_json_header(res);
+	onion_response_add_cookie(res, SMAGIC, buf, -1, NULL, NULL, 0); // TODO 检查 cookie 的有效期
 	onion_response_write0(res, json_object_to_json_string(obj));
 
 	json_object_put(obj);
@@ -207,51 +217,32 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
 
-	const onion_dict *param_dict = onion_request_get_query_dict(req);
-	const char * userid = onion_dict_get(param_dict, "userid");
-	const char * sessid = onion_dict_get(param_dict, "sessid");
-	const char * appkey = onion_dict_get(param_dict, "appkey");
-	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
-	time_t now_t = time(NULL);
-	char buf[512];
-
-	if(userid == NULL || sessid == NULL || appkey == NULL) {
+	const char *cookie_str = onion_request_get_cookie(req, SMAGIC);
+	if(cookie_str == NULL || cookie_str[0] == '\0') {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
-	if(strcasecmp(userid, "guest") == 0) {
+	struct bmy_cookie cookie;
+
+	time_t now_t = time(NULL);
+	char buf[512];
+
+	snprintf(buf, sizeof(buf), "%s", cookie_str);
+	bmy_cookie_parse(buf, &cookie);
+
+	if (cookie.userid == NULL || cookie.sessid == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	if (strcasecmp(cookie.userid, "guest") == 0) {
 		return api_error(p, req, res, API_RT_CNTLGOTGST);
 	}
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0) {
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	}
+	int utmp_idx = ythtbbs_session_get_utmp_idx(cookie.sessid, cookie.userid);
+	ythtbbs_user_logout(cookie.userid, utmp_idx); // TODO return value
 
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-
-	sprintf(buf, "%s exitbbs api", ue->userid);
-	newtrace(buf);
-	ytht_strsncpy(ue->lasthost, fromhost, 16);
-	ue->lastlogout = now_t;
-	save_user_data(ue);
-
-	int utmp_index = get_user_utmp_index(sessid);
-	int uid=shm_utmp->uinfo[utmp_index].uid;
-	remove_uindex(uid, utmp_index+1);
-	memset(&(shm_utmp->uinfo[utmp_index]), 0, sizeof(struct user_info));
-
-	if(check_user_perm(ue, PERM_BOARDS) && count_uindex(uid)==0)
-		setbmstatus(ue, 0);
-
-	free(ue);
-
+	onion_response_add_cookie(res, SMAGIC, "", 0, NULL, NULL, 0);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
-	return OCS_PROCESSED;
 }
 
 int api_user_check_session(ONION_FUNC_PROTO_STR)
