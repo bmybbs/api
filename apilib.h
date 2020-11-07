@@ -47,7 +47,6 @@ void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...);
 void api_template_free(api_template_t tpl);
 
 struct BCACHE     *shm_bcache;
-struct UCACHE     *shm_ucache;
 int shm_init();
 
 extern char *ummap_ptr;
