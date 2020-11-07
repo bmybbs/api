@@ -375,7 +375,7 @@ static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = &(shm_utmp->uinfo[uent_index]);
+	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 	if(strcmp(ui->token, token) != 0) {
 		return api_error(p, req, res, API_RT_WRONGTOKEN);
 	}

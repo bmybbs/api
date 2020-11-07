@@ -425,7 +425,7 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	if(qryday_str!=NULL && atoi(qryday)>0)
 		qryday = atoi(qryday);
 
-	struct user_info * ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info * ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 	int num = search_user_article_with_title_keywords(articles, MAX_SEARCH_NUM, ui,
 			query_ue->userid, NULL, NULL, NULL, qryday * 86400);
 
@@ -670,34 +670,9 @@ __attribute__((deprecated)) static int activation_code_set_user(char *code, char
 	return 0;
 }
 
-static int adduser_with_activation_code(struct userec *x, char *code)
-{
-	int i, rt;
-	int fd = open(PASSFILE ".lock", O_RDONLY | O_CREAT, 0600);
-	flock(fd, LOCK_EX);
-
-	rt = activation_code_query(code);
-	if(rt!=ACQR_NORMAL) {
-		flock(fd, LOCK_UN);
-		close(fd);
-		return rt;
-	}
-
-	for(i=0; i<MAXUSERS; i++) {
-		if(shm_ucache->userid[i][0]==0) {
-			if((i+1) > shm_ucache->number)
-				shm_ucache->number = i+1;
-			strncpy(shm_ucache->userid[i], x->userid, 13);
-			insertuseridhash(shm_uidhash->uhi, UCACHE_HASH_SIZE, x->userid, i+1);
-			save_user_data(x);
-			break;
-		}
-	}
-
-	rt = activation_code_set_user(code, x->userid);
-	flock(fd, LOCK_UN);
-	close(fd);
-	return (rt == 1) ? ACQR_NORMAL : ACQR_DBERROR;
+// TODO deprecated
+static int adduser_with_activation_code(struct userec *x, char *code) {
+	return ACQR_NORMAL;
 }
 
 static void api_newcomer(struct userec *x,char *fromhost, char *words)

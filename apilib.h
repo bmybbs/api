@@ -46,7 +46,6 @@ api_template_t api_template_create(const char * filename);
 void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...);
 void api_template_free(api_template_t tpl);
 
-struct UTMPFILE   *shm_utmp;
 struct BCACHE     *shm_bcache;
 struct UCACHE     *shm_ucache;
 struct UCACHEHASH *shm_uidhash;
@@ -57,9 +56,6 @@ extern char *ummap_ptr;
 extern int ummap_size;
 int ummap();
 
-
-int finduseridhash(struct useridhashitem *ptr, int size, const char *userid);
-int insertuseridhash(struct useridhashitem *ptr, int size, char *userid, int num);
 int getusernum(const char *id);
 struct userec * getuser(const char *id);
 char * getuserlevelname(unsigned userlevel);
@@ -71,13 +67,6 @@ int save_user_data(struct userec *x);
  * @return utmp 的索引值，注意是从0开始。
  */
 int get_user_utmp_index(const char *sessid);
-
-/**
- * @brief 计算uid为uid的用户当前在登录的个数
- * @param uid uid，从1开始索引
- * @return
- */
-int count_uindex(int uid);
 
 /**
  * @brief 检查用户 session 是否有效

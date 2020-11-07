@@ -71,16 +71,10 @@ int getNextChar(register FILE* fp, int *future, int *future_char);
  */
 int shm_init()
 {
-	shm_utmp    = (struct UTMPFILE*) get_old_shm(UTMP_SHMKEY, sizeof(struct UTMPFILE));
+	ythtbbs_cache_utmp_resolve();
+	ythtbbs_cache_UserTable_resolve();
 	shm_bcache  = (struct BCACHE*) get_old_shm(BCACHE_SHMKEY, sizeof(struct BCACHE));
-	shm_ucache  = (struct UCACHE*) get_old_shm(UCACHE_SHMKEY, sizeof(struct UCACHE));
-	shm_uidhash = (struct UCACHEHASH*) get_old_shm(UCACHE_HASH_SHMKEY, sizeof(struct UCACHEHASH));
-	shm_uindex  = (struct UINDEX*) get_old_shm(UINDEX_SHMKEY, sizeof(struct UINDEX));
-	if( shm_utmp == 0 ||
-		shm_bcache == 0 ||
-		shm_ucache == 0 ||
-		shm_uidhash == 0 ||
-		shm_uindex == 0 )
+	if (shm_bcache == 0)
 		return -1; // shm error
 	else
 		return 0;
@@ -142,20 +136,8 @@ struct userec * getuser(const char *id)
 	return user;
 }
 
-int getusernum(const char *id)
-{
-	int i;
-	if(id[0] == 0 || strchr(id, '.'))
-		return -1;
-
-	i = finduseridhash(shm_uidhash->uhi, UCACHE_HASH_SIZE, id) - 1;
-	if (i>=0 && !strcasecmp(shm_ucache->userid[i], id))
-		return i;    // check user in shm_ucache
-	for (i=0; i<MAXUSERS; i++) {
-		if (!strcasecmp(shm_ucache->userid[i], id))
-			return i;  // 遍历 shm_ucache 找到真实的索引
-	}
-	return -1;
+int getusernum(const char *id) {
+	return ythtbbs_cache_UserIDHashTable_find_idx(id);
 }
 
 /** hash user id
@@ -179,52 +161,6 @@ int useridhash(const char *id)
 	n1 %= 26;
 	n2 %= 26;
 	return n1 *26 + n2;
-}
-
-/** find user from shm_uidhash
- *
- * @param ptr pointer to UCACHEHASH
- * @param size UCACHE_HASH_SIZE
- * @param userid
- * @return
- */
-int finduseridhash(struct useridhashitem *ptr, int size, const char *userid)
-{
-	int h, s, i, j;
-	h = useridhash(userid);
-	s = size / 26 / 26;
-	i = h * s;
-	for(j=0; j<s*5; j++) {
-		if(!strcasecmp(ptr[i].userid, userid))
-			return ptr[i].num;
-		i++;
-		if (i >= size)
-			i %= size;
-	}
-
-	return -1;
-}
-
-int insertuseridhash(struct useridhashitem *ptr, int size, char *userid, int num)
-{
-	int h, s, i, j=0;
-	if(!*userid)
-		return -1;
-	h = useridhash(userid);
-	s = size / 26 / 26;
-	i = h * s;
-
-	while (j<s*5 && ptr[i].num>0 && ptr[i].num!=num) {
-		++i;
-		if(i>=size)
-			i%= size;
-	}
-	if(j==s*5)
-		return -1;
-
-	ptr[i].num = num;
-	strcpy(ptr[i].userid, userid);
-	return 0;
 }
 
 /** 依据用户权限位获取本站职位名称
@@ -366,27 +302,6 @@ int get_user_utmp_index(const char *sessid)
 			+(sessid[2] - 'A');
 }
 
-int count_uindex(int uid)
-{
-	int i, utmp_index, count=0;
-	struct user_info *ui;
-	if(uid <= 0 || uid > MAXUSERS)
-		return 0;
-
-	for (i=0; i<6; i++) {
-		utmp_index = shm_uindex->user[uid-1][i];
-		if(utmp_index<=0)
-			continue;
-		ui = &(shm_utmp->uinfo[utmp_index-1]);
-		if(!ui->active || ui->pid==0 || ui->uid != uid)
-			continue;
-
-		count++;
-	}
-
-	return count;
-}
-
 int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 {
 	return check_user_session_with_mode_change(x, sessid, appkey, -1);
@@ -401,19 +316,7 @@ int check_user_session_with_mode_change(struct userec *x, const char *sessid, co
 	char ssid[30];
 	strncpy(ssid, sessid+3, 30);
 
-	struct user_info *ui = &(shm_utmp->uinfo[uent_index]);
-
-#ifdef APIDEBUG
-	int uid = getusernum(x->userid);
-	int i,y;
-	for(i=0; i<6; i++) {
-		y=shm_uindex->user[uid][i];
-		if(y!=0) {
-			y--;
-			printf("%d\t%d\t%c%c%c\t%s\n", i, y, y/26/26+65, y/26%26+65, y%26+65, shm_utmp->uinfo[y].sessionid);
-		}
-	}
-#endif
+	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 
 	if(ui->pid == APPPID
 			&& strcasecmp(ui->userid, x->userid)==0
