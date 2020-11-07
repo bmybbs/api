@@ -558,7 +558,8 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 	if(secstr == NULL || strlen(secstr)>=2 || strstr(sec_array, secstr) == NULL)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	if(!userid)
-		return api_board_list_sec_guest(p, req, res);
+		return api_error(p, req, res, API_RT_WRONGPARAM); // TODO
+		//return api_board_list_sec_guest(p, req, res);
 	if(!sessid || !appkey)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
@@ -606,6 +607,8 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 
 static int api_board_list_sec_guest(ONION_FUNC_PROTO_STR)
 {
+	return 0;
+/*
 	int guest_uid = getusernum("guest");
 	int guest_uent_index, i;
 	struct user_info *ui=NULL;
@@ -653,7 +656,7 @@ static int api_board_list_sec_guest(ONION_FUNC_PROTO_STR)
 	onion_response_write0(res, s);
 	free(s);
 	return OCS_PROCESSED;
-
+*/
 }
 
 static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, int sortmode, const char *fromhost, struct user_info *ui)

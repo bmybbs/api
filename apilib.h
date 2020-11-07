@@ -48,8 +48,6 @@ void api_template_free(api_template_t tpl);
 
 struct BCACHE     *shm_bcache;
 struct UCACHE     *shm_ucache;
-struct UCACHEHASH *shm_uidhash;
-struct UINDEX     *shm_uindex;
 int shm_init();
 
 extern char *ummap_ptr;

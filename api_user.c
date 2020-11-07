@@ -10,6 +10,7 @@
 #include "ytht/crypt.h"
 #include "ytht/strlib.h"
 #include "ytht/common.h"
+#include "ytht/random.h"
 #include "ythtbbs/identify.h"
 #include "ythtbbs/misc.h"
 #include "ythtbbs/user.h"
@@ -38,14 +39,6 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char * ap
  */
 static int iphash(const char *fromhost);
 
-/**
- * @brief 从 shm_uindex 中移除记录的 utmp 索引
- * 该方法来自 nju09，使用的时候注意并发冲突。
- * @param uid
- * @param utmpent
- */
-static void remove_uindex(int uid, int utmpent);
-
 static int cmpfuid(unsigned int *a, unsigned int *b);
 
 static int initfriends(struct user_info *u);
@@ -62,15 +55,6 @@ enum activation_code_query_result {
  * @return 查看 activation_code_query_result
  */
 static int activation_code_query(char *code);
-
-/** 使用激活码
- * @brief 变更激活码的状态，同时设定用户 id。
- * @param code 激活码
- * @param userid 用户 ID
- * @return SQL 影响的行数
- * @warning 可能存在并发，当前应用下不予考虑
- */
-static int activation_code_set_user(char *code, char *userid);
 
 /** 使用激活码注册用户
  *
@@ -592,82 +576,9 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char *app
 	return API_RT_SUCCESSFUL;
 }
 
-static int iphash(const char *fromhost)
-{
-	struct in_addr addr;
-	inet_aton(fromhost, &addr);
-	return addr.s_addr % NHASH;
-}
-
-static void remove_uindex(int uid, int utmpent)
-{
-	int i;
-	if (uid<=0 || uid > MAXUSERS)
-		return;
-
-	for(i=0; i<6; ++i) {
-		if(shm_uindex->user[uid-1][i] == utmpent) {
-			shm_uindex->user[uid-1][i] = 0;
-			return;
-		}
-	}
-}
-
-static int initfriends(struct user_info *u)
-{
-	int i, fnum=0;
-	char buf[128];
-	FILE *fp;
-	memset(u->friend, 0, sizeof(u->friend));
-	sethomefile(buf, u->userid, "friends");
-	u->fnum = file_size_s(buf) / sizeof(struct ythtbbs_override);
-	if(u->fnum <=0)
-		return 0;
-
-	u->fnum = (u->fnum>=MAXFRIENDS) ? MAXFRIENDS : u->fnum;
-
-	struct ythtbbs_override *fff = (struct ythtbbs_override *)malloc(MAXFRIENDS * sizeof(struct ythtbbs_override));
-	// TODO: 判断 malloc 调用失败
-	memset(fff, 0, MAXFRIENDS*sizeof(struct ythtbbs_override));
-	fp = fopen(buf, "r");
-	fread(fff, sizeof(struct ythtbbs_override), MAXFRIENDS, fp);
-
-	for(i=0; i<u->fnum; ++i) {
-		u->friend[i] = getusernum(fff[i].id) + 1;
-		if(u->friend[i])
-			fnum++;
-		else
-			fff[i].id[0]=0;
-	}
-
-	qsort(u->friend, u->fnum, sizeof(u->friend[0]), (void *)cmpfuid);
-	if(fnum != u->fnum) {
-		fseek(fp, 0, SEEK_SET);
-		for(i=0; i<u->fnum; ++i)
-			if(fff[i].id[0])
-				fwrite(&(fff[i]), sizeof(struct ythtbbs_override), 1, fp);
-	}
-
-	u->fnum = fnum;
-	free(fff);
-	fclose(fp);
-	return fnum;
-
-}
-
-static int cmpfuid(unsigned int *a, unsigned int *b)
-{
-	return *a - *b;
-}
-
 __attribute__((deprecated)) static int activation_code_query(char *code)
 {
 	return ACQR_NORMAL;
-}
-
-__attribute__((deprecated)) static int activation_code_set_user(char *code, char *userid)
-{
-	return 0;
 }
 
 // TODO deprecated
