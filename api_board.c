@@ -435,6 +435,27 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
+static int api_board_autocomplete_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	const char *search_str = va_arg(ap, const char *);
+	struct user_info *ui = va_arg(ap, struct user_info *);
+	struct json_object *json_array_board = va_arg(ap, struct json_object *);
+
+	if (board->header.filename[0] <= 32 || board->header.filename[0] > 'z')
+		return 0;
+
+	if (!check_user_read_perm_x(ui, board))
+		return 0;
+
+	if (strcasestr(board->header.filename, search_str)) {
+		struct json_object *obj = json_object_new_object();
+		json_object_object_add(obj, "name", json_object_new_string(board->header.filename));
+		json_object_object_add(obj, "secstr", json_object_new_string(board->header.sec1));
+		json_object_array_add(json_array_board, obj);
+	}
+
+	return 0;
+}
+
 int api_board_autocomplete(ONION_FUNC_PROTO_STR)
 {
 	const char * userid = onion_request_get_query(req, "userid");
@@ -458,26 +479,11 @@ int api_board_autocomplete(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	int i;
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-	struct boardmem *p_brdmem = NULL;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"board_array\":[]}");
 	struct json_object *json_array_board = json_object_object_get(obj, "board_array");
 
-	for(i=0; i<MAXBOARD && i<shm_bcache->number; ++i) {
-		p_brdmem = &(shm_bcache->bcache[i]);
-		if(p_brdmem->header.filename[0]<=32 || p_brdmem->header.filename[0]>'z')
-			continue;
-		if(!check_user_read_perm_x(ui, p_brdmem))
-			continue;
-		if(strcasestr(p_brdmem->header.filename, search_str)) {
-			struct json_object * b_o = json_object_new_object();
-			json_object_object_add(b_o, "name", json_object_new_string(p_brdmem->header.filename));
-			json_object_object_add(b_o, "secstr", json_object_new_string(p_brdmem->header.sec1));
-			json_object_array_add(json_array_board, b_o);
-		}
-	}
-
+	ythtbbs_cache_Board_foreach_v(api_board_autocomplete_callback, search_str, ui, json_array_board);
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(obj));
 
