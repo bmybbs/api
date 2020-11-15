@@ -46,7 +46,6 @@ api_template_t api_template_create(const char * filename);
 void api_template_set(api_template_t *tpl, const char *key, char *fmt, ...);
 void api_template_free(api_template_t tpl);
 
-struct BCACHE     *shm_bcache;
 int shm_init();
 
 extern char *ummap_ptr;
@@ -201,7 +200,7 @@ int do_article_post(char *board, char *title, char *filename, char *id,
  * @return 返回文件名中实际使用的时间戳
  */
 int do_mail_post(char *to_userid, char *title, char *filename, char *id,
-				 char *nickname, char *ip, int sig, int mark);
+				char *nickname, char *ip, int sig, int mark);
 
 /**
  * @brief 保存邮件到发件箱
@@ -217,7 +216,7 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
  * @return
  */
 int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
-		 char *nickname, char *ip, int sig, int mark);
+		char *nickname, char *ip, int sig, int mark);
 
 /**
  * @brief 将 ansi 颜色控制转换成 HTML 标记
