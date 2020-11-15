@@ -73,11 +73,8 @@ int shm_init()
 {
 	ythtbbs_cache_utmp_resolve();
 	ythtbbs_cache_UserTable_resolve();
-	shm_bcache  = (struct BCACHE*) get_old_shm(BCACHE_SHMKEY, sizeof(struct BCACHE));
-	if (shm_bcache == 0)
-		return -1; // shm error
-	else
-		return 0;
+	ythtbbs_cache_Board_resolve();
+	return 0;
 }
 
 /** 映射 .PASSWDS 文件到内存
