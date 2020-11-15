@@ -279,8 +279,8 @@ int setbmhat(struct boardmanager *bm, int *online)
 	/*
 	if(strcmp(shm_bcache->bcache[bm->bid].header.filename, bm->board)) {
 		errlog("error board name %s, %s. user %d",
-			   shm_bcache->bcache[bm->bid].header.filename,
-			   bm->board, bm->bid);
+			shm_bcache->bcache[bm->bid].header.filename,
+			bm->board, bm->bid);
 		return -1;
 	}
 	if(*online) {
@@ -872,7 +872,7 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 }
 
 int do_mail_post(char *to_userid, char *title, char *filename, char *id,
-				 char *nickname, char *ip, int sig, int mark)
+				char *nickname, char *ip, int sig, int mark)
 {
 	FILE *fp, *fp2;
 	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];
@@ -932,7 +932,7 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 }
 
 int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
-				 char *nickname, char *ip, int sig, int mark)
+				char *nickname, char *ip, int sig, int mark)
 {
 	FILE *fp, *fp2;
 	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];
