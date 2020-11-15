@@ -562,6 +562,33 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
+static int api_board_list_sec_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	struct user_info *ui = va_arg(ap, struct user_info *);
+	struct boardmem **board_array = va_arg(ap, struct boardmem **);
+	int *count = va_arg(ap, int *);
+	int hasintro = va_arg(ap, int);
+	const char *secstr = va_arg(ap, const char *);
+	int len = strlen(secstr);
+
+	if (board->header.filename[0] <= 32 || board->header.filename[0] > 'z')
+		return 0;
+
+	if (hasintro) {
+		if (strcmp(secstr, board->header.sec1) && strcmp(secstr, board->header.sec2))
+			return 0;
+	} else {
+		if (strncmp(secstr, board->header.sec1, len) && strncmp(secstr, board->header.sec2, len))
+			return 0;
+	}
+
+	if (!check_user_read_perm_x(ui, board))
+		return 0;
+
+	board_array[*count] = board;
+	*count = *count + 1;
+	return 0;
+}
+
 static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 {
 	const char * secstr = onion_request_get_query(req, "secstr");
@@ -590,31 +617,17 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	struct boardmem *board_array[MAXBOARD], *x;
-	int len,  hasintro = 0, i = 0, count = 0;
+	struct boardmem *board_array[MAXBOARD];
+	int hasintro = 0, count = 0;
 	const struct sectree *sec;
 	int uent_index = get_user_utmp_index(sessid);
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 	sec = getsectree(secstr);
-	len = strlen(secstr);
 	if(sec->introstr[0])
 		hasintro = 1;
-	for(i=0; i<MAXBOARD && i<shm_bcache->number; ++i) {
-		x = &(shm_bcache->bcache[i]);
-		if(x->header.filename[0]<=32 || x->header.filename[0]>'z')
-			continue;
-		if(hasintro){
-			if(strcmp(secstr, x->header.sec1) && strcmp(secstr, x->header.sec2))
-				continue;
-		}else{
-			if(strncmp(secstr, x->header.sec1, len) && strncmp(secstr, x->header.sec2, len))
-				continue;
-		}
-		if(!check_user_read_perm_x(ui, x))
-			continue;
-		board_array[count] = x;
-		count++;
-	}
+
+	ythtbbs_cache_Board_foreach_v(api_board_list_sec_callback, ui, board_array, &count, hasintro, secstr);
+
 	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ui);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
