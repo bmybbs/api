@@ -991,6 +991,81 @@ int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id
 	return 0;
 }
 
+static int search_user_article_with_title_keywords_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	struct user_info *ui = va_arg(ap, struct user_info *);
+	struct bmy_article *articles_array = va_arg(ap, struct bmy_article *);
+	int *article_sum = va_arg(ap, int *);
+	int max_searchnum = va_arg(ap, int);
+	const char *query_userid = va_arg(ap, const char *);
+	const char *title_keyword1 = va_arg(ap, const char *);
+	const char *title_keyword2 = va_arg(ap, const char *);
+	const char *title_keyword3 = va_arg(ap, const char *);
+	time_t starttime = va_arg(ap, time_t);
+	time_t now_t = va_arg(ap, time_t);
+	int searchtime = va_arg(ap, int);
+
+	char dir[256];
+	int nr = 0, start = 0, i;
+	struct bmy_article *tmp_ptr = NULL;
+	struct mmapfile mf = { .ptr = NULL };
+	struct fileheader *x = NULL;
+
+	if (*article_sum >= max_searchnum)
+		return QUIT;
+
+	if (!check_user_read_perm_x(ui, board))
+		return 0;
+
+	sprintf(dir, "boards/%s/.DIR", board->header.filename);
+	mmapfile(NULL, &mf);
+	if (mmapfile(dir, &mf) < 0)
+		return 0;
+
+	x = (struct fileheader *) mf.ptr;
+	nr = mf.size / sizeof(struct fileheader);
+
+	if (nr == 0) {
+		mmapfile(NULL, &mf);
+		return 0;
+	}
+
+	start = Search_Bin(mf.ptr, starttime, 0, nr - 1);
+	if (start < 0)
+		start = - (start + 1);
+
+	for (i = start; i < nr; i++) {
+		if (*article_sum >= max_searchnum)
+			break;
+
+		if (abs(now_t - x[i].filetime) > searchtime)
+			continue;
+
+		if (query_userid[0] && strcasecmp(x[i].owner, query_userid))
+			continue;
+
+		if (title_keyword1 && title_keyword1[0] && !strcasestr(x[i].title, title_keyword1))
+			continue;
+		if (title_keyword2 && title_keyword2[0] && !strcasestr(x[i].title, title_keyword2))
+			continue;
+		if (title_keyword3 && title_keyword3[0] && !strcasestr(x[i].title, title_keyword3))
+			continue;
+
+		// TODO
+		tmp_ptr = &articles_array[*article_sum];
+		strcpy(tmp_ptr->board, board->header.filename);
+		strcpy(tmp_ptr->title, x[i].title);
+		tmp_ptr->filetime = x[i].filetime;
+		tmp_ptr->mark = x[i].accessed;
+		tmp_ptr->thread = x[i].thread;
+		tmp_ptr->sequence_num = i;
+
+		*article_sum = *article_sum + 1;
+	}
+
+	mmapfile(NULL, &mf);
+	return 0;
+}
+
 int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
@@ -1002,60 +1077,10 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 	if(starttime < 0)
 		starttime = 0;
 
-	char dir[256];
-	int article_sum = 0, board_counter = 0, nr = 0, start = 0, i;
-	struct mmapfile mf = { ptr: NULL };
-	struct fileheader *x = NULL;
+	int article_sum = 0;
 
-	for(; board_counter < shm_bcache->number; board_counter++) {
-		if(article_sum >= max_searchnum)
-			break;
+	ythtbbs_cache_Board_foreach_v(search_user_article_with_title_keywords_callback, ui_currentuser, articles_array, &article_sum, max_searchnum, query_userid, title_keyword1, title_keyword2, title_keyword3, starttime, now_t, searchtime);
 
-		if(!check_user_read_perm_x(ui_currentuser, &(shm_bcache->bcache[board_counter])))
-			continue;
-
-		sprintf(dir, "boards/%s/.DIR", shm_bcache->bcache[board_counter].header.filename);
-		mmapfile(NULL, &mf);
-		if(mmapfile(dir, &mf) < 0) {
-			continue;
-		}
-
-		x = (struct fileheader*)mf.ptr;
-		nr = mf.size / sizeof(struct fileheader);
-		if(nr == 0)
-			continue;
-
-		start = Search_Bin(mf.ptr, starttime, 0, nr - 1);
-		if(start < 0)
-			start = - (start + 1);
-
-		for(i = start; i < nr; i++) {
-			if(article_sum >= max_searchnum)
-				break;
-
-			if(abs(now_t - x[i].filetime) > searchtime)
-				continue;
-
-			if(query_userid[0] && strcasecmp(x[i].owner, query_userid))
-				continue;
-
-			if(title_keyword1 && title_keyword1[0] && !strcasestr(x[i].title, title_keyword1))
-				continue;
-			if(title_keyword2 && title_keyword2[0] && !strcasestr(x[i].title, title_keyword2))
-				continue;
-			if(title_keyword3 && title_keyword3[0] && !strcasestr(x[i].title, title_keyword3))
-				continue;
-
-			strcpy(articles_array[article_sum].board, shm_bcache->bcache[board_counter].header.filename);
-			strcpy(articles_array[article_sum].title, x[i].title);
-			articles_array[article_sum].filetime = x[i].filetime;
-			articles_array[article_sum].mark = x[i].accessed;
-			articles_array[article_sum].thread = x[i].thread;
-			articles_array[article_sum].sequence_num = i;
-
-			article_sum++;
-		}
-	}
 	return 0;
 }
 
