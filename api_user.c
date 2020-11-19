@@ -1,3 +1,4 @@
+#include <onion/response.h>
 #include <time.h>
 #include <string.h>
 #include <sys/file.h>
@@ -9,11 +10,15 @@
 #include "ytht/crypt.h"
 #include "ytht/strlib.h"
 #include "ytht/common.h"
+#include "ytht/random.h"
 #include "ythtbbs/identify.h"
 #include "ythtbbs/misc.h"
 #include "ythtbbs/user.h"
+#include "ythtbbs/override.h"
 #include "ythtbbs/notification.h"
 #include "ythtbbs/permissions.h"
+#include "ythtbbs/session.h"
+#include "bmy/cookie.h"
 
 #include "api.h"
 #include "apilib.h"
@@ -34,14 +39,6 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char * ap
  */
 static int iphash(const char *fromhost);
 
-/**
- * @brief 从 shm_uindex 中移除记录的 utmp 索引
- * 该方法来自 nju09，使用的时候注意并发冲突。
- * @param uid
- * @param utmpent
- */
-static void remove_uindex(int uid, int utmpent);
-
 static int cmpfuid(unsigned int *a, unsigned int *b);
 
 static int initfriends(struct user_info *u);
@@ -58,15 +55,6 @@ enum activation_code_query_result {
  * @return 查看 activation_code_query_result
  */
 static int activation_code_query(char *code);
-
-/** 使用激活码
- * @brief 变更激活码的状态，同时设定用户 id。
- * @param code 激活码
- * @param userid 用户 ID
- * @return SQL 影响的行数
- * @warning 可能存在并发，当前应用下不予考虑
- */
-static int activation_code_set_user(char *code, char *userid);
 
 /** 使用激活码注册用户
  *
@@ -112,7 +100,6 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	const char * appkey = onion_dict_get(param_dict, "appkey");
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
-	char buf[512];
 	time_t now_t = time(NULL);
 	time_t dtime;
 	struct tm dt;
@@ -126,63 +113,29 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	if(!strcmp(userid, ""))
 		userid = "guest";
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0) {
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	} else if(strcasecmp(userid, "guest")) {
-		if(checkbansite(fromhost)) {
-			return api_error(p, req, res, API_RT_SITEFBDIP);
-		} else if(userbansite(ue->userid, fromhost)) {
-			return api_error(p, req, res, API_RT_FORBIDDENIP);
-		} else if(!ytht_crypt_checkpasswd(ue->passwd, passwd)) {
-			logattempt(ue->userid, fromhost, "API", now_t);
-			return api_error(p, req, res, API_RT_ERRORPWD);
-		} else if(!(check_user_perm(ue, PERM_BASIC))) {
-			return api_error(p, req, res, API_RT_FBDNUSER);
-		}
-	}
-
-	int r = api_do_login(ue, fromhost, appkey, now_t, &utmp_index);
-	if(r != API_RT_SUCCESSFUL) { // TODO: 检查是否还有未释放的资源
-		free(ue);
+	struct userec ue;
+	struct user_info ui;
+	int r = ythtbbs_user_login(userid, passwd, fromhost, YTHTBBS_LOGIN_API, &ui, &ue, &utmp_index);
+	if(r != YTHTBBS_USER_LOGIN_OK) { // TODO: 检查是否还有未释放的资源
 		return api_error(p, req, res, r);
 	}
 
-	if(strcasecmp(userid, "guest")) {
-		t = ue->lastlogin;
-		ue->lastlogin = now_t;
+	struct json_object *obj = json_object_new_object();
+	json_object_object_add(obj, "userid", json_object_new_string(ue.userid));
+	json_object_object_add(obj, "sessid", json_object_new_string(ui.sessionid));
 
-		dtime = t - 4*3600;
-		localtime_r(&dtime, &dt);
-		t = dt.tm_mday;
-
-		dtime = now_t - 4*3600;
-		localtime_r(&now_t, &dt);
-
-		if(t<dt.tm_mday && ue->numdays<800)
-			ue->numdays++;
-		ue->numlogins++;
-		ytht_strsncpy(ue->lasthost, fromhost, 16);
-		save_user_data(ue);
-	}
-
-	sprintf(buf, "%s enter %s api", ue->userid, fromhost);
-	newtrace(buf);
-
-	api_template_t tpl = api_template_create("templates/api_user_login.json");
-	api_template_set(&tpl, "userid", ue->userid);
-	api_template_set(&tpl, "sessid", "%c%c%c%s",
-			(utmp_index-1) / 26 / 26 + 'A',
-			(utmp_index-1) / 26 % 26 + 'A',
-			(utmp_index-1) % 26 + 'A',
-			shm_utmp->uinfo[utmp_index-1].sessionid);
-	api_template_set(&tpl, "token", shm_utmp->uinfo[utmp_index-1].token);
-
+	struct bmy_cookie cookie = {
+		.userid = ui.userid,
+		.sessid = ui.sessionid,
+		.token  = ""
+	};
+	char buf[60];
+	bmy_cookie_gen(buf, sizeof(buf), &cookie);
 	api_set_json_header(res);
-	onion_response_write0(res, tpl);
+	onion_response_add_cookie(res, SMAGIC, buf, -1, NULL, NULL, 0); // TODO 检查 cookie 的有效期
+	onion_response_write0(res, json_object_to_json_string(obj));
 
-	api_template_free(tpl);
-	free(ue);
+	json_object_put(obj);
 	return OCS_PROCESSED;
 }
 
@@ -248,52 +201,33 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 {
 	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
-	
-	const onion_dict *param_dict = onion_request_get_query_dict(req);
-	const char * userid = onion_dict_get(param_dict, "userid");
-	const char * sessid = onion_dict_get(param_dict, "sessid");
-	const char * appkey = onion_dict_get(param_dict, "appkey");
-	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
-	time_t now_t = time(NULL);
-	char buf[512];
 
-	if(userid == NULL || sessid == NULL || appkey == NULL) {
+	const char *cookie_str = onion_request_get_cookie(req, SMAGIC);
+	if(cookie_str == NULL || cookie_str[0] == '\0') {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
-	if(strcasecmp(userid, "guest") == 0) {
+	struct bmy_cookie cookie;
+
+	time_t now_t = time(NULL);
+	char buf[512];
+
+	snprintf(buf, sizeof(buf), "%s", cookie_str);
+	bmy_cookie_parse(buf, &cookie);
+
+	if (cookie.userid == NULL || cookie.sessid == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	if (strcasecmp(cookie.userid, "guest") == 0) {
 		return api_error(p, req, res, API_RT_CNTLGOTGST);
 	}
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0) {
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	}
+	int utmp_idx = ythtbbs_session_get_utmp_idx(cookie.sessid, cookie.userid);
+	ythtbbs_user_logout(cookie.userid, utmp_idx); // TODO return value
 
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-
-	sprintf(buf, "%s exitbbs api", ue->userid);
-	newtrace(buf);
-	ytht_strsncpy(ue->lasthost, fromhost, 16);
-	ue->lastlogout = now_t;
-	save_user_data(ue);
-
-	int utmp_index = get_user_utmp_index(sessid);
-	int uid=shm_utmp->uinfo[utmp_index].uid;
-	remove_uindex(uid, utmp_index+1);
-	memset(&(shm_utmp->uinfo[utmp_index]), 0, sizeof(struct user_info));
-
-	if(check_user_perm(ue, PERM_BOARDS) && count_uindex(uid)==0)
-		setbmstatus(ue, 0);
-
-	free(ue);
-
+	onion_response_add_cookie(res, SMAGIC, "", 0, NULL, NULL, 0);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
-	return OCS_PROCESSED;
 }
 
 int api_user_check_session(ONION_FUNC_PROTO_STR)
@@ -366,7 +300,7 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 	ytht_strsncpy(x.userid, userid, 13);
 
 	char salt[3];
-	getsalt(salt);
+	ytht_get_salt(salt);
 	ytht_strsncpy(x.passwd, ytht_crypt_crypt1(passwd, salt), 14);
 
 	x.userlevel = PERM_DEFAULT;
@@ -475,7 +409,7 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	if(qryday_str!=NULL && atoi(qryday)>0)
 		qryday = atoi(qryday);
 
-	struct user_info * ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info * ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 	int num = search_user_article_with_title_keywords(articles, MAX_SEARCH_NUM, ui,
 			query_ue->userid, NULL, NULL, NULL, qryday * 86400);
 
@@ -585,6 +519,16 @@ int api_user_rejects_del(ONION_FUNC_PROTO_STR)
 	return api_user_X_File_del(p, req, res, UFT_REJECTS);
 }
 
+static int autocomplete_callback(const struct ythtbbs_cache_User *user, va_list ap) {
+	char *search_str = va_arg(ap, char *);
+	struct json_object *json_array_user = va_arg(ap, struct json_object *); // TODO
+
+	if (strcasestr(user->userid, search_str) == user->userid)
+		json_object_array_add(json_array_user, json_object_new_string(user->userid));
+
+	return 0;
+}
+
 int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 {
 	const char * userid = onion_request_get_query(req, "userid");
@@ -612,10 +556,7 @@ int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"user_array\":[]}");
 	struct json_object *json_array_user = json_object_object_get(obj, "user_array");
 
-	for(i=0; i<MAXUSERS && i<shm_ucache->number; ++i) {
-		if(strcasestr(shm_ucache->userid[i], search_str) == shm_ucache->userid[i])
-			json_object_array_add(json_array_user, json_object_new_string(shm_ucache->userid[i]));
-	}
+	ythtbbs_cache_UserTable_apply_v(autocomplete_callback, search_str, json_array_user);
 
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(obj));
@@ -637,220 +578,9 @@ static int api_do_login(struct userec *ue, const char *fromhost, const char *app
 	uid = getusernum(ue->userid) + 1;
 
 	gethostname(hostnamebuf, 256);
-	sprintf(ULIST, MY_BBS_HOME "/%s.%s", ULIST_BASE, hostnamebuf);
 
-	fp_ulist = fopen(ULIST, "a");
-	flock(fileno(fp_ulist), LOCK_EX);	// TODO: 检查每一个 return 前有没有 unlock
-
-	/* 开始遍历已经使用的槽位，若找到，则赋予 utmp_pos，
-	 * 并返回 API_RT_SUCCESSFUL。
-	 *
-	 * UINDEX 中 0、1 用于 term，2 用于 nju09，
-	 * 3、4、5 的用于 API。
-	 * TODO: BBSLIB.c:2962 ？？
-	 * TODO: 增大 UINDEX 应修改此处
-	 */
-
-	for(i=3; i<6; ++i) {
-		uent_index = shm_uindex->user[uid-1][i];
-		if(strcasecmp(shm_utmp->uinfo[uent_index-1].userid, ue->userid) == 0
-				&& shm_utmp->uinfo[uent_index-1].pid == APPPID) {
-			if(strcasecmp(shm_utmp->uinfo[uent_index-1].appkey, appkey) == 0) {
-				*utmp_pos = uent_index;
-				// TODO: 应该更新相关信息
-				flock(fileno(fp_ulist), LOCK_UN);
-				fclose(fp_ulist);
-				return API_RT_SUCCESSFUL;
-			}
-		} else {
-			shm_uindex->user[uid-1][i] = 0;
-			insert_pos = i;
-		}
-	}
-
-	/* 判断 insert_pos，如果等于 0，说明当前槽位都在被当前用户的应用使用
-	 * 从 shm_utmp 踢掉最后一个使用的，并复用该位置
-	 */
-
-	if(insert_pos == 0) {
-		uent_index = shm_uindex->user[uid-1][3];
-		earlest_app_time = shm_utmp->uinfo[uent_index-1].lasttime;
-		earlest_pos = 3;
-
-		for(i=4; i<6; ++i) {
-			uent_index = shm_uindex->user[uid-1][i];
-			if(shm_utmp->uinfo[uent_index-1].lasttime < earlest_app_time) {
-				earlest_app_time = shm_utmp->uinfo[uent_index-1].lasttime;
-				earlest_pos = i;
-			}
-		}
-
-		// 释放 earlest_pos
-		*utmp_pos = shm_uindex->user[uid-1][earlest_pos];
-		errlog("API stay too long, drop %s.%d", ue->userid, earlest_pos);
-		sprintf(buf, "%s.%d drop api", ue->userid, earlest_pos);
-		newtrace(buf);
-		shm_uindex->user[uid-1][earlest_pos] = 0;
-		insert_pos = earlest_pos;
-		memset(&(shm_utmp->uinfo[*utmp_pos-1]), 0, sizeof(struct user_info));
-	}
-
-	/* 此时应该 shm_uindex 的位置有了，而 shm_utmp 可能有可能没有。
-	 * 若不存在 shm_utmp 的位置，则先全盘索引，
-	 * 找到后再完成初始化。
-	 */
-
-	if(*utmp_pos == 0) {
-		for(i=0, n=iphash(fromhost)*(MAXACTIVE/NHASH); i<MAXACTIVE; i++, n++) {
-			if(n>=MAXACTIVE)
-				n=0;
-			u = &(shm_utmp->uinfo[n]);
-
-			if(!u->active || !u->pid) {
-				*utmp_pos = n+1;
-				break;
-			} else if(u->pid==APPPID
-					&& (login_time - u->lasttime)>3600*24) {
-				errlog("API stay too long, drop %s", u->userid);
-				memset(buf, 0, sizeof(buf));
-				sprintf(buf, "%s drop API", u->userid);
-				newtrace(buf);
-				remove_uindex(u->uid, n+1);
-				memset(u, 0, sizeof(struct user_info));
-				*utmp_pos = n+1;	// TODO: 检查是否应该 +1
-				break;
-			}
-		}
-		if(*utmp_pos == 0) {
-			flock(fileno(fp_ulist), LOCK_UN);
-			fclose(fp_ulist);
-			return API_RT_NOEMTSESS;
-		}
-	}
-
-	/* 现在应该 shm_utmp 的位置也找出来了，同时该位置已经清空数据了，
-	 * 初始化，然后再加到 shm_uindex 里面去
-	 */
-
-	u=&(shm_utmp->uinfo[*utmp_pos-1]);
-	u->active = 1;
-	u->uid = uid;
-	u->pid = APPPID;
-	u->mode = LOGIN;
-
-	u->userlevel = ue->userlevel;
-	u->lasttime = login_time;
-	u->curboard = 0;
-
-	if(check_user_perm(ue, PERM_LOGINCLOAK) &&
-			(ue->flags[0] & CLOAK_FLAG))
-		u->invisible = YEA;
-
-	u->pager = 0;
-
-	ytht_strsncpy(u->from, fromhost, 24);
-	ytht_strsncpy(u->username, ue->username, NAMELEN);
-	ytht_strsncpy(u->userid, ue->userid, IDLEN+1);
-	ytht_strsncpy(u->appkey, appkey, APPKEYLENGTH);
-	getrandomstr(u->sessionid);
-	getrandomstr_r(u->token, TOKENLENGTH+1);
-
-	if(strcasecmp(ue->userid, "guest"))
-		initfriends(u);
-	else
-		memset(u->friend, 0, sizeof(u->friend));
-
-	if(strcasecmp(ue->userid, "guest")) {
-		sethomefile(fname, ue->userid, "clubrights");
-		if((fp_clubright = fopen(fname, "r")) == NULL) {
-			memset(u->clubrights, 0, 4*sizeof(int));
-		} else {
-			while (fgets(genbuf, STRLEN, fp_clubright) != NULL) {
-				clubnum = atoi(genbuf);
-				u->clubrights[clubnum/32] |= (1<<clubnum%32);
-			}
-			fclose(fp_clubright);
-		}
-	} else {
-		memset(u->clubrights, 0, 4*sizeof(int));
-	}
-
-	shm_uindex->user[uid-1][insert_pos] = *utmp_pos;
-	flock(fileno(fp_ulist), LOCK_UN);
-	fclose(fp_ulist);
-
-	if(check_user_perm(ue, PERM_BOARDS))
-		setbmstatus(ue, 1);
 
 	return API_RT_SUCCESSFUL;
-}
-
-static int iphash(const char *fromhost)
-{
-	struct in_addr addr;
-	inet_aton(fromhost, &addr);
-	return addr.s_addr % NHASH;
-}
-
-static void remove_uindex(int uid, int utmpent)
-{
-	int i;
-	if (uid<=0 || uid > MAXUSERS)
-		return;
-
-	for(i=0; i<6; ++i) {
-		if(shm_uindex->user[uid-1][i] == utmpent) {
-			shm_uindex->user[uid-1][i] = 0;
-			return;
-		}
-	}
-}
-
-static int initfriends(struct user_info *u)
-{
-	int i, fnum=0;
-	char buf[128];
-	FILE *fp;
-	memset(u->friend, 0, sizeof(u->friend));
-	sethomefile(buf, u->userid, "friends");
-	u->fnum = file_size_s(buf) / sizeof(struct override);
-	if(u->fnum <=0)
-		return 0;
-
-	u->fnum = (u->fnum>=MAXFRIENDS) ? MAXFRIENDS : u->fnum;
-
-	struct override *fff = (struct override *)malloc(MAXFRIENDS * sizeof(struct override));
-	// TODO: 判断 malloc 调用失败
-	memset(fff, 0, MAXFRIENDS*sizeof(struct override));
-	fp = fopen(buf, "r");
-	fread(fff, sizeof(struct override), MAXFRIENDS, fp);
-
-	for(i=0; i<u->fnum; ++i) {
-		u->friend[i] = getusernum(fff[i].id) + 1;
-		if(u->friend[i])
-			fnum++;
-		else
-			fff[i].id[0]=0;
-	}
-
-	qsort(u->friend, u->fnum, sizeof(u->friend[0]), (void *)cmpfuid);
-	if(fnum != u->fnum) {
-		fseek(fp, 0, SEEK_SET);
-		for(i=0; i<u->fnum; ++i)
-			if(fff[i].id[0])
-				fwrite(&(fff[i]), sizeof(struct override), 1, fp);
-	}
-
-	u->fnum = fnum;
-	free(fff);
-	fclose(fp);
-	return fnum;
-
-}
-
-static int cmpfuid(unsigned int *a, unsigned int *b)
-{
-	return *a - *b;
 }
 
 __attribute__((deprecated)) static int activation_code_query(char *code)
@@ -858,39 +588,9 @@ __attribute__((deprecated)) static int activation_code_query(char *code)
 	return ACQR_NORMAL;
 }
 
-__attribute__((deprecated)) static int activation_code_set_user(char *code, char *userid)
-{
-	return 0;
-}
-
-static int adduser_with_activation_code(struct userec *x, char *code)
-{
-	int i, rt;
-	int fd = open(PASSFILE ".lock", O_RDONLY | O_CREAT, 0600);
-	flock(fd, LOCK_EX);
-
-	rt = activation_code_query(code);
-	if(rt!=ACQR_NORMAL) {
-		flock(fd, LOCK_UN);
-		close(fd);
-		return rt;
-	}
-
-	for(i=0; i<MAXUSERS; i++) {
-		if(shm_ucache->userid[i][0]==0) {
-			if((i+1) > shm_ucache->number)
-				shm_ucache->number = i+1;
-			strncpy(shm_ucache->userid[i], x->userid, 13);
-			insertuseridhash(shm_uidhash->uhi, UCACHE_HASH_SIZE, x->userid, i+1);
-			save_user_data(x);
-			break;
-		}
-	}
-
-	rt = activation_code_set_user(code, x->userid);
-	flock(fd, LOCK_UN);
-	close(fd);
-	return (rt == 1) ? ACQR_NORMAL : ACQR_DBERROR;
+// TODO deprecated
+static int adduser_with_activation_code(struct userec *x, char *code) {
+	return ACQR_NORMAL;
 }
 
 static void api_newcomer(struct userec *x,char *fromhost, char *words)
@@ -929,13 +629,13 @@ static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	struct override * array;
+	struct ythtbbs_override * array;
 	int size=0;
 	if(mode == UFT_FRIENDS) {
-		array = (struct override *)malloc(sizeof(struct override) * MAXFRIENDS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
 		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
 	} else {
-		array = (struct override *)malloc(sizeof(struct override) * MAXREJECTS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
 		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
 	}
 
@@ -992,10 +692,10 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	struct override * array;
+	struct ythtbbs_override * array;
 	int size=0;
 	if(mode == UFT_FRIENDS) {
-		array = (struct override *)malloc(sizeof(struct override) * MAXFRIENDS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
 		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
 
 		if(size >= MAXFRIENDS-1) {
@@ -1005,7 +705,7 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 			return api_error(p, req, res, API_RT_REACHMAXRCD);
 		}
 	} else {
-		array = (struct override *)malloc(sizeof(struct override) * MAXREJECTS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
 		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
 
 		if(size >= MAXREJECTS-1) {
@@ -1037,7 +737,7 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 	FILE *fp = fopen(path, "w");
 	if(fp) {
 		flock(fileno(fp), LOCK_EX);
-		fwrite(array, sizeof(struct override), size, fp);
+		fwrite(array, sizeof(struct ythtbbs_override), size, fp);
 		flock(fileno(fp), LOCK_UN);
 		fclose(fp);
 
@@ -1084,13 +784,13 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	struct override * array;
+	struct ythtbbs_override * array;
 	int size=0;
 	if(mode == UFT_FRIENDS) {
-		array = (struct override *)malloc(sizeof(struct override) * MAXFRIENDS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
 		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
 	} else {
-		array = (struct override *)malloc(sizeof(struct override) * MAXREJECTS);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
 		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
 	}
 
@@ -1105,7 +805,7 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 
 	int i;
 	for(i=pos; i<size-1; ++i) {
-		memcpy(&array[i], &array[i+1], sizeof(struct override));
+		memcpy(&array[i], &array[i+1], sizeof(struct ythtbbs_override));
 	}
 	size--;
 
@@ -1117,7 +817,7 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 	FILE *fp = fopen(path, "w");
 	if(fp) {
 		flock(fileno(fp), LOCK_EX);
-		fwrite(array, sizeof(struct override), size, fp);
+		fwrite(array, sizeof(struct ythtbbs_override), size, fp);
 		flock(fileno(fp), LOCK_UN);
 		fclose(fp);
 

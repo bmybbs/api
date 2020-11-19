@@ -28,6 +28,7 @@
 #include "ythtbbs/misc.h"
 #include "ythtbbs/binaryattach.h"
 #include "ythtbbs/docutil.h"
+#include "ythtbbs/override.h"
 
 char *ummap_ptr = NULL;
 int ummap_size = 0;
@@ -70,19 +71,10 @@ int getNextChar(register FILE* fp, int *future, int *future_char);
  */
 int shm_init()
 {
-	shm_utmp    = (struct UTMPFILE*) get_old_shm(UTMP_SHMKEY, sizeof(struct UTMPFILE));
-	shm_bcache  = (struct BCACHE*) get_old_shm(BCACHE_SHMKEY, sizeof(struct BCACHE));
-	shm_ucache  = (struct UCACHE*) get_old_shm(UCACHE_SHMKEY, sizeof(struct UCACHE));
-	shm_uidhash = (struct UCACHEHASH*) get_old_shm(UCACHE_HASH_SHMKEY, sizeof(struct UCACHEHASH));
-	shm_uindex  = (struct UINDEX*) get_old_shm(UINDEX_SHMKEY, sizeof(struct UINDEX));
-	if( shm_utmp == 0 ||
-		shm_bcache == 0 ||
-		shm_ucache == 0 ||
-		shm_uidhash == 0 ||
-		shm_uindex == 0 )
-		return -1; // shm error
-	else
-		return 0;
+	ythtbbs_cache_utmp_resolve();
+	ythtbbs_cache_UserTable_resolve();
+	ythtbbs_cache_Board_resolve();
+	return 0;
 }
 
 /** 映射 .PASSWDS 文件到内存
@@ -141,20 +133,8 @@ struct userec * getuser(const char *id)
 	return user;
 }
 
-int getusernum(const char *id)
-{
-	int i;
-	if(id[0] == 0 || strchr(id, '.'))
-		return -1;
-
-	i = finduseridhash(shm_uidhash->uhi, UCACHE_HASH_SIZE, id) - 1;
-	if (i>=0 && !strcasecmp(shm_ucache->userid[i], id))
-		return i;    // check user in shm_ucache
-	for (i=0; i<MAXUSERS; i++) {
-		if (!strcasecmp(shm_ucache->userid[i], id))
-			return i;  // 遍历 shm_ucache 找到真实的索引
-	}
-	return -1;
+int getusernum(const char *id) {
+	return ythtbbs_cache_UserIDHashTable_find_idx(id);
 }
 
 /** hash user id
@@ -178,52 +158,6 @@ int useridhash(const char *id)
 	n1 %= 26;
 	n2 %= 26;
 	return n1 *26 + n2;
-}
-
-/** find user from shm_uidhash
- *
- * @param ptr pointer to UCACHEHASH
- * @param size UCACHE_HASH_SIZE
- * @param userid
- * @return
- */
-int finduseridhash(struct useridhashitem *ptr, int size, const char *userid)
-{
-	int h, s, i, j;
-	h = useridhash(userid);
-	s = size / 26 / 26;
-	i = h * s;
-	for(j=0; j<s*5; j++) {
-		if(!strcasecmp(ptr[i].userid, userid))
-			return ptr[i].num;
-		i++;
-		if (i >= size)
-			i %= size;
-	}
-
-	return -1;
-}
-
-int insertuseridhash(struct useridhashitem *ptr, int size, char *userid, int num)
-{
-	int h, s, i, j=0;
-	if(!*userid)
-		return -1;
-	h = useridhash(userid);
-	s = size / 26 / 26;
-	i = h * s;
-
-	while (j<s*5 && ptr[i].num>0 && ptr[i].num!=num) {
-		++i;
-		if(i>=size)
-			i%= size;
-	}
-	if(j==s*5)
-		return -1;
-
-	ptr[i].num = num;
-	strcpy(ptr[i].userid, userid);
-	return 0;
 }
 
 /** 依据用户权限位获取本站职位名称
@@ -345,8 +279,8 @@ int setbmhat(struct boardmanager *bm, int *online)
 	/*
 	if(strcmp(shm_bcache->bcache[bm->bid].header.filename, bm->board)) {
 		errlog("error board name %s, %s. user %d",
-			   shm_bcache->bcache[bm->bid].header.filename,
-			   bm->board, bm->bid);
+			shm_bcache->bcache[bm->bid].header.filename,
+			bm->board, bm->bid);
 		return -1;
 	}
 	if(*online) {
@@ -365,27 +299,6 @@ int get_user_utmp_index(const char *sessid)
 			+(sessid[2] - 'A');
 }
 
-int count_uindex(int uid)
-{
-	int i, utmp_index, count=0;
-	struct user_info *ui;
-	if(uid <= 0 || uid > MAXUSERS)
-		return 0;
-
-	for (i=0; i<6; i++) {
-		utmp_index = shm_uindex->user[uid-1][i];
-		if(utmp_index<=0)
-			continue;
-		ui = &(shm_utmp->uinfo[utmp_index-1]);
-		if(!ui->active || ui->pid==0 || ui->uid != uid)
-			continue;
-
-		count++;
-	}
-
-	return count;
-}
-
 int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 {
 	return check_user_session_with_mode_change(x, sessid, appkey, -1);
@@ -400,19 +313,7 @@ int check_user_session_with_mode_change(struct userec *x, const char *sessid, co
 	char ssid[30];
 	strncpy(ssid, sessid+3, 30);
 
-	struct user_info *ui = &(shm_utmp->uinfo[uent_index]);
-
-#ifdef APIDEBUG
-	int uid = getusernum(x->userid);
-	int i,y;
-	for(i=0; i<6; i++) {
-		y=shm_uindex->user[uid][i];
-		if(y!=0) {
-			y--;
-			printf("%d\t%d\t%c%c%c\t%s\n", i, y, y/26/26+65, y/26%26+65, y%26+65, shm_utmp->uinfo[y].sessionid);
-		}
-	}
-#endif
+	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 
 	if(ui->pid == APPPID
 			&& strcasecmp(ui->userid, x->userid)==0
@@ -971,7 +872,7 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 }
 
 int do_mail_post(char *to_userid, char *title, char *filename, char *id,
-				 char *nickname, char *ip, int sig, int mark)
+				char *nickname, char *ip, int sig, int mark)
 {
 	FILE *fp, *fp2;
 	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];
@@ -1031,7 +932,7 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 }
 
 int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
-				 char *nickname, char *ip, int sig, int mark)
+				char *nickname, char *ip, int sig, int mark)
 {
 	FILE *fp, *fp2;
 	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];
@@ -1090,6 +991,81 @@ int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id
 	return 0;
 }
 
+static int search_user_article_with_title_keywords_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	struct user_info *ui = va_arg(ap, struct user_info *);
+	struct bmy_article *articles_array = va_arg(ap, struct bmy_article *);
+	int *article_sum = va_arg(ap, int *);
+	int max_searchnum = va_arg(ap, int);
+	const char *query_userid = va_arg(ap, const char *);
+	const char *title_keyword1 = va_arg(ap, const char *);
+	const char *title_keyword2 = va_arg(ap, const char *);
+	const char *title_keyword3 = va_arg(ap, const char *);
+	time_t starttime = va_arg(ap, time_t);
+	time_t now_t = va_arg(ap, time_t);
+	int searchtime = va_arg(ap, int);
+
+	char dir[256];
+	int nr = 0, start = 0, i;
+	struct bmy_article *tmp_ptr = NULL;
+	struct mmapfile mf = { .ptr = NULL };
+	struct fileheader *x = NULL;
+
+	if (*article_sum >= max_searchnum)
+		return QUIT;
+
+	if (!check_user_read_perm_x(ui, board))
+		return 0;
+
+	sprintf(dir, "boards/%s/.DIR", board->header.filename);
+	mmapfile(NULL, &mf);
+	if (mmapfile(dir, &mf) < 0)
+		return 0;
+
+	x = (struct fileheader *) mf.ptr;
+	nr = mf.size / sizeof(struct fileheader);
+
+	if (nr == 0) {
+		mmapfile(NULL, &mf);
+		return 0;
+	}
+
+	start = Search_Bin(mf.ptr, starttime, 0, nr - 1);
+	if (start < 0)
+		start = - (start + 1);
+
+	for (i = start; i < nr; i++) {
+		if (*article_sum >= max_searchnum)
+			break;
+
+		if (abs(now_t - x[i].filetime) > searchtime)
+			continue;
+
+		if (query_userid[0] && strcasecmp(x[i].owner, query_userid))
+			continue;
+
+		if (title_keyword1 && title_keyword1[0] && !strcasestr(x[i].title, title_keyword1))
+			continue;
+		if (title_keyword2 && title_keyword2[0] && !strcasestr(x[i].title, title_keyword2))
+			continue;
+		if (title_keyword3 && title_keyword3[0] && !strcasestr(x[i].title, title_keyword3))
+			continue;
+
+		// TODO
+		tmp_ptr = &articles_array[*article_sum];
+		strcpy(tmp_ptr->board, board->header.filename);
+		strcpy(tmp_ptr->title, x[i].title);
+		tmp_ptr->filetime = x[i].filetime;
+		tmp_ptr->mark = x[i].accessed;
+		tmp_ptr->thread = x[i].thread;
+		tmp_ptr->sequence_num = i;
+
+		*article_sum = *article_sum + 1;
+	}
+
+	mmapfile(NULL, &mf);
+	return 0;
+}
+
 int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
@@ -1101,66 +1077,16 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 	if(starttime < 0)
 		starttime = 0;
 
-	char dir[256];
-	int article_sum = 0, board_counter = 0, nr = 0, start = 0, i;
-	struct mmapfile mf = { ptr: NULL };
-	struct fileheader *x = NULL;
+	int article_sum = 0;
 
-	for(; board_counter < shm_bcache->number; board_counter++) {
-		if(article_sum >= max_searchnum)
-			break;
+	ythtbbs_cache_Board_foreach_v(search_user_article_with_title_keywords_callback, ui_currentuser, articles_array, &article_sum, max_searchnum, query_userid, title_keyword1, title_keyword2, title_keyword3, starttime, now_t, searchtime);
 
-		if(!check_user_read_perm_x(ui_currentuser, &(shm_bcache->bcache[board_counter])))
-			continue;
-
-		sprintf(dir, "boards/%s/.DIR", shm_bcache->bcache[board_counter].header.filename);
-		mmapfile(NULL, &mf);
-		if(mmapfile(dir, &mf) < 0) {
-			continue;
-		}
-
-		x = (struct fileheader*)mf.ptr;
-		nr = mf.size / sizeof(struct fileheader);
-		if(nr == 0)
-			continue;
-
-		start = Search_Bin(mf.ptr, starttime, 0, nr - 1);
-		if(start < 0)
-			start = - (start + 1);
-
-		for(i = start; i < nr; i++) {
-			if(article_sum >= max_searchnum)
-				break;
-
-			if(abs(now_t - x[i].filetime) > searchtime)
-				continue;
-
-			if(query_userid[0] && strcasecmp(x[i].owner, query_userid))
-				continue;
-
-			if(title_keyword1 && title_keyword1[0] && !strcasestr(x[i].title, title_keyword1))
-				continue;
-			if(title_keyword2 && title_keyword2[0] && !strcasestr(x[i].title, title_keyword2))
-				continue;
-			if(title_keyword3 && title_keyword3[0] && !strcasestr(x[i].title, title_keyword3))
-				continue;
-
-			strcpy(articles_array[article_sum].board, shm_bcache->bcache[board_counter].header.filename);
-			strcpy(articles_array[article_sum].title, x[i].title);
-			articles_array[article_sum].filetime = x[i].filetime;
-			articles_array[article_sum].mark = x[i].accessed;
-			articles_array[article_sum].thread = x[i].thread;
-			articles_array[article_sum].sequence_num = i;
-
-			article_sum++;
-		}
-	}
 	return 0;
 }
 
-int load_user_X_File(struct override *array, int size, const char *userid, int mode)
+int load_user_X_File(struct ythtbbs_override *array, int size, const char *userid, int mode)
 {
-	memset(array, 0, sizeof(struct override) * size);
+	memset(array, 0, sizeof(struct ythtbbs_override) * size);
 
 	FILE *fp;
 	char file[256];
@@ -1179,7 +1105,7 @@ int load_user_X_File(struct override *array, int size, const char *userid, int m
 	return num;
 }
 
-int is_queryid_in_user_X_File(const char *queryid, const struct override *array, const int size)
+int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override *array, const int size)
 {
 	int i=0, pos=-1;
 	for(;i<size; ++i) {

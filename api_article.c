@@ -13,6 +13,8 @@
 #include "ytht/numbyte.h"
 #include "ytht/common.h"
 #include "ytht/fileop.h"
+#include "ythtbbs/cache.h"
+#include "ythtbbs/commend.h"
 #include "ythtbbs/docutil.h"
 #include "ythtbbs/article.h"
 #include "ythtbbs/misc.h"
@@ -406,7 +408,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	}
 	if(ue != NULL)
 		free(ue);
-	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL) {
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
@@ -550,7 +552,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	}
 	if(ue != NULL)
 		free(ue);
-	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
@@ -673,7 +675,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 	if(ue != NULL)
 		free(ue);
 
-	struct user_info *ui = &(shm_utmp->uinfo[get_user_utmp_index(sessid)]);
+	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 	struct boardmem *b   = getboardbyname(board);
 	if(b == NULL)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
@@ -752,7 +754,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	int uent_index = get_user_utmp_index(sessid);
 	struct user_info *ui = (strcasecmp(userid, "guest")==0) ?
-		NULL : &(shm_utmp->uinfo[uent_index]);
+		NULL : ythtbbs_cache_utmp_get_by_idx(uent_index);
 	if(!check_user_read_perm_x(ui, bmem)) {
 		free(ue);
 		return api_error(p, req, res, API_RT_NOBRDRPERM);
@@ -938,7 +940,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = &(shm_utmp->uinfo[uent_index]);
+	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 
 	if(!check_user_post_perm_x(ui, bmem)) {
 		free(ue);
@@ -1040,7 +1042,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	free(ue);
 	free(title_gbk);
-	getrandomstr_r(ui->token, TOKENLENGTH+1);
+	ytht_get_random_str_r(ui->token, TOKENLENGTH+1);
 	memset(ui->from, 0, 20);
 	strncpy(ui->from, fromhost, 20);
 	api_set_json_header(res);
