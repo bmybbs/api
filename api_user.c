@@ -277,7 +277,7 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
-	if(badstr(passwd) || badstr(userid)) {
+	if(ytht_badstr(passwd) || ytht_badstr(userid)) {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
