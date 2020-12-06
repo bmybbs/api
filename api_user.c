@@ -519,7 +519,7 @@ int api_user_rejects_del(ONION_FUNC_PROTO_STR)
 	return api_user_X_File_del(p, req, res, UFT_REJECTS);
 }
 
-static int autocomplete_callback(const struct ythtbbs_cache_User *user, va_list ap) {
+static int autocomplete_callback(const struct ythtbbs_cache_User *user, int curr_idx, va_list ap) {
 	char *search_str = va_arg(ap, char *);
 	struct json_object *json_array_user = va_arg(ap, struct json_object *); // TODO
 
@@ -556,7 +556,7 @@ int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"user_array\":[]}");
 	struct json_object *json_array_user = json_object_object_get(obj, "user_array");
 
-	ythtbbs_cache_UserTable_apply_v(autocomplete_callback, search_str, json_array_user);
+	ythtbbs_cache_UserTable_foreach_v(autocomplete_callback, search_str, json_array_user);
 
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(obj));
