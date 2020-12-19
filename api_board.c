@@ -46,17 +46,17 @@ static int api_board_list_sec_guest(ONION_FUNC_PROTO_STR);
 /**
  * @brief 读取收藏夹文件。
  * 该方法来自 nju09/bbsmybrd.c。
- * @param mybrd char[GOOD_BRC_NUM][STRLEN] 类型，使用前需要预先分配存储空间。
+ * @param mybrd char[GOOD_BRD_NUM][STRLEN] 类型，使用前需要预先分配存储空间。
  * @param mybrdnum 收藏夹版面计数，需要预先分配存储空间。
  * @param userid
  * @return 成功返回 0.
  */
-static int readmybrd(char mybrd[GOOD_BRC_NUM][80], int *mybrdnum, const char *userid);
+static int readmybrd(char mybrd[GOOD_BRD_NUM][80], int *mybrdnum, const char *userid);
 
 /**
  * @brief 检查是否位于收藏夹中
  * @param board 版面名称
- * @param mybrd char[GOOD_BRC_NUM][STRLEN] 类型
+ * @param mybrd char[GOOD_BRD_NUM][STRLEN] 类型
  * @param mybrdnum 收藏夹版面计数
  * @return 存在返回1，否则返回0。
  */
@@ -267,11 +267,11 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 
-	char mybrd[GOOD_BRC_NUM][STRLEN];
+	char mybrd[GOOD_BRD_NUM][STRLEN];
 	int mybrdnum;
 	r = readmybrd(mybrd, &mybrdnum, ui->userid);
 
-	if(mybrdnum >= GOOD_BRC_NUM) {
+	if(mybrdnum >= GOOD_BRD_NUM) {
 		return api_error(p, req, res, API_RT_REACHMAXRCD);
 	}
 
@@ -339,7 +339,7 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 
-	char mybrd[GOOD_BRC_NUM][STRLEN];
+	char mybrd[GOOD_BRD_NUM][STRLEN];
 	int mybrdnum;
 	r = readmybrd(mybrd, &mybrdnum, ui->userid);
 
@@ -401,7 +401,7 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 
-	char mybrd[GOOD_BRC_NUM][STRLEN];
+	char mybrd[GOOD_BRD_NUM][STRLEN];
 	int mybrdnum;
 	r = readmybrd(mybrd, &mybrdnum, ui->userid);
 
@@ -539,7 +539,7 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
-	char mybrd[GOOD_BRC_NUM][STRLEN];
+	char mybrd[GOOD_BRD_NUM][STRLEN];
 	int mybrdnum;
 	r = readmybrd(mybrd, &mybrdnum, ue->userid);
 	if(r != API_RT_SUCCESSFUL) {
@@ -753,7 +753,7 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 	return r;
 }
 
-static int readmybrd(char mybrd[GOOD_BRC_NUM][80], int *mybrdnum, const char *userid)
+static int readmybrd(char mybrd[GOOD_BRD_NUM][80], int *mybrdnum, const char *userid)
 {
 	char file[256];
 	FILE *fp;
@@ -767,7 +767,7 @@ static int readmybrd(char mybrd[GOOD_BRC_NUM][80], int *mybrdnum, const char *us
 			if(mybrd[*mybrdnum][len-1] == '\n')
 				mybrd[*mybrdnum][len-1] = 0;
 			(*mybrdnum)++;
-			if(*mybrdnum >= GOOD_BRC_NUM)
+			if(*mybrdnum >= GOOD_BRD_NUM)
 				break;
 		}
 		fclose(fp);
