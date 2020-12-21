@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^attach/upload$", api_attach_upload);
 	onion_url_add(urls, "^notification/list$", api_notification_list);
 	onion_url_add(urls, "^notification/del$", api_notification_del);
+	onion_url_add(urls, "^subscription/list$", api_subscription_list);
 
 	onion_listen(o);
 
