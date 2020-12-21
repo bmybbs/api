@@ -21,8 +21,9 @@ int main(int argc, char *argv[])
 
 	chdir(MY_BBS_HOME);
 
-	/*if(shm_init()<0)
+	if(shm_init()<0)
 		return -1;
+	/*
 	if(ummap()<0)
 		return -1;
 	*/
