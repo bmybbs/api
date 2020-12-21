@@ -32,16 +32,6 @@
  * @return 返回 error_code 错误码
  */
 static int api_do_login(struct userec *ue, const char *fromhost, const char * appkey, time_t login_time, int *utmp_pos);
-/**
- * @brief iphash 方法，参见 src
- * @param fromhost
- * @return
- */
-static int iphash(const char *fromhost);
-
-static int cmpfuid(unsigned int *a, unsigned int *b);
-
-static int initfriends(struct user_info *u);
 
 enum activation_code_query_result {
 	ACQR_NOT_EXIST	= -1,	// 激活码不存在
