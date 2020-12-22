@@ -78,6 +78,8 @@ static int cmpboardscore(struct boardmem **b1, struct boardmem **b2);
  */
 static int cmpboardinboard(struct boardmem **b1, struct boardmem **b2);
 
+static bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname);
+
 int api_board_list(ONION_FUNC_PROTO_STR)
 {
 	const char * secstr = onion_request_get_query(req, "secstr");
@@ -252,7 +254,7 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 
 	struct goodboard g_brd;
-	ythtbbs_mybrd_load(ui->userid, &g_brd, NULL /* TODO */);
+	ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
 
 	if(g_brd.num >= GOOD_BRD_NUM) {
 		return api_error(p, req, res, API_RT_REACHMAXRCD);
@@ -272,7 +274,7 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 	}
 
 	// 所有校验通过，写入用户文件
-	ythtbbs_mybrd_save(ui->userid, &g_brd, NULL /* TODO */);
+	ythtbbs_mybrd_save_ext(ui, &g_brd, api_mybrd_has_read_perm);
 
 	api_set_json_header(res);
 	onion_response_printf(res, "{\"errcode\": 0, \"board\": \"%s\", \"secstr\":\"%s\"}", b->header.filename, b->header.sec1);
@@ -306,7 +308,7 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 
 	struct goodboard g_brd;
-	ythtbbs_mybrd_load(ui->userid, &g_brd, NULL /* TODO */);
+	ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
 
 	if(g_brd.num == 0) {
 		return api_error(p, req, res, API_RT_NOTINRCD);
@@ -317,7 +319,7 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 	}
 
 	// 所有校验通过，写入用户文件
-	ythtbbs_mybrd_save(ui->userid, &g_brd, NULL /* TODO */);
+	ythtbbs_mybrd_save_ext(ui, &g_brd, api_mybrd_has_read_perm);
 
 	api_set_json_header(res);
 	onion_response_printf(res, "{\"errcode\": 0, \"board\": \"%s\"}", board);
@@ -350,7 +352,7 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 
 	struct goodboard g_brd;
-	ythtbbs_mybrd_load(ui->userid, &g_brd, NULL /* TODO */);
+	ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
 
 	// 输出
 	char buf[512];
@@ -485,8 +487,10 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, r);
 	}
 
+	int uent_index = get_user_utmp_index(sessid);
+	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 	struct goodboard g_brd;
-	ythtbbs_mybrd_load(ue->userid, &g_brd, NULL /* TODO */);
+	ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
 	if(r != API_RT_SUCCESSFUL) {
 		free(ue);
 		return api_error(p, req, res, r);
@@ -494,8 +498,6 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 
 	int count=0;
 	struct boardmem *board_array[MAXBOARD];
-	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 
 	ythtbbs_cache_Board_foreach_v(api_board_fav_list_callback, ui, board_array, &count, &g_brd);
 
@@ -726,3 +728,8 @@ static int cmpboardinboard(struct boardmem **b1, struct boardmem **b2)
 {
 	return ((*b1)->inboard - (*b2)->inboard);
 }
+
+static bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname) {
+	return check_user_read_perm(ptr_info, boardname) > 0;
+}
+
