@@ -786,7 +786,7 @@ int mail_count(char *id, int *unread)
 }
 
 int do_article_post(char *board, char *title, char *filename, char *id,
-		char *nickname, char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
+		char *nickname, const char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
 {
 	FILE *fp, *fp1, *fp2;
 	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_gbk;
@@ -1082,27 +1082,6 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 	ythtbbs_cache_Board_foreach_v(search_user_article_with_title_keywords_callback, ui_currentuser, articles_array, &article_sum, max_searchnum, query_userid, title_keyword1, title_keyword2, title_keyword3, starttime, now_t, searchtime);
 
 	return 0;
-}
-
-int load_user_X_File(struct ythtbbs_override *array, int size, const char *userid, int mode)
-{
-	memset(array, 0, sizeof(struct ythtbbs_override) * size);
-
-	FILE *fp;
-	char file[256];
-	int num = 0;
-	if(mode == UFT_FRIENDS)
-		sethomefile(file, userid, "friends");
-	else
-		sethomefile(file, userid, "rejects");
-
-	fp = fopen(file, "r");
-	if(fp) {
-		num = fread(array, sizeof(array[0]), size, fp);
-		fclose(fp);
-	}
-
-	return num;
 }
 
 int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override *array, const int size)

@@ -182,7 +182,7 @@ char * calc_perf_str_utf8(int perf);
  * @return 返回文件名中实际使用的时间戳
  */
 int do_article_post(char *board, char *title, char *filename, char *id,
-					char *nickname, char *ip, int sig, int mark,
+					char *nickname, const char *ip, int sig, int mark,
 					int outgoing, char *realauthor, int thread);
 
 /**
@@ -243,14 +243,6 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime);
-
-/**
- * 区分好友、黑名单操作
- */
-enum user_X_file_type {
-	UFT_FRIENDS,			//! 好友文件
-	UFT_REJECTS				//! 黑名单
-};
 
 /**
  * @brief 加载好友、黑名单文件

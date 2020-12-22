@@ -11,6 +11,7 @@
 #include "ytht/strlib.h"
 #include "ytht/common.h"
 #include "ytht/random.h"
+#include "bmy/convcode.h"
 #include "ythtbbs/identify.h"
 #include "ythtbbs/misc.h"
 #include "ythtbbs/user.h"
@@ -34,16 +35,16 @@ enum activation_code_query_result {
  * @param code 激活码
  * @return 查看 activation_code_query_result
  */
-static int activation_code_query(char *code);
+static int activation_code_query(const char *code);
 
 /** 使用激活码注册用户
  *
  * @param x
  * @param code
  */
-static int adduser_with_activation_code(struct userec *x, char *code);
+static int adduser_with_activation_code(struct userec *x, const char *code);
 
-static void api_newcomer(struct userec *x, char *fromhost, char *words);
+static void api_newcomer(struct userec *x, const char *fromhost, char *words);
 
 /** 好友、黑名单的显示
  *
@@ -51,7 +52,7 @@ static void api_newcomer(struct userec *x, char *fromhost, char *words);
  * @param mode
  * @return
  */
-static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode);
+static int api_user_override_File_list(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode);
 
 /** 好友、黑名单的用户添加
  *
@@ -59,7 +60,7 @@ static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode);
  * @param mode
  * @return
  */
-static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode);
+static int api_user_override_File_add(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode);
 
 /** 好友、黑名单的用户删除
  *
@@ -67,7 +68,7 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode);
  * @param mode
  * @return
  */
-static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode);
+static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode);
 
 int api_user_login(ONION_FUNC_PROTO_STR)
 {
@@ -290,12 +291,12 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 	x.firstlogin = now_t;
 	x.lastlogin = now_t - 3600;
 	x.userdefine = -1;
-	x.flags[0] = CURSOR_FLAG | PAGER_FLAG;
+	x.flags[0] = BRDSORT_FLAG2 | PAGER_FLAG; // see src/bbs/register.c
 
 	adduser_with_activation_code(&x, active);
 
 	char filename[80];
-	sethomepath(filename, userid);
+	sethomepath_s(filename, sizeof(filename), userid);
 	mkdir(filename, 0755);
 
 	api_newcomer(&x, fromhost, "");
@@ -357,7 +358,7 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 			time_t cache_time = atol(rReplyTime->str);
 			freeReplyObject(rReplyTime);
 
-			if(abs(now_t - cache_time) < 300) {
+			if(now_t - cache_time < 300) {
 				// 缓存时间小于 5min 才使用缓存
 				rReplyOut = redisCommand(rContext, "GET useractivities-%s-%s",
 						ue->userid, query_ue->userid);
@@ -386,8 +387,8 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	memset(articles, 0, sizeof(struct bmy_article) * MAX_SEARCH_NUM);
 
 	int qryday = 3; // 默认为3天
-	if(qryday_str!=NULL && atoi(qryday)>0)
-		qryday = atoi(qryday);
+	if(qryday_str != NULL && atoi(qryday_str) > 0)
+		qryday = atoi(qryday_str);
 
 	struct user_info * ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 	int num = search_user_article_with_title_keywords(articles, MAX_SEARCH_NUM, ui,
@@ -413,7 +414,7 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 		if(strcmp(curr_board, ap->board) != 0) {
 			// 新的版面
 			curr_board = ap->board;
-			b = getboardbyname(curr_board);
+			b = ythtbbs_cache_Board_get_board_by_name(curr_board);
 
 			asprintf(&tmp_buf, "{\"board\":\"%s\", \"secstr\":\"%s\", \"articles\":[]}", curr_board, b->header.sec1);
 			json_board_obj = json_tokener_parse(tmp_buf);
@@ -425,7 +426,7 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 		}
 
 		// 添加实体，因为此时 json_articles_array 指向了正确的数组
-		asprintf(&tmp_buf, "{\"aid\":%d, \"tid\":%d, \"mark\":%d, \"num\":%d}",
+		asprintf(&tmp_buf, "{\"aid\":%ld, \"tid\":%ld, \"mark\":%d, \"num\":%d}",
 				ap->filetime, ap->thread, ap->mark, ap->sequence_num);
 		json_article_obj = json_tokener_parse(tmp_buf);
 		free(tmp_buf);
@@ -471,32 +472,32 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 
 int api_user_friends_list(ONION_FUNC_PROTO_STR)
 {
-	return api_user_X_File_list(p, req, res, UFT_FRIENDS);
+	return api_user_override_File_list(p, req, res, YTHTBBS_OVERRIDE_FRIENDS);
 }
 
 int api_user_rejects_list(ONION_FUNC_PROTO_STR)
 {
-	return api_user_X_File_list(p, req, res, UFT_REJECTS);
+	return api_user_override_File_list(p, req, res, YTHTBBS_OVERRIDE_REJECTS);
 }
 
 int api_user_friends_add(ONION_FUNC_PROTO_STR)
 {
-	return api_user_X_File_add(p, req, res, UFT_FRIENDS);
+	return api_user_override_File_add(p, req, res, YTHTBBS_OVERRIDE_FRIENDS);
 }
 
 int api_user_rejects_add(ONION_FUNC_PROTO_STR)
 {
-	return api_user_X_File_add(p, req, res, UFT_REJECTS);
+	return api_user_override_File_add(p, req, res, YTHTBBS_OVERRIDE_REJECTS);
 }
 
 int api_user_friends_del(ONION_FUNC_PROTO_STR)
 {
-	return api_user_X_File_del(p, req, res, UFT_FRIENDS);
+	return api_user_override_File_del(p, req, res, YTHTBBS_OVERRIDE_FRIENDS);
 }
 
 int api_user_rejects_del(ONION_FUNC_PROTO_STR)
 {
-	return api_user_X_File_del(p, req, res, UFT_REJECTS);
+	return api_user_override_File_del(p, req, res, YTHTBBS_OVERRIDE_REJECTS);
 }
 
 static int autocomplete_callback(const struct ythtbbs_cache_User *user, int curr_idx, va_list ap) {
@@ -546,17 +547,17 @@ int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
-__attribute__((deprecated)) static int activation_code_query(char *code)
+__attribute__((deprecated)) static int activation_code_query(const char *code)
 {
 	return ACQR_NORMAL;
 }
 
 // TODO deprecated
-static int adduser_with_activation_code(struct userec *x, char *code) {
+static int adduser_with_activation_code(struct userec *x, const char *code) {
 	return ACQR_NORMAL;
 }
 
-static void api_newcomer(struct userec *x,char *fromhost, char *words)
+static void api_newcomer(struct userec *x, const char *fromhost, char *words)
 {
 	FILE *fp;
 	char filename[80];
@@ -569,11 +570,11 @@ static void api_newcomer(struct userec *x,char *fromhost, char *words)
 	fprintf(fp, "%s", words);
 	fclose(fp);
 	do_article_post("newcomers", "API 新手上路", filename, x->userid,
-		     x->username, fromhost, -1, 0, 0, x->userid, -1);
+		x->username, fromhost, -1, 0, 0, x->userid, -1);
 	unlink(filename);
 }
 
-static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
+static int api_user_override_File_list(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode)
 {
 	const char * userid = onion_request_get_query(req, "userid");
 	const char * sessid = onion_request_get_query(req, "sessid");
@@ -594,13 +595,14 @@ static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
 
 	struct ythtbbs_override * array;
 	int size=0;
-	if(mode == UFT_FRIENDS) {
+	if(mode == YTHTBBS_OVERRIDE_FRIENDS) {
 		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
-		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
+		size = MAXFRIENDS;
 	} else {
 		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
-		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
+		size = MAXREJECTS;
 	}
+	size = ythtbbs_override_get_records(ue->userid, array, size, mode);
 
 	char exp_utf[2*sizeof(array[0].exp)];
 	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"users\":[]}");
@@ -627,13 +629,14 @@ static int api_user_X_File_list(ONION_FUNC_PROTO_STR, int mode)
 	return OCS_PROCESSED;
 }
 
-static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
+static int api_user_override_File_add(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode)
 {
 	const char * userid = onion_request_get_query(req, "userid");
 	const char * sessid = onion_request_get_query(req, "sessid");
 	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * queryid = onion_request_get_query(req, "queryid");
 	const char * exp_utf = onion_request_get_query(req, "explain");
+	int lockfd;
 
 	if(!userid || !sessid || !appkey || !queryid)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -655,77 +658,49 @@ static int api_user_X_File_add(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	struct ythtbbs_override * array;
-	int size=0;
-	if(mode == UFT_FRIENDS) {
-		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
-		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
-
-		if(size >= MAXFRIENDS-1) {
-			free(array);
-			free(ue);
-			free(query_ue);
-			return api_error(p, req, res, API_RT_REACHMAXRCD);
-		}
-	} else {
-		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
-		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
-
-		if(size >= MAXREJECTS-1) {
-			free(array);
-			free(ue);
-			free(query_ue);
-			return api_error(p, req, res, API_RT_REACHMAXRCD);
-		}
-	}
-
-	int pos = is_queryid_in_user_X_File(queryid, array, size);
-	if(pos>=0) {
+	if(ythtbbs_override_included(ue->userid, mode, queryid)) {
 		// queryid 已存在
-		free(array);
 		free(ue);
 		free(query_ue);
 		return api_error(p, req, res, API_RT_ALRDYINRCD);
 	}
 
-	strcpy(array[size].id, query_ue->userid);
-	u2g(exp_utf, strlen(exp_utf), array[size].exp, sizeof(array[size].exp));
-	size++;
+	size_t size;
 
-	char path[256];
-	if(mode == UFT_FRIENDS)
-		sethomefile(path, ue->userid, "friends");
-	else
-		sethomefile(path, ue->userid, "rejects");
-	FILE *fp = fopen(path, "w");
-	if(fp) {
-		flock(fileno(fp), LOCK_EX);
-		fwrite(array, sizeof(struct ythtbbs_override), size, fp);
-		flock(fileno(fp), LOCK_UN);
-		fclose(fp);
-
-		api_set_json_header(res);
-		onion_response_printf(res, "{ \"errcode\": 0, \"userid\": \"%s\" }", query_ue->userid);
-
-		free(array);
+	lockfd = ythtbbs_override_lock(ue->userid, mode);
+	size = ythtbbs_override_count(ue->userid, mode);
+	if (size >= (mode == YTHTBBS_OVERRIDE_FRIENDS ? MAXFRIENDS : MAXREJECTS) - 1) {
+		ythtbbs_override_unlock(lockfd);
 		free(ue);
 		free(query_ue);
-
-		return OCS_PROCESSED;
-	} else {
-		free(array);
-		free(ue);
-		free(query_ue);
-		return api_error(p, req, res, API_RT_NOSUCHFILE);
+		return api_error(p, req, res, API_RT_REACHMAXRCD);
 	}
+
+	struct ythtbbs_override of;
+	strcpy(of.id, query_ue->userid);
+	char *exp_utf_2 = strdup(exp_utf);
+	u2g(exp_utf_2, strlen(exp_utf), of.exp, sizeof(of.exp));
+	free(exp_utf_2);
+
+	ythtbbs_override_add(ue->userid, &of, mode);
+	ythtbbs_override_unlock(lockfd);
+
+	api_set_json_header(res);
+	onion_response_printf(res, "{ \"errcode\": 0, \"userid\": \"%s\" }", query_ue->userid);
+
+	free(ue);
+	free(query_ue);
+
+	return OCS_PROCESSED;
 }
 
-static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
+static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode)
 {
 	const char * userid = onion_request_get_query(req, "userid");
 	const char * sessid = onion_request_get_query(req, "sessid");
 	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * queryid = onion_request_get_query(req, "queryid");
+	int lockfd;
 
 	if(!userid || !sessid || !appkey || !queryid)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -747,54 +722,44 @@ static int api_user_X_File_del(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, r);
 	}
 
-	struct ythtbbs_override * array;
-	int size=0;
-	if(mode == UFT_FRIENDS) {
-		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
-		size = load_user_X_File(array, MAXFRIENDS, ue->userid, UFT_FRIENDS);
-	} else {
-		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
-		size = load_user_X_File(array, MAXREJECTS, ue->userid, UFT_REJECTS);
-	}
-
-	int pos = is_queryid_in_user_X_File(queryid, array, size);
-	if(pos < 0) {
+	if(!ythtbbs_override_included(ue->userid, mode, queryid)) {
 		// queryid 不存在
-		free(array);
 		free(ue);
 		free(query_ue);
 		return api_error(p, req, res, API_RT_NOTINRCD);
 	}
 
-	int i;
-	for(i=pos; i<size-1; ++i) {
-		memcpy(&array[i], &array[i+1], sizeof(struct ythtbbs_override));
-	}
-	size--;
-
-	char path[256];
-	if(mode == UFT_FRIENDS)
-		sethomefile(path, ue->userid, "friends");
-	else
-		sethomefile(path, ue->userid, "rejects");
-	FILE *fp = fopen(path, "w");
-	if(fp) {
-		flock(fileno(fp), LOCK_EX);
-		fwrite(array, sizeof(struct ythtbbs_override), size, fp);
-		flock(fileno(fp), LOCK_UN);
-		fclose(fp);
-
-		api_set_json_header(res);
-		onion_response_printf(res, "{ \"errcode\": 0, \"userid\": \"%s\" }", query_ue->userid);
-
-		free(array);
-		free(ue);
-		free(query_ue);
-		return OCS_PROCESSED;
+	struct ythtbbs_override * array;
+	int size;
+	if (mode == YTHTBBS_OVERRIDE_FRIENDS) {
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
+		size = MAXFRIENDS;
 	} else {
-		free(array);
-		free(ue);
-		free(query_ue);
-		return api_error(p, req, res, API_RT_NOSUCHFILE);
+		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
+		size = MAXREJECTS;
 	}
+
+	lockfd = ythtbbs_override_lock(ue->userid, mode);
+	size = ythtbbs_override_get_records(ue->userid, array, size, mode);
+
+	int i;
+	for (i = 0; i < size - 1; ++i) {
+		if (strcasecmp(array[i].id, queryid) == 0) {
+			array[i].id[0] = '\0';
+			size--;
+			break;
+		}
+	}
+
+	ythtbbs_override_set_records(ue->userid, array, size, mode);
+	ythtbbs_override_unlock(lockfd);
+
+	api_set_json_header(res);
+	onion_response_printf(res, "{ \"errcode\": 0, \"userid\": \"%s\" }", query_ue->userid);
+
+	free(array);
+	free(ue);
+	free(query_ue);
+	return OCS_PROCESSED;
 }
+
