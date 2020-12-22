@@ -23,16 +23,6 @@
 #include "api.h"
 #include "apilib.h"
 
-#define NHASH 67
-/**
- * @brief 依据 appkey 登录用户
- * @param ue
- * @param appkey
- * @param utmp_pos 传出参数，给出 utmp 中的索引值，用于生成 SESSION 字符串
- * @return 返回 error_code 错误码
- */
-static int api_do_login(struct userec *ue, const char *fromhost, const char * appkey, time_t login_time, int *utmp_pos);
-
 enum activation_code_query_result {
 	ACQR_NOT_EXIST	= -1,	// 激活码不存在
 	ACQR_NORMAL		= 0,	// 激活码正确
@@ -554,23 +544,6 @@ int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 	json_object_put(obj);
 
 	return OCS_PROCESSED;
-}
-
-static int api_do_login(struct userec *ue, const char *fromhost, const char *appkey, time_t login_time, int *utmp_pos)
-{
-	*utmp_pos = 0;
-	time_t earlest_app_time;
-	int uid, i, uent_index, earlest_pos, n, clubnum;
-	int insert_pos=0;
-	char ULIST[STRLEN], hostnamebuf[256], buf[256], fname[80], genbuf[256];
-	struct user_info *u;
-	FILE *fp_ulist, *fp_clubright;
-	uid = getusernum(ue->userid) + 1;
-
-	gethostname(hostnamebuf, 256);
-
-
-	return API_RT_SUCCESSFUL;
 }
 
 __attribute__((deprecated)) static int activation_code_query(char *code)
