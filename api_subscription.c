@@ -14,32 +14,19 @@
 static const int COUNT_PER_PAGE = 40;
 
 int api_subscription_list(ONION_FUNC_PROTO_STR) {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
 	char output[1024];
+
 	if (!api_check_method(req, OR_GET))
 		return api_error(p, req, res, API_RT_WRONGMETHOD);
 
-	const char *cookie_str = onion_request_get_cookie(req, SMAGIC);
-
-	if (cookie_str == NULL || cookie_str[0] == '\0')
-		return api_error(p, req, res, API_RT_WRONGPARAM);
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
 	time_t now_t = time(NULL);
 
-	struct bmy_cookie cookie;
-	char buf[512];
-	ytht_strsncpy(buf, cookie_str, sizeof(buf));
-	bmy_cookie_parse(buf, &cookie);
-
-	if (cookie.userid == NULL || cookie.sessid == NULL)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	if (strcasecmp(cookie.userid, "guest") == 0)
-		return api_error(p, req, res, API_RT_NOTLOGGEDIN);
-
-	int utmp_idx = ythtbbs_session_get_utmp_idx(cookie.sessid, cookie.userid);
-	if (utmp_idx < 0)
-		return api_error(p, req, res, API_RT_NOTLOGGEDIN);
-
-	struct user_info *ptr_info = ythtbbs_cache_utmp_get_by_idx(utmp_idx);
 	const char *start_str = onion_request_get_query(req, "start");
 	time_t start_time;
 	if (start_str == NULL || start_str[0] == '\0')

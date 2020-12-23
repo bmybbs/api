@@ -273,6 +273,12 @@ int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override
 int file_size_s(const char *filepath);
 
 bool api_check_method(onion_request *req, onion_request_flags flags);
+#define DEFINE_COMMON_SESSION_VARS \
+	char cookie_buf[512];\
+	struct bmy_cookie cookie;\
+	int utmp_idx;\
+	struct user_info *ptr_info;
+
 /**
  @brief 检查会话状态并初始化变量
  如果没有正确登录，utmp_idx 和 pptr_info 会分别初始化为 -1 和 NULL。
