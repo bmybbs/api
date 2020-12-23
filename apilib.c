@@ -29,6 +29,8 @@
 #include "ythtbbs/binaryattach.h"
 #include "ythtbbs/docutil.h"
 #include "ythtbbs/override.h"
+#include "ythtbbs/cache.h"
+#include "ythtbbs/session.h"
 
 char *ummap_ptr = NULL;
 int ummap_size = 0;
@@ -1106,3 +1108,27 @@ int file_size_s(const char *filepath)
 bool api_check_method(onion_request *req, onion_request_flags flags) {
 	return flags == (onion_request_get_flags(req) & OR_METHODS);
 }
+
+int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, struct bmy_cookie *cookie, int *utmp_idx, struct user_info **pptr_info) {
+	const char *cookie_str = onion_request_get_cookie(req, SMAGIC);
+	*pptr_info = NULL;
+	*utmp_idx = -1;
+	if(cookie_str == NULL || cookie_str[0] == '\0') {
+		return API_RT_WRONGPARAM;
+	}
+
+	strncpy(cookie_buf, cookie_str, buf_len);
+	bmy_cookie_parse(cookie_buf, cookie);
+	if (cookie->userid == NULL || cookie->sessid == NULL || strcasecmp(cookie->userid, "guest") == 0) {
+		return API_RT_NOTLOGGEDIN;
+	}
+
+	*utmp_idx = ythtbbs_session_get_utmp_idx(cookie->sessid, cookie->userid);
+	if (*utmp_idx < 0) {
+		return API_RT_NOTLOGGEDIN;
+	}
+
+	*pptr_info = ythtbbs_cache_utmp_get_by_idx(*utmp_idx);
+	return API_RT_SUCCESSFUL;
+}
+
