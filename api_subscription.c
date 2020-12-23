@@ -8,12 +8,14 @@
 #include "ythtbbs/session.h"
 #include "ythtbbs/cache.h"
 #include "api.h"
+#include "apilib.h"
 #include "error_code.h"
 
 static const int COUNT_PER_PAGE = 40;
 
 int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	char output[1024];
+	if (!api_check_method(req, OR_GET))
 	if (OR_GET != (onion_request_get_flags(req) & OR_METHODS))
 		return api_error(p, req, res, API_RT_WRONGMETHOD);
 

@@ -3,6 +3,7 @@
 
 #include <time.h>
 #include <stdio.h>
+#include <onion/request.h>
 
 #include "ythtbbs/cache.h"
 #include "ythtbbs/user.h"
@@ -270,4 +271,5 @@ int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override
  */
 int file_size_s(const char *filepath);
 
+bool api_check_method(onion_request *req, onion_request_flags flags);
 #endif

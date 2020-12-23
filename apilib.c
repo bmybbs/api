@@ -1102,3 +1102,7 @@ int file_size_s(const char *filepath)
 
 	return buf.st_size;
 }
+
+bool api_check_method(onion_request *req, onion_request_flags flags) {
+	return flags == (onion_request_get_flags(req) & OR_METHODS);
+}

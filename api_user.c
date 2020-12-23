@@ -72,7 +72,7 @@ static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 
 int api_user_login(ONION_FUNC_PROTO_STR)
 {
-	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
+	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
 
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
@@ -180,7 +180,7 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 
 int api_user_logout(ONION_FUNC_PROTO_STR)
 {
-	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
+	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
 
 	const char *cookie_str = onion_request_get_cookie(req, SMAGIC);

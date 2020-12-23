@@ -856,7 +856,7 @@ int api_article_reply(ONION_FUNC_PROTO_STR)
 
 static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 {
-	if((onion_request_get_flags(req)&OR_METHODS) != OR_POST)
+	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD);
 
 	const char * board = onion_request_get_query(req, "board");
