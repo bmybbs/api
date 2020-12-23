@@ -1,9 +1,3 @@
-/*
- * apilib.c
- *
- *  Created on: 2012-10-29
- *      Author: shenyang
- */
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
