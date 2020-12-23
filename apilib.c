@@ -4,7 +4,6 @@
  *  Created on: 2012-10-29
  *      Author: shenyang
  */
-#include <ctype.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -17,7 +16,6 @@
 #include "error_code.h"
 #include "ytht/strlib.h"
 #include "ytht/timeop.h"
-#include "ytht/shmop.h"
 #include "ytht/fileop.h"
 #include "ytht/numbyte.h"
 #include "bmy/convcode.h"
@@ -26,11 +24,9 @@
 #include "ythtbbs/user.h"
 #include "ythtbbs/record.h"
 #include "ythtbbs/article.h"
-#include "ythtbbs/misc.h"
 #include "ythtbbs/binaryattach.h"
 #include "ythtbbs/docutil.h"
 #include "ythtbbs/override.h"
-#include "ythtbbs/cache.h"
 #include "ythtbbs/session.h"
 
 char *ummap_ptr = NULL;
@@ -140,29 +136,6 @@ int getusernum(const char *id) {
 	return ythtbbs_cache_UserIDHashTable_find_idx(id);
 }
 
-/** hash user id
- * Only have 25 * 26 + 25 = 675 different hash values.
- * From nju09/BBSLIB.c
- * @param id
- * @return
- */
-int useridhash(const char *id)
-{
-	int n1 = 0;
-	int n2 = 0;
-	while(*id) {
-		n1 += ((unsigned char) toupper(*id)) % 26;
-		id ++;
-		if(!*id)
-			break;
-		n2 += ((unsigned char) toupper(*id)) % 26;
-		id ++;
-	}
-	n1 %= 26;
-	n2 %= 26;
-	return n1 *26 + n2;
-}
-
 /** 依据用户权限位获取本站职位名称
  *
  * @param userlevel
@@ -264,35 +237,6 @@ int save_user_data(struct userec *x)
 	flock(fd, LOCK_UN);
 	close(fd);
 	return 1;
-}
-
-int setbmstatus(struct userec *ue, int online)
-{
-	char path[256];
-	sethomefile_s(path, sizeof(path), ue->userid, "mboard");
-
-	bmfilesync(ue);
-
-	new_apply_record(path, sizeof(struct boardmanager), (void *) setbmhat, &online);
-	return 0;
-}
-
-int setbmhat(struct boardmanager *bm, int *online)
-{
-	/*
-	if(strcmp(shm_bcache->bcache[bm->bid].header.filename, bm->board)) {
-		errlog("error board name %s, %s. user %d",
-			shm_bcache->bcache[bm->bid].header.filename,
-			bm->board, bm->bid);
-		return -1;
-	}
-	if(*online) {
-		shm_bcache->bcache[bm->bid].bmonline |= (1 << bm->bmpos);
-		if(u)
-	}*/
-
-	//TODO
-	return 0;
 }
 
 int get_user_utmp_index(const char *sessid)
@@ -1082,16 +1026,6 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 	ythtbbs_cache_Board_foreach_v(search_user_article_with_title_keywords_callback, ui_currentuser, articles_array, &article_sum, max_searchnum, query_userid, title_keyword1, title_keyword2, title_keyword3, starttime, now_t, searchtime);
 
 	return 0;
-}
-
-int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override *array, const int size)
-{
-	int i=0, pos=-1;
-	for(;i<size; ++i) {
-		if(strcasecmp(queryid, array[i].id) == 0)
-			pos = i;
-	}
-	return pos;
 }
 
 int file_size_s(const char *filepath)

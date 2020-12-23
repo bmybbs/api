@@ -85,9 +85,6 @@ int check_user_session(struct userec *x, const char *sessid, const char *appkey)
  */
 int check_user_session_with_mode_change(struct userec *x, const char *sessid, const char *appkey, int mode);
 
-int setbmhat(struct boardmanager *bm, int *online);
-int setbmstatus(struct userec *ue, int online);
-
 /**
  * @brief 字符串替换函数
  * @param ori 原始字符串
@@ -245,24 +242,6 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime);
-
-/**
- * @brief 加载好友、黑名单文件
- * @param array 预先分配好空间
- * @param userid 用户 id
- * @param mode 模式，参见 @see enum user_X_file_type
- * @return 成功返回列表中的用户数
- */
-int load_user_X_File(struct ythtbbs_override *array, int size, const char *userid, int mode);
-
-/**
- * @brief 判断某用户名是否在用户的好友、黑名单中
- * @param queryid 查询的用户
- * @param array 已加载的好友、黑名单列表
- * @param size 已加载的好友、黑名单长度
- * @return 若存在，返回索引位置。不存在则返回 -1。
- */
-int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override *array, const int size);
 
 /**
  * @brief 获取文件的大小
