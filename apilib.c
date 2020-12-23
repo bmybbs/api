@@ -600,69 +600,65 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 					if (mompos==momelem->digitcount) //only zeros => delete all
 					{
 						bo=0;ul=0;bl=0;fc=-1;bc=-1;
-					}
-					else
-					{
-						switch (momelem->digit[mompos])
-						{
-							case 1: bo=1; break;
-							case 2: if (mompos+1<momelem->digitcount)
-											switch (momelem->digit[mompos+1])
-											{
-												case 1: //Reset blink and bold
-													bo=0;
-													bl=0;
-													break;
-												case 4: //Reset underline
-													ul=0;
-													break;
-													case 7: //Reset Inverted
-													temp = bc;
-													if (fc == -1 || fc == 9)
-													{
-															bc = 0;
-													}
-													else
-														bc = fc;
-													if (temp == -1 || temp == 9)
-													{
-															fc = 7;
-													}
-													else
-														fc = temp;
-													break;
-											}
-											break;
-					case 3: if (mompos+1<momelem->digitcount)
-										fc=momelem->digit[mompos+1];
+					} else {
+						switch (momelem->digit[mompos]) {
+						case 1: bo=1; break;
+						case 2:
+							if (mompos+1<momelem->digitcount) {
+								switch (momelem->digit[mompos+1]) {
+								case 1: //Reset blink and bold
+									bo=0;
+									bl=0;
 									break;
-					case 4: if (mompos+1==momelem->digitcount)
-										ul=1;
-									else
-										bc=momelem->digit[mompos+1];
+								case 4: //Reset underline
+									ul=0;
 									break;
-					case 5: bl=1; break;
-					case 7: //TODO: Inverse
+								case 7: //Reset Inverted
 									temp = bc;
 									if (fc == -1 || fc == 9)
 									{
-											bc = 0;
+										bc = 0;
 									}
 									else
 										bc = fc;
 									if (temp == -1 || temp == 9)
 									{
-											fc = 7;
+										fc = 7;
 									}
 									else
 										fc = temp;
 									break;
+								}
+							}
+							break;
+						case 3:
+							if (mompos+1<momelem->digitcount)
+								fc=momelem->digit[mompos+1];
+							break;
+						case 4:
+							if (mompos+1==momelem->digitcount)
+								ul=1;
+							else
+								bc=momelem->digit[mompos+1];
+							break;
+						case 5: bl=1; break;
+						case 7: //TODO: Inverse
+							temp = bc;
+							if (fc == -1 || fc == 9) {
+								bc = 0;
+							} else
+								bc = fc;
+							if (temp == -1 || temp == 9) {
+								fc = 7;
+							} else
+								fc = temp;
+							break;
 						}
 					}
 					momelem=momelem->next;
 				}
 				deleteParse(elem);
-			break;
+				break;
 			case 'H': break;
 			}
 
@@ -730,8 +726,9 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 			case '<':	fprintf(out_stream, "&lt;"); break;
 			case '>':	fprintf(out_stream, "&gt;"); break;
 			case '\n':
-			case 13: 	momline++;line=0;
-						fprintf(out_stream, "<br />\n"); break;
+			case 13:
+				momline++;line=0;
+				fprintf(out_stream, "<br />\n"); break;
 			default:	fprintf(out_stream, "%c",c);
 			}
 		}
