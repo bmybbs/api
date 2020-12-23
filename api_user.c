@@ -78,7 +78,6 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	const onion_dict *param_dict = onion_request_get_query_dict(req);
 	const char * userid = onion_dict_get(param_dict, "userid");
 	const char * passwd = onion_dict_get(param_dict, "passwd");
-	const char * appkey = onion_dict_get(param_dict, "appkey");
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
 	time_t now_t = time(NULL);
@@ -87,7 +86,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	int t;
 	int utmp_index;
 
-	if(userid == NULL || passwd == NULL || appkey ==NULL) {
+	if(userid == NULL || passwd == NULL) {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
@@ -122,26 +121,25 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 
 int api_user_query(ONION_FUNC_PROTO_STR)
 {
-	const onion_dict *param_dict = onion_request_get_query_dict(req);
-	const char * userid = onion_dict_get(param_dict, "userid");	//用户id
-	const char * appkey = onion_request_get_query(req, "appkey");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+
+	if (!api_check_method(req, OR_GET))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
 	const char * queryid = onion_request_get_query(req, "queryid"); //查询id
-	const char * sessid = onion_request_get_query(req, "sessid");
 	char buf[4096];
 	struct userec *ue;
 
 	if(!queryid || queryid[0]=='\0') {
 		// 查询自己
-		if(!userid || !appkey || !sessid)
-			return api_error(p, req, res, API_RT_WRONGPARAM);
-
-		ue = getuser(userid);
+		ue = getuser(ptr_info->userid);
 		if(ue == 0)
 			return api_error(p, req, res, API_RT_NOSUCHUSER);
-		if(check_user_session(ue, sessid, appkey) != API_RT_SUCCESSFUL) {
-			free(ue);
-			return api_error(p, req, res, API_RT_WRONGSESS);
-		}
 
 		int unread_mail;
 		mail_count(ue->userid, &unread_mail);
@@ -180,32 +178,17 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 
 int api_user_logout(ONION_FUNC_PROTO_STR)
 {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+
 	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
 
-	const char *cookie_str = onion_request_get_cookie(req, SMAGIC);
-	if(cookie_str == NULL || cookie_str[0] == '\0') {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
-	struct bmy_cookie cookie;
-
-	time_t now_t = time(NULL);
-	char buf[512];
-
-	snprintf(buf, sizeof(buf), "%s", cookie_str);
-	bmy_cookie_parse(buf, &cookie);
-
-	if (cookie.userid == NULL || cookie.sessid == NULL) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	if (strcasecmp(cookie.userid, "guest") == 0) {
-		return api_error(p, req, res, API_RT_CNTLGOTGST);
-	}
-
-	int utmp_idx = ythtbbs_session_get_utmp_idx(cookie.sessid, cookie.userid);
-	ythtbbs_user_logout(cookie.userid, utmp_idx); // TODO return value
+	ythtbbs_user_logout(ptr_info->userid, utmp_idx); // TODO return value
 
 	onion_response_add_cookie(res, SMAGIC, "", 0, NULL, NULL, 0);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
@@ -213,32 +196,14 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 
 int api_user_check_session(ONION_FUNC_PROTO_STR)
 {
-	const onion_dict *param_dict = onion_request_get_query_dict(req);
-	const char * userid = onion_dict_get(param_dict, "userid");
-	const char * sessid = onion_dict_get(param_dict, "sessid");
-	const char * appkey = onion_dict_get(param_dict, "appkey");
-
-	if(userid == NULL || sessid == NULL || appkey == NULL) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	if(!strcmp(userid, ""))
-		userid="guest";
-
-	struct userec *ue = getuser(userid);
-	if(ue == 0) {
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	}
-
-	int r=check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if(rc != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, rc);
 	}
 
 	api_set_json_header(res);
 	onion_response_write0(res, "{\"errcode\":0}");
-	free(ue);
 
 	return OCS_PROCESSED;
 }
