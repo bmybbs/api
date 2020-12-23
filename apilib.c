@@ -20,6 +20,7 @@
 #include "ytht/shmop.h"
 #include "ytht/fileop.h"
 #include "ytht/numbyte.h"
+#include "bmy/convcode.h"
 #include "ythtbbs/cache.h"
 #include "ythtbbs/permissions.h"
 #include "ythtbbs/user.h"
@@ -268,7 +269,7 @@ int save_user_data(struct userec *x)
 int setbmstatus(struct userec *ue, int online)
 {
 	char path[256];
-	sethomefile(path, ue->userid, "mboard");
+	sethomefile_s(path, sizeof(path), ue->userid, "mboard");
 
 	bmfilesync(ue);
 
@@ -767,10 +768,10 @@ int mail_count(char *id, int *unread)
 	struct fileheader *x;
 	char path[80];
 	int total=0, i=0;
-	struct mmapfile mf = { ptr:NULL };
+	struct mmapfile mf = { .ptr = NULL };
 	*unread = 0;
 
-	setmailfile(path, id, ".DIR");
+	setmailfile_s(path, sizeof(path), id, ".DIR");
 
 	if(mmapfile(path, &mf)<0)
 		return 0;
@@ -883,7 +884,7 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 
 	memset(&header, 0, sizeof(header));
 	fh_setowner(&header, id, 0);
-	setmailfile(buf, to_userid, "");
+	setmailfile_s(buf, sizeof(buf), to_userid, "");
 
 	time_t now_t = time(NULL);
 	t = trycreatefile(buf, "M.%d.A", now_t, 100);
@@ -928,7 +929,7 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 	fwrite(tmp_gbk_buf, 1, strlen(tmp_gbk_buf), fp);
 	fclose(fp);	// 输出完成
 
-	setmailfile(buf, to_userid, ".DIR");
+	setmailfile_s(buf, sizeof(buf), to_userid, ".DIR");
 	append_record(buf, &header, sizeof(header));
 	return 0;
 }
@@ -1039,7 +1040,7 @@ static int search_user_article_with_title_keywords_callback(struct boardmem *boa
 		if (*article_sum >= max_searchnum)
 			break;
 
-		if (abs(now_t - x[i].filetime) > searchtime)
+		if (labs(now_t - x[i].filetime) > searchtime)
 			continue;
 
 		if (query_userid[0] && strcasecmp(x[i].owner, query_userid))
