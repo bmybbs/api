@@ -207,16 +207,21 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		sprintf(ttfile, "wwwtmp/ctopten");
 	} else { // 分区热门
 		listmax = 5;
-		sprintf(ttfile, "etc/Area_Dir/%s", secstr);
+		sprintf(ttfile, "etc/Area_Dir/%c", (secstr != NULL) ? secstr[0] : '0');
 	}
 
-	struct api_article top_list[listmax];
+	struct api_article *top_list = calloc(listmax, sizeof(struct api_article));
+	if (top_list == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
 	struct fileheader fh;
-	memset(top_list, 0, sizeof(top_list[0]) * listmax);
 
 	htmlDocPtr doc = htmlParseFile(ttfile, "GBK");
-	if(doc==NULL)
+	if(doc == NULL) {
+		free(top_list);
 		return api_error(p, req, res, API_RT_NOTOP10FILE);
+	}
 
 	char xpath_links[40], xpath_nums[16];
 
@@ -231,6 +236,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
 	if(ctx==NULL) {
 		xmlFreeDoc(doc);
+		free(top_list);
 		return api_error(p, req, res, API_RT_XMLFMTERROR);
 	}
 
@@ -242,6 +248,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		xmlXPathFreeObject(r_nums);
 		xmlXPathFreeContext(ctx);
 		xmlFreeDoc(doc);
+		free(top_list);
 		return api_error(p, req, res, API_RT_XMLFMTERROR);
 	}
 
@@ -253,6 +260,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		xmlXPathFreeObject(r_nums);
 		xmlXPathFreeContext(ctx);
 		xmlFreeDoc(doc);
+		free(top_list);
 		return api_error(p, req, res, API_RT_XMLFMTERROR);
 	}
 
@@ -322,6 +330,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	xmlXPathFreeObject(r_nums);
 	xmlXPathFreeContext(ctx);
 	xmlFreeDoc(doc);
+	free(top_list);
 
 	api_set_json_header(res);
 	onion_response_write0(res, s);
@@ -335,9 +344,8 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 {
 	if(0 >= number)
 		number = 20;
-	struct api_article commend_list[number];
+	struct api_article *commend_list;
 	struct commend x;
-	memset(commend_list, 0, sizeof(commend_list[0]) * number);
 	char dir[80];
 	FILE *fp = NULL;
 	if(0 == mode)
@@ -346,10 +354,18 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		strcpy(dir, ".COMMEND2");
 	int fsize = file_size_s(dir);
 	int total = fsize / sizeof(struct commend);
-	fp = fopen(dir, "r");
 
-	if(!fp || fsize == 0)
+	commend_list = calloc(number, sizeof(struct api_article));
+	if (commend_list == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	fp = fopen(dir, "r");
+	if(!fp || fsize == 0) {
+		free(commend_list);
 		return api_error(p, req, res, API_RT_NOCMMNDFILE);
+	}
+
 	if(startnum == 0)
 		startnum = total- number + 1;
 	if(startnum <= 0)
@@ -378,6 +394,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
+	free(commend_list);
 	return OCS_PROCESSED;
 }
 
@@ -589,8 +606,11 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	if(count == 0)
 		count = total_article;
 
-	struct api_article board_list[count];
-	memset(board_list, 0, sizeof(board_list[0]) * count);
+	struct api_article *board_list = calloc(count, sizeof(struct api_article));
+	if (board_list == NULL) {
+		munmap(data, fsize);
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
 
 	if(startnum == 0)
 		startnum = total_article - count + 1;
@@ -645,6 +665,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
+	free(board_list);
 	return OCS_PROCESSED;
 }
 
@@ -691,8 +712,11 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_NOBRDTPFILE);
 
 	int count = file_size_s(topdir) / sizeof(struct fileheader);
-	struct api_article board_list[count];
-	memset(board_list, 0, sizeof(struct api_article) * count);
+	struct api_article *board_list = calloc(count, sizeof(struct api_article));
+	if (board_list == NULL) {
+		fclose(fp);
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
 
 	int i;
 	for(i = 0; i<count; ++i) {
@@ -715,6 +739,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
+	free(board_list);
 
 	return OCS_PROCESSED;
 }
