@@ -723,8 +723,8 @@ int mail_count(char *id, int *unread)
 	return total;
 }
 
-int do_article_post(char *board, char *title, char *filename, char *id,
-		char *nickname, const char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
+int do_article_post(const char *board, const char *title, const char *filename, const char *id,
+		const char *nickname, const char *ip, int sig, int mark, int outgoing, const char *realauthor, int thread)
 {
 	FILE *fp, *fp1, *fp2;
 	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_gbk;

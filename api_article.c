@@ -13,6 +13,8 @@
 #include "ytht/numbyte.h"
 #include "ytht/common.h"
 #include "ytht/fileop.h"
+#include "ytht/random.h"
+#include "bmy/convcode.h"
 #include "ythtbbs/cache.h"
 #include "ythtbbs/commend.h"
 #include "ythtbbs/docutil.h"
@@ -409,7 +411,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	if(ue != NULL)
 		free(ue);
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-	struct boardmem *b   = getboardbyname(board);
+	struct boardmem *b   = ythtbbs_cache_Board_get_board_by_name(board);
 	if(b == NULL) {
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	}
@@ -553,7 +555,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	if(ue != NULL)
 		free(ue);
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-	struct boardmem *b   = getboardbyname(board);
+	struct boardmem *b   = ythtbbs_cache_Board_get_board_by_name(board);
 	if(b == NULL)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	if(!check_user_read_perm_x(ui, b))
@@ -676,7 +678,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 		free(ue);
 
 	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-	struct boardmem *b   = getboardbyname(board);
+	struct boardmem *b   = ythtbbs_cache_Board_get_board_by_name(board);
 	if(b == NULL)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 
@@ -729,7 +731,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
-	struct boardmem *bmem = getboardbyname(bname);
+	struct boardmem *bmem = ythtbbs_cache_Board_get_board_by_name(bname);
 	if(!bmem)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 
@@ -775,7 +777,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	sprintf(filename, "M.%d.A", aid);
 	sprintf(dir_file, "boards/%s/.DIR", bname);
 
-	struct mmapfile mf = { ptr:NULL };
+	struct mmapfile mf = { .ptr = NULL };
 	if(mmapfile(dir_file, &mf) == -1) {
 		free(ue);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
@@ -809,7 +811,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	int curr_permission = !strncmp(ui->userid, fh->owner, IDLEN+1);
 	sprintf(article_json_str, "{\"errcode\":0, \"attach\":[], "
 			"\"can_edit\":%d, \"can_delete\":%d, \"can_reply\":%d, "
-			"\"board\":\"%s\", \"author\":\"%s\", \"thread\":%d, \"num\":%d}",
+			"\"board\":\"%s\", \"author\":\"%s\", \"thread\":%ld, \"num\":%d}",
 			curr_permission, curr_permission,
 			!(fh->accessed & FH_NOREPLY), bmem->header.filename,
 			fh2owner(fh), fh->thread, num);
@@ -890,7 +892,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
-	struct boardmem * bmem = getboardbyname(board);
+	struct boardmem * bmem = ythtbbs_cache_Board_get_board_by_name(board);
 	if(bmem==NULL) {
 		free(ue);
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
@@ -905,7 +907,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		int ref = atoi(ref_str);
 		int rid = atoi(rid_str);
 
-		struct mmapfile mf = { ptr:NULL };
+		struct mmapfile mf = { .ptr = NULL };
 		if(mmapfile(dir, &mf) == -1) {
 			free(ue);
 			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
@@ -926,7 +928,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		if(x) {
 			thread = x->thread;
 			if(strchr(x->owner, '.') == NULL) {
-				if(x->owner == 0) {
+				if(x->owner[0] == '\0') {
 					memcpy(noti_userid, &x->owner[1], IDLEN);
 				} else {
 					memcpy(noti_userid, x->owner, IDLEN);
@@ -986,8 +988,8 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	char * title_gbk = (char *)malloc(strlen(title)*2);
 	memset(title_gbk, 0, strlen(title)*2);
 	u2g(title, strlen(title), title_gbk, strlen(title)*2);
-	int i;
-	for(i=0;i<strlen(title_gbk);++i) {
+	size_t i;
+	for(i = 0; i < strlen(title_gbk); ++i) {
 		if(title_gbk[i]<=27 && title_gbk[i]>=-1)
 			title_gbk[i] = ' ';
 	}
@@ -1066,12 +1068,12 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
 		p = &(ba_list[i]);
 		memset(buf, 0, 512);
 		if(mode==0) {
-			sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
+			sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
 				"\"th_num\":%d, \"mark\":%d }",
 				p->type, p->filetime, p->thread, p->th_num, p->mark);
 		} else {
-			b = getboardbyname(p->board);
-			sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
+			b = ythtbbs_cache_Board_get_board_by_name(p->board);
+			sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
 				"\"th_num\":%d, \"mark\":%d, \"secstr\":\"%s\" }",
 				p->type, p->filetime, p->thread, p->th_num, p->mark, b->header.sec1);
 		}
@@ -1101,7 +1103,7 @@ static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_li
 	for(i=0; i<count; ++i) {
 		p = &(ba_list[i]);
 		memset(buf, 0, 512);
-		sprintf(buf, "{ \"type\":%d, \"aid\":%d, \"tid\":%d, "
+		sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
 				"\"th_num\":%d, \"mark\":%d ,\"num\":%d, \"th_size\":%d, \"th_commenter\":[] }",
 				p->type, p->filetime, p->thread, p->th_num, p->mark, p->sequence_num, p->th_size);
 		jp = json_tokener_parse(buf);
@@ -1133,13 +1135,13 @@ static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_li
 static int get_thread_by_filetime(char *board, int filetime)
 {
 	char dir[80];
-	struct mmapfile mf = { ptr:NULL };
+	struct mmapfile mf = { .ptr = NULL };
 	struct fileheader *p_fh;
 	int thread;
 
 	sprintf(dir, "boards/%s/.DIR", board);
 
-	if(mmapfile(dir, &mf) == MAP_FAILED)
+	if(mmapfile(dir, &mf) == -1)
 		return 0;
 
 	if(mf.size == 0) {
@@ -1172,12 +1174,12 @@ static void parse_thread_info(struct bmy_article *ba)
 	int i = 0, j = 0, num_records = 0, is_in_commenter_list = 0;
 	struct fileheader * curr_article = NULL;
 	char * curr_userid = NULL;
-	struct mmapfile mf = { ptr:NULL };
-	if(NULL == ba->board)
+	struct mmapfile mf = { .ptr = NULL };
+	if(NULL == ba || ba->board[0] == '\0')
 		return ;
 	sprintf(dir, "boards/%s/.DIR", ba->board);
 
-	if(MAP_FAILED == mmapfile(dir, &mf))
+	if(-1 == mmapfile(dir, &mf))
 		return ;
 
 	if(mf.size == 0) {
@@ -1230,12 +1232,12 @@ static int get_number_of_articles_in_thread(char *board, int thread)
 {
 	char dir[80];
 	int i = 0, num_in_thread = 0, num_records = 0;
-	struct mmapfile mf = { ptr:NULL };
+	struct mmapfile mf = { .ptr = NULL };
 	if(NULL == board)
 		return 0;
 	sprintf(dir, "boards/%s/.DIR",board);
 
-	if(MAP_FAILED == mmapfile(dir, &mf))
+	if(-1 == mmapfile(dir, &mf))
 		return 0;
 
 	if(mf.size == 0) {
@@ -1266,7 +1268,7 @@ static void get_fileheader_by_filetime_thread(int mode, char *board, int id, str
 {
 	char dir[80];
 	int i = 0, num_records = 0;
-	struct mmapfile mf = { ptr:NULL };
+	struct mmapfile mf = { .ptr = NULL };
 	struct fileheader * p_fh = NULL;
 	if(NULL == fh_for_return)
 		return;
@@ -1275,7 +1277,7 @@ static void get_fileheader_by_filetime_thread(int mode, char *board, int id, str
 		return ;
 	sprintf(dir, "boards/%s/.DIR",board);
 
-	if(MAP_FAILED == mmapfile(dir, &mf))
+	if(-1 == mmapfile(dir, &mf))
 		return;
 
 	if(mf.size == 0) {
