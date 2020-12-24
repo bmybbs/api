@@ -643,9 +643,7 @@ static int api_user_override_File_add(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 
 	struct ythtbbs_override of;
 	strcpy(of.id, query_ue->userid);
-	char *exp_utf_2 = strdup(exp_utf);
-	u2g(exp_utf_2, strlen(exp_utf), of.exp, sizeof(of.exp));
-	free(exp_utf_2);
+	u2g(exp_utf, strlen(exp_utf), of.exp, sizeof(of.exp));
 
 	ythtbbs_override_add(ue->userid, &of, mode);
 	ythtbbs_override_unlock(lockfd);
