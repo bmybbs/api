@@ -20,7 +20,6 @@
 #include "ythtbbs/article.h"
 #include "ythtbbs/binaryattach.h"
 #include "ythtbbs/docutil.h"
-#include "ythtbbs/override.h"
 #include "ythtbbs/session.h"
 
 char *ummap_ptr = NULL;
