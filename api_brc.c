@@ -19,7 +19,7 @@ int readuserallbrc(char *userid, struct allbrc *allbrc, char *allbrcuser, const 
 	} else {
 		if (!must && !strncmp(allbrcuser, userid, STRLEN))
 			return 0;
-		sethomefile(buf, userid, "brc");
+		sethomefile_s(buf, sizeof(buf), userid, "brc");
 		ytht_strsncpy(allbrcuser, userid, sizeof (allbrcuser));
 		brc_init(allbrc, userid, buf);
 	}
