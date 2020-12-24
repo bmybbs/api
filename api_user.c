@@ -135,7 +135,7 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 	char buf[4096];
 	struct userec *ue;
 
-	if(!queryid || queryid[0]=='\0') {
+	if(!queryid || queryid[0]=='\0' || strcasecmp(queryid, ptr_info->userid) == 0) {
 		// 查询自己
 		ue = getuser(ptr_info->userid);
 		if(ue == 0)
