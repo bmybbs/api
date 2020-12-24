@@ -62,7 +62,7 @@ int api_attach_list(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_NOSUCHFILE);
 
 	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"attach_array\":[]}");
-	struct json_array_attach * aa = json_object_object_get(obj, "attach_array");
+	struct json_object * aa = json_object_object_get(obj, "attach_array");
 
 	while((pdent = readdir(pdir))) {
 		if(!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
@@ -90,6 +90,7 @@ int api_attach_list(ONION_FUNC_PROTO_STR)
 
 int api_attach_upload(ONION_FUNC_PROTO_STR)
 {
+	char filename_buf[512];
 	if(!(onion_request_get_flags(req) & OR_POST))
 		return api_error(p, req, res, API_RT_FUNCNOTIMPL);
 
@@ -122,8 +123,8 @@ int api_attach_upload(ONION_FUNC_PROTO_STR)
 	if(strlen(userattachpath) + strlen(name) > 1022)	// 1024 - '\0' - '/'
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	sprintf(filename, "%s/%s", userattachpath, name);
-	char * ext_name = name + strlen(name);
+	snprintf(filename_buf, sizeof(filename_buf), "%s/%s", userattachpath, name);
+	const char * ext_name = name + strlen(name);
 	int upload_size = atoi(length_str);
 	if (upload_size <= 0 || upload_size > 5000000)
 		return api_error(p, req, res, API_RT_ATTTOOBIG);
@@ -201,7 +202,7 @@ static int api_attach_show_mail(ONION_FUNC_PROTO_STR)
 
 static void output_binary_attach(onion_response *res, const char *filename, const char *attachname, int attachpos)
 {
-	struct mmapfile mf = {ptr:NULL};
+	struct mmapfile mf = {.ptr = NULL};
 
 	if(mmapfile(filename, &mf) < 0) {
 		api_error(NULL, NULL, res, API_RT_MAILATTERR);
@@ -221,11 +222,11 @@ static void output_binary_attach(onion_response *res, const char *filename, cons
 	}
 
 	/* attachpos 的说明
-	 * 例如原文件为：
-	 * beginbinaryattach test.txt\n\0\0\0\0\024....
-	 * 省略号为 test.txt 的正文
-	 * 此处 attachpos 指向的位置为 \n
-	 */
+	* 例如原文件为：
+	* beginbinaryattach test.txt\n\0\0\0\0\024....
+	* 省略号为 test.txt 的正文
+	* 此处 attachpos 指向的位置为 \n
+	*/
 	unsigned int size = ntohl(*(unsigned int *)(mf.ptr + attachpos));
 	char * body = (char *)malloc(size);
 
