@@ -384,39 +384,30 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 
 static int api_article_list_board(ONION_FUNC_PROTO_STR)
 {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
 	const char * board        = onion_request_get_query(req, "board");
 	const char * str_btype    = onion_request_get_query(req, "btype");
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
 	const char * str_page     = onion_request_get_query(req, "page");
-	const char * userid   = onion_request_get_query(req, "userid");
-	const char * appkey   = onion_request_get_query(req, "appkey");
-	const char * sessid   = onion_request_get_query(req, "sessid");
+
 	//判断必要参数
-	if(!(board && str_btype && userid && appkey && sessid))
+	if(!(board && str_btype))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
-	//if(strlen(sessid) != 32)
-	//	return api_error(p, req, res, API_RT_WRONGPARAM);
-	//TODO: 签名检查
-	//...
-	//判断版面访问权
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL){
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-	if(ue != NULL)
-		free(ue);
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-	struct boardmem *b   = ythtbbs_cache_Board_get_board_by_name(board);
+
+	struct boardmem *b = ythtbbs_cache_Board_get_board_by_name(board);
 	if(b == NULL) {
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	}
-	if(!check_user_read_perm_x(ui, b)) {
-		return api_error(p, req, res, API_RT_NOBRDRPERM);
+	if (rc == API_RT_SUCCESSFUL) {
+		if (!check_user_read_perm_x(ptr_info, b)) {
+			return api_error(p, req, res, API_RT_NOBRDRPERM);
+		}
+	} else {
+		if (!check_guest_read_perm_x(b)) {
+			return api_error(p, req, res, API_RT_NOBRDRPERM);
+		}
 	}
 
 	int mode = 0, startnum = 0, count = 0;
@@ -431,22 +422,28 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	else
 		mode = 0;
 	int fd = 0;
-	struct bmy_article board_list[count];
-	memset(board_list, 0, sizeof(board_list[0]) * count);
+
+	struct bmy_article *board_list = calloc(count, sizeof(struct bmy_article));
+	if (board_list == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
 	struct fileheader *data = NULL, x2;
 	char dir[80], filename[80];
 	int i = 0, total = 0, total_article = 0;
 
-	sprintf(dir, "boards/%s/.DIR", board);
+	snprintf(dir, sizeof(dir), "boards/%s/.DIR", board);
 	int fsize = file_size_s(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
+		free(board_list);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 
 	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
 	close(fd);
 	if(MAP_FAILED == data) {
+		free(board_list);
 		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 	}
 
@@ -523,6 +520,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
+	free(board_list);
 	return OCS_PROCESSED;
 }
 
