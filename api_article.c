@@ -542,38 +542,30 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 
 static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
 	const char * board        = onion_request_get_query(req, "board");
 	const char * str_thread   = onion_request_get_query(req, "thread");
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
-	const char * userid   = onion_request_get_query(req, "userid");
-	const char * appkey   = onion_request_get_query(req, "appkey");
-	const char * sessid   = onion_request_get_query(req, "sessid");
 	//判断必要参数
-	if(!(board && str_thread && userid && appkey && sessid))
+	if(!(board && str_thread))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	int thread = atoi(str_thread);
 	if(thread == 0)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
-	//TODO: 签名检查
-	//...
+
 	//判断版面访问权
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL){
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-	if(ue != NULL)
-		free(ue);
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-	struct boardmem *b   = ythtbbs_cache_Board_get_board_by_name(board);
+	struct boardmem *b = ythtbbs_cache_Board_get_board_by_name(board);
 	if(b == NULL)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
-	if(!check_user_read_perm_x(ui, b))
-		return api_error(p, req, res, API_RT_FBDNUSER);
+	if (rc == API_RT_SUCCESSFUL) {
+		if (!check_user_read_perm_x(ptr_info, b))
+			return api_error(p, req, res, API_RT_FBDNUSER);
+	} else {
+		if (!check_guest_read_perm_x(b))
+			return api_error(p, req, res, API_RT_NOSUCHBRD);
+	}
 
 	int startnum = 0, count = 0;
 	if(str_startnum != NULL)
