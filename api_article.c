@@ -407,6 +407,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
 	const char * str_page     = onion_request_get_query(req, "page");
+	char logbuf[512];
 
 	//判断必要参数
 	if(!(board && str_btype))
@@ -506,8 +507,8 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 				x2.sizebyte = data[i].sizebyte;
 				lseek(fd, -1 * sizeof (x2), SEEK_CUR);
 				if(write(fd, &x2, sizeof (x2)) == -1) {
-					errlog("write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.\n",
-							dir, (startnum-1+i), filename, errno, strerror(errno));
+					snprintf(logbuf, sizeof(logbuf), "write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.", dir, (startnum-1+i), filename, errno, strerror(errno));
+					newtrace(logbuf);
 				}
 			}
 			flock(fd, LOCK_UN);
@@ -548,6 +549,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	const char * str_thread   = onion_request_get_query(req, "thread");
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
+	char logbuf[512];
 	//判断必要参数
 	if(!(board && str_thread))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -628,8 +630,8 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 				x2.sizebyte = data[i].sizebyte;
 				lseek(fd, -1 * sizeof (x2), SEEK_CUR);
 				if(write(fd, &x2, sizeof (x2)) == -1) {
-					errlog("write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.\n",
-							dir, (startnum-1+i), filename, errno, strerror(errno));
+					snprintf(logbuf, sizeof(logbuf), "write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.", dir, (startnum-1+i), filename, errno, strerror(errno));
+					newtrace(logbuf);
 				}
 			}
 			flock(fd, LOCK_UN);
