@@ -21,7 +21,7 @@
  * @param ui 当前会话的 user_info 指针，用于判断版面是否存在未读信息
  * @return 字符指针
  */
-static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, int sortmode, const char *fromhost, struct user_info *ui);
+static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, const char *fromhost, struct user_info *ui);
 
 /**
  * @brief 返回用户的收藏版面列表
@@ -483,7 +483,7 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
-static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, int sortmode, const char *fromhost, struct user_info *ui)
+static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, const char *fromhost, struct user_info *ui)
 {
 	char buf[512];
 	int i, j;
@@ -492,19 +492,16 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"boardlist\":[]}");
 	struct json_object *json_array = json_object_object_get(obj, "boardlist");
 
-	if(sortmode<=0 || sortmode>3)
-		sortmode = 2;
 	switch (sortmode) {
-	case 1:
+	case BOARD_SORT_ALPHABET:
 		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboard);
 		break;
-	case 2:
-		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardscore);
-		break;
-	case 3:
+	case BOARD_SORT_INBOARD:
 		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardinboard);
 		break;
 	default:
+	case BOARD_SORT_SCORE:
+		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardscore);
 		break;
 	}
 

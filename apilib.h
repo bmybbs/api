@@ -12,6 +12,12 @@
 
 #define MAX_COMMENTER_COUNT 10
 
+typedef enum board_sort_mode_e {
+	BOARD_SORT_ALPHABET = 1,
+	BOARD_SORT_SCORE    = 2,
+	BOARD_SORT_INBOARD  = 3,
+} board_sort_mode;
+
 enum article_parse_mode {
 	ARTICLE_PARSE_WITH_ANSICOLOR,		///< 将颜色转换为 HTML 样式
 	ARTICLE_PARSE_WITHOUT_ANSICOLOR		///< 将 \033 字符转换为 [ESC]
