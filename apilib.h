@@ -28,7 +28,7 @@ enum API_POST_TYPE {
 	API_POST_TYPE_REPLY		///< 回帖模式
 };
 
-struct bmy_article {
+struct api_article {
 	int type;				///< 类型，1表示主题，0表示一般文章
 	char title[80];			///< 标题
 	char board[24];			///< 版面id
@@ -244,7 +244,7 @@ void aha_convert(FILE *in_stream, FILE *out_stream);
  * @param searchtime 和当前时间相比，搜索的时间段，单位秒
  * @return 包含的记录条数
  */
-int search_user_article_with_title_keywords(struct bmy_article *articles_array,
+int search_user_article_with_title_keywords(struct api_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime);

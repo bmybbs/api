@@ -31,7 +31,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode);
 
 static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode);
 
-static char * bmy_mail_array_to_json_string(struct bmy_article *ba_list, int count, int mode, struct userec *ue);
+static char * bmy_mail_array_to_json_string(struct api_article *ba_list, int count, int mode, struct userec *ue);
 
 static char * parse_mail(char * userid, int filetime, int mode, struct attach_link **attach_link_list);
 
@@ -88,8 +88,8 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 	struct fileheader x;
 	int i;
-	struct bmy_article mail_list[count];
-	memset(mail_list, 0, sizeof(struct bmy_article) * count);
+	struct api_article mail_list[count];
+	memset(mail_list, 0, sizeof(struct api_article) * count);
 	fseek(fp, (startnum - 1) * sizeof(struct fileheader), SEEK_SET);
 	for(i=0; i<count; ++i) {
 		if(fread(&x, sizeof(x), 1, fp) <= 0)
@@ -313,11 +313,11 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	return OCS_PROCESSED;
 }
 
-static char * bmy_mail_array_to_json_string(struct bmy_article *ba_list, int count, int mode, struct userec *ue)
+static char * bmy_mail_array_to_json_string(struct api_article *ba_list, int count, int mode, struct userec *ue)
 {
 	char buf[512];
 	int i;
-	struct bmy_article *p;
+	struct api_article *p;
 	struct json_object *jp;
 
 	sprintf(buf, "{\"errcode\":0,\"max_size\":%d, \"current_size\":%d, \"maillist\":[]}", get_user_max_mail_size(ue), get_user_mail_size(ue->userid));

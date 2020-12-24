@@ -19,23 +19,22 @@
 #include "ythtbbs/commend.h"
 #include "ythtbbs/docutil.h"
 #include "ythtbbs/article.h"
-#include "ythtbbs/misc.h"
 #include "ythtbbs/notification.h"
 
 #include "api.h"
 #include "apilib.h"
 /**
- * @brief 将 struct bmy_article 数组序列化为 json 字符串。
+ * @brief 将 struct api_article 数组序列化为 json 字符串。
  * 这个方法不考虑异常，因此方法里确定了 errcode 为 0，也就是 API_RT_SUCCESSFUL，
- * 相关的异常应该在从 BMY 数据转为 bmy_article 的过程中判断、处理。
- * @param ba_list struct bmy_article 数组
+ * 相关的异常应该在从 BMY 数据转为 api_article 的过程中判断、处理。
+ * @param ba_list struct api_article 数组
  * @param count 数组长度
  * @param mode 0:不输出文章所在版面信息, 1:输出每个文章所在的版面信息。
  * @return json 字符串
  * @warning 记得调用完成 free
  */
-static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count, int mode);
-static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count, int mode);
+static char* api_article_array_to_json_string(struct api_article *ba_list, int count, int mode);
+static char* api_article_with_num_array_to_json_string(struct api_article *ba_list, int count, int mode);
 
 /**
  * @brief 将十大、分区热门话题转为 JSON 数据输出
@@ -95,9 +94,9 @@ static int get_thread_by_filetime(char *board, int filetime);
 
 /**
  * @brief 通过同主题ID查找同主题文章的帖子数、总大小，以及参与评论的用户 ID
- * @param ba struct bmy_article，API 中缓存帖子信息的结构体
+ * @param ba struct api_article，API 中缓存帖子信息的结构体
  */
-static void parse_thread_info(struct bmy_article *ba);
+static void parse_thread_info(struct api_article *ba);
 
 /**
  * @brief 通过主题ID查找同主题文章数量
@@ -211,7 +210,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		sprintf(ttfile, "etc/Area_Dir/%s", secstr);
 	}
 
-	struct bmy_article top_list[listmax];
+	struct api_article top_list[listmax];
 	struct fileheader fh;
 	memset(top_list, 0, sizeof(top_list[0]) * listmax);
 
@@ -317,7 +316,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 
 	}
 
-	char *s = bmy_article_array_to_json_string(top_list, total, 1);
+	char *s = api_article_array_to_json_string(top_list, total, 1);
 
 	xmlXPathFreeObject(r_links);
 	xmlXPathFreeObject(r_nums);
@@ -336,7 +335,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 {
 	if(0 >= number)
 		number = 20;
-	struct bmy_article commend_list[number];
+	struct api_article commend_list[number];
 	struct commend x;
 	memset(commend_list, 0, sizeof(commend_list[0]) * number);
 	char dir[80];
@@ -375,7 +374,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		++count;
 	}
 	fclose(fp);
-	char *s = bmy_article_array_to_json_string(commend_list, count, 1);
+	char *s = api_article_array_to_json_string(commend_list, count, 1);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
@@ -423,7 +422,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		mode = 0;
 	int fd = 0;
 
-	struct bmy_article *board_list = calloc(count, sizeof(struct bmy_article));
+	struct api_article *board_list = calloc(count, sizeof(struct api_article));
 	if (board_list == NULL) {
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
@@ -516,7 +515,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	for(i = 0; i < num; ++i){
 		parse_thread_info(&board_list[i]);
 	}
-	char *s = bmy_article_with_num_array_to_json_string(board_list, num, mode);
+	char *s = api_article_with_num_array_to_json_string(board_list, num, mode);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
@@ -590,7 +589,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	if(count == 0)
 		count = total_article;
 
-	struct bmy_article board_list[count];
+	struct api_article board_list[count];
 	memset(board_list, 0, sizeof(board_list[0]) * count);
 
 	if(startnum == 0)
@@ -642,7 +641,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	for(i = 0; i < num; ++i){
 		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 	}
-	char *s = bmy_article_array_to_json_string(board_list, num, 1);
+	char *s = api_article_array_to_json_string(board_list, num, 1);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
@@ -692,8 +691,8 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_NOBRDTPFILE);
 
 	int count = file_size_s(topdir) / sizeof(struct fileheader);
-	struct bmy_article board_list[count];
-	memset(board_list, 0, sizeof(struct bmy_article) * count);
+	struct api_article board_list[count];
+	memset(board_list, 0, sizeof(struct api_article) * count);
 
 	int i;
 	for(i = 0; i<count; ++i) {
@@ -712,7 +711,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 
 	fclose(fp);
 
-	char *s = bmy_article_array_to_json_string(board_list, count, 1);
+	char *s = api_article_array_to_json_string(board_list, count, 1);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
@@ -1052,12 +1051,12 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	return OCS_NOT_IMPLEMENTED;
 }
 
-static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int count, int mode)
+static char* api_article_array_to_json_string(struct api_article *ba_list, int count, int mode)
 {
 	char buf[512];
 	int i;
 	struct boardmem *b;
-	struct bmy_article *p;
+	struct api_article *p;
 	struct json_object *jp;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
 	struct json_object *json_array = json_object_object_get(obj, "articlelist");
@@ -1089,11 +1088,11 @@ static char* bmy_article_array_to_json_string(struct bmy_article *ba_list, int c
 
 	return r;
 }
-static char* bmy_article_with_num_array_to_json_string(struct bmy_article *ba_list, int count, int mode)
+static char* api_article_with_num_array_to_json_string(struct api_article *ba_list, int count, int mode)
 {
 	char buf[512];
 	int i, j;
-	struct bmy_article *p;
+	struct api_article *p;
 	struct json_object *jp;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
 	struct json_object *json_array = json_object_object_get(obj, "articlelist");
@@ -1165,7 +1164,7 @@ static int get_thread_by_filetime(char *board, int filetime)
 	return 0;
 }
 
-static void parse_thread_info(struct bmy_article *ba)
+static void parse_thread_info(struct api_article *ba)
 {
 	// TODO
 	char dir[80];

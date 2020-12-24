@@ -348,8 +348,8 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	}
 
 	const int MAX_SEARCH_NUM = 1000;
-	struct bmy_article * articles = (struct bmy_article*)malloc(sizeof(struct bmy_article) * MAX_SEARCH_NUM);
-	memset(articles, 0, sizeof(struct bmy_article) * MAX_SEARCH_NUM);
+	struct api_article * articles = (struct api_article*)malloc(sizeof(struct api_article) * MAX_SEARCH_NUM);
+	memset(articles, 0, sizeof(struct api_article) * MAX_SEARCH_NUM);
 
 	int qryday = 3; // 默认为3天
 	if(qryday_str != NULL && atoi(qryday_str) > 0)
@@ -371,7 +371,7 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 
 	int i;
 	char * curr_board = NULL;	// 判断版面名
-	struct bmy_article *ap;
+	struct api_article *ap;
 	struct boardmem *b;
 	for(i=0; i<num; ++i) {
 		ap = &articles[i];

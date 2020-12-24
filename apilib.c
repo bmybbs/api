@@ -930,7 +930,7 @@ int do_mail_post_to_sent_box(const char *userid, const char *title, const char *
 
 static int search_user_article_with_title_keywords_callback(struct boardmem *board, int curr_idx, va_list ap) {
 	struct user_info *ui = va_arg(ap, struct user_info *);
-	struct bmy_article *articles_array = va_arg(ap, struct bmy_article *);
+	struct api_article *articles_array = va_arg(ap, struct api_article *);
 	int *article_sum = va_arg(ap, int *);
 	int max_searchnum = va_arg(ap, int);
 	const char *query_userid = va_arg(ap, const char *);
@@ -943,7 +943,7 @@ static int search_user_article_with_title_keywords_callback(struct boardmem *boa
 
 	char dir[256];
 	int nr = 0, start = 0, i;
-	struct bmy_article *tmp_ptr = NULL;
+	struct api_article *tmp_ptr = NULL;
 	struct mmapfile mf = { .ptr = NULL };
 	struct fileheader *x = NULL;
 
@@ -1003,7 +1003,7 @@ static int search_user_article_with_title_keywords_callback(struct boardmem *boa
 	return 0;
 }
 
-int search_user_article_with_title_keywords(struct bmy_article *articles_array,
+int search_user_article_with_title_keywords(struct api_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime)
