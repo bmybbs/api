@@ -809,8 +809,8 @@ int do_article_post(const char *board, const char *title, const char *filename, 
 	return t;
 }
 
-int do_mail_post(char *to_userid, char *title, char *filename, char *id,
-				char *nickname, char *ip, int sig, int mark)
+int do_mail_post(const char *to_userid, const char *title, const char *filename, const char *id,
+				const char *nickname, const char *ip, int sig, int mark)
 {
 	FILE *fp, *fp2;
 	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];
@@ -869,8 +869,8 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 	return 0;
 }
 
-int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
-				char *nickname, char *ip, int sig, int mark)
+int do_mail_post_to_sent_box(const char *userid, const char *title, const char *filename, const char *id,
+				const char *nickname, const char *ip, int sig, int mark)
 {
 	FILE *fp, *fp2;
 	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];

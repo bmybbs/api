@@ -204,8 +204,8 @@ int do_article_post(const char *board, const char *title, const char *filename, 
  * @param mark fileheader 的标记
  * @return 返回文件名中实际使用的时间戳
  */
-int do_mail_post(char *to_userid, char *title, char *filename, char *id,
-				char *nickname, char *ip, int sig, int mark);
+int do_mail_post(const char *to_userid, const char *title, const char *filename, const char *id,
+				const char *nickname, const char *ip, int sig, int mark);
 
 /**
  * @brief 保存邮件到发件箱
@@ -220,8 +220,8 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
  * @param mark
  * @return
  */
-int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
-		char *nickname, char *ip, int sig, int mark);
+int do_mail_post_to_sent_box(const char *userid, const char *title, const char *filename, const char *id,
+		const char *nickname, const char *ip, int sig, int mark);
 
 /**
  * @brief 将 ansi 颜色控制转换成 HTML 标记
