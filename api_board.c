@@ -147,12 +147,14 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 		}
 	}
 
-	memset(filename, 0, sizeof(filename));
-	sethomefile_s(filename, sizeof(filename), ptr_info->userid, ".goodbrd");
+	if (rc == API_RT_SUCCESSFUL) {
+		memset(filename, 0, sizeof(filename));
+		sethomefile_s(filename, sizeof(filename), ptr_info->userid, ".goodbrd");
+	}
 	sprintf(buf, "{\"errcode\":0, \"bm\":[], \"hot_topic\":[], \"is_fav\":%d,"
 			"\"voting\":%d, \"article_num\":%d, \"thread_num\":%d, \"score\":%d,"
 			"\"inboard_num\":%d, \"secstr\":\"%s\", \"today_new\":%d}",
-			seek_in_file(filename, bmem->header.filename),
+			(rc == API_RT_SUCCESSFUL) ? seek_in_file(filename, bmem->header.filename) : 0,
 			(bmem->header.flag & VOTE_FLAG),
 			bmem->total, thread_num, bmem->score,
 			bmem->inboard, bmem->header.sec1, today_num);
