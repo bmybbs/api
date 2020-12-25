@@ -52,16 +52,7 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	struct fileheader_utf *ptr_header;
 	for (i = 0; i < articles->count; i++) {
 		ptr_header = &articles->articles[i];
-		article_obj = json_object_new_object();
-
-		json_object_object_add(article_obj, "boardname_en", json_object_new_string(ptr_header->boardname_en));
-		json_object_object_add(article_obj, "boardname_zh", json_object_new_string(ptr_header->boardname_zh));
-		json_object_object_add(article_obj, "author", json_object_new_string(ptr_header->owner));
-		json_object_object_add(article_obj, "title", json_object_new_string(ptr_header->title));
-		json_object_object_add(article_obj, "tid", json_object_new_int64(ptr_header->thread));
-		json_object_object_add(article_obj, "count", json_object_new_int(ptr_header->count));
-		json_object_object_add(article_obj, "accessed", json_object_new_int(ptr_header->accessed));
-
+		article_obj = apilib_convert_fileheader_utf_to_jsonobj(ptr_header);
 		json_object_array_put_idx(article_array, i, article_obj);
 	}
 
