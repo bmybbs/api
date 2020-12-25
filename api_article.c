@@ -15,6 +15,7 @@
 #include "ytht/fileop.h"
 #include "ytht/random.h"
 #include "bmy/convcode.h"
+#include "bmy/article.h"
 #include "ythtbbs/cache.h"
 #include "ythtbbs/commend.h"
 #include "ythtbbs/docutil.h"
@@ -75,6 +76,8 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR);
 static int api_article_list_thread(ONION_FUNC_PROTO_STR);
 
 static int api_article_list_boardtop(ONION_FUNC_PROTO_STR);
+
+static int api_article_list_section(ONION_FUNC_PROTO_STR);
 
 /**
  * @brief 实际处理发文的接口。
@@ -184,6 +187,8 @@ int api_article_list(ONION_FUNC_PROTO_STR)
 		return api_article_list_thread(p, req, res);
 	} else if(strcasecmp(type, "boardtop")==0) {
 		return api_article_list_boardtop(p, req, res);
+	} else if (strcasecmp(type, "section") == 0) {
+		return api_article_list_section(p, req, res);
 	} else
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 }
@@ -1338,3 +1343,69 @@ static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *
 
 	return NULL;
 }
+
+static const int COUNT_PER_PAGE = 40;
+
+static int api_article_list_section(ONION_FUNC_PROTO_STR) {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	size_t count, i;
+	time_t start;
+	const char *secstr    = onion_request_get_query(req, "secstr");
+	const char *start_str = onion_request_get_query(req, "start");
+
+	if (secstr == NULL || secstr[0] == '\0')
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (start_str != NULL)
+		start = atol(start_str);
+	else
+		start = time(NULL);
+
+	struct bmy_articles *articles = bmy_article_list_section(secstr[0], COUNT_PER_PAGE, start);
+
+	if (articles == NULL || articles->count == 0) {
+		goto EMPTY;
+	}
+
+	struct boardmem *b;
+	for (i = 0, count = 0; i < articles->count; i++) {
+		b = ythtbbs_cache_Board_get_board_by_name(articles->articles[i].boardname_en);
+		if (check_guest_read_perm_x(b) || (rc == API_RT_SUCCESSFUL && check_user_read_perm_x(ptr_info, b))) {
+			count++;
+		}
+	}
+
+	if (count == 0) {
+		goto EMPTY;
+	}
+
+	struct json_object *obj = json_object_new_object();
+	struct json_object *article_array = json_object_new_array_ext(count);
+	struct json_object *article_obj;
+
+	for (i = 0, count = 0; i < articles->count; i++) {
+		b = ythtbbs_cache_Board_get_board_by_name(articles->articles[i].boardname_en);
+		if (check_guest_read_perm_x(b) || (rc == API_RT_SUCCESSFUL && check_user_read_perm_x(ptr_info, b))) {
+			article_obj = apilib_convert_fileheader_utf_to_jsonobj(&articles->articles[i]);
+			json_object_array_put_idx(article_array, count, article_obj);
+			count++;
+		}
+	}
+
+	json_object_object_add(obj, "articles", article_array);
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE));
+	json_object_put(obj);
+	bmy_article_list_free(articles);
+	return OCS_PROCESSED;
+
+EMPTY:
+	bmy_article_list_free(articles);
+	api_set_json_header(res);
+	onion_response_write0(res, "{ \"errcode\": 0 }"); // TODO
+	return OCS_PROCESSED;
+}
+
