@@ -740,51 +740,37 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 
 static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+
 	const char * bname = onion_request_get_query(req, "board");
 	const char * aid_str = onion_request_get_query(req, "aid");
 
-	if(!bname || !aid_str) {
+	if (!bname || !aid_str) {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
 	struct boardmem *bmem = ythtbbs_cache_Board_get_board_by_name(bname);
-	if(!bmem)
+	if (!bmem)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 
 	int aid = atoi(aid_str);
 
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
-
-	if(!userid || !sessid || !appkey)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	if(check_user_session(ue, sessid, appkey) != API_RT_SUCCESSFUL) {
-		free(ue);
-		userid = "guest";	// session 不合法的情况下，userid 和 ue 转为 guest
-		ue = getuser(userid);
-	}
-
-	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = (strcasecmp(userid, "guest")==0) ?
-		NULL : ythtbbs_cache_utmp_get_by_idx(uent_index);
-	if(!check_user_read_perm_x(ui, bmem)) {
-		free(ue);
-		return api_error(p, req, res, API_RT_NOBRDRPERM);
+	if (rc == API_RT_SUCCESSFUL) {
+		if (!check_user_read_perm_x(ptr_info, bmem)) {
+			return api_error(p, req, res, API_RT_NOBRDRPERM);
+		}
+	} else {
+		if (!check_guest_read_perm_x(bmem))
+			return api_error(p, req, res, API_RT_NOSUCHBRD);
 	}
 
 	// 删除回复提醒
-	if(is_post_in_notification(ue->userid, bname, aid))
-		del_post_notification(ue->userid, bname, aid);
+	if (is_post_in_notification(ptr_info->userid, bname, aid))
+		del_post_notification(ptr_info->userid, bname, aid);
 
 	int total = bmem->total;
-	if(total<=0) {
-		free(ue);
+	if (total <= 0) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 
@@ -794,23 +780,20 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	sprintf(dir_file, "boards/%s/.DIR", bname);
 
 	struct mmapfile mf = { .ptr = NULL };
-	if(mmapfile(dir_file, &mf) == -1) {
-		free(ue);
+	if (mmapfile(dir_file, &mf) == -1) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 
 	const char * num_str = onion_request_get_query(req, "num");
 	int num = (num_str == NULL) ? -1 : (atoi(num_str)-1);
 	fh = findbarticle(&mf, aid, &num, 1);
-	if(fh == NULL) {
+	if (fh == NULL) {
 		mmapfile(NULL, &mf);
-		free(ue);
 		return api_error(p, req, res, API_RT_NOSUCHATCL);
 	}
 
-	if(fh->owner[0] == '-') {
+	if (fh->owner[0] == '-') {
 		mmapfile(NULL, &mf);
-		free(ue);
 		return api_error(p, req, res, API_RT_ATCLDELETED);
 	}
 
@@ -824,7 +807,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	char * article_json_str = (char *)malloc(strlen(article_content_utf8) + 512);
 	memset(article_json_str, 0, strlen(article_content_utf8) + 512);
-	int curr_permission = !strncmp(ui->userid, fh->owner, IDLEN+1);
+	int curr_permission = !strncmp(ptr_info->userid, fh->owner, IDLEN+1);
 	sprintf(article_json_str, "{\"errcode\":0, \"attach\":[], "
 			"\"can_edit\":%d, \"can_delete\":%d, \"can_reply\":%d, "
 			"\"board\":\"%s\", \"author\":\"%s\", \"thread\":%ld, \"num\":%d}",
@@ -835,7 +818,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	struct json_object * jp = json_tokener_parse(article_json_str);
 	json_object_object_add(jp, "content", json_object_new_string(article_content_utf8));
 	json_object_object_add(jp, "title", json_object_new_string(title_utf8));
-	if(attach_link_list) {
+	if (attach_link_list) {
 		struct json_object * attach_array = json_object_object_get(jp, "attach");
 		char at_buf[320];
 		struct attach_link * alp = attach_link_list;
@@ -849,7 +832,6 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	char * api_output = strdup(json_object_to_json_string(jp));
 
-	free(ue);
 	mmapfile(NULL, &mf);
 	free(article_content_utf8);
 	free(article_json_str);
