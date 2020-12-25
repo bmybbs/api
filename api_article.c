@@ -1351,10 +1351,15 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	int rc;
 	size_t count, i;
 	time_t start;
+	char c;
 	const char *secstr    = onion_request_get_query(req, "secstr");
 	const char *start_str = onion_request_get_query(req, "start");
 
 	if (secstr == NULL || secstr[0] == '\0')
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	c = secstr[0];
+	if (!((c >= '0' && c <= '9') || c == 'G' || c == 'N' || c == 'H' || c == 'A' || c == 'C'))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
@@ -1363,7 +1368,7 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	else
 		start = time(NULL);
 
-	struct bmy_articles *articles = bmy_article_list_section(secstr[0], COUNT_PER_PAGE, start);
+	struct bmy_articles *articles = bmy_article_list_section(c, COUNT_PER_PAGE, start);
 
 	if (articles == NULL || articles->count == 0) {
 		goto EMPTY;
