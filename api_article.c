@@ -766,7 +766,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	// 删除回复提醒
-	if (is_post_in_notification(ptr_info->userid, bname, aid))
+	if (rc == API_RT_SUCCESSFUL && is_post_in_notification(ptr_info->userid, bname, aid))
 		del_post_notification(ptr_info->userid, bname, aid);
 
 	int total = bmem->total;
