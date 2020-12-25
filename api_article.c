@@ -807,7 +807,7 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	char * article_json_str = (char *)malloc(strlen(article_content_utf8) + 512);
 	memset(article_json_str, 0, strlen(article_content_utf8) + 512);
-	int curr_permission = !strncmp(ptr_info->userid, fh->owner, IDLEN+1);
+	int curr_permission = (rc == API_RT_SUCCESSFUL) ? !strncmp(ptr_info->userid, fh->owner, IDLEN+1) : 0;
 	sprintf(article_json_str, "{\"errcode\":0, \"attach\":[], "
 			"\"can_edit\":%d, \"can_delete\":%d, \"can_reply\":%d, "
 			"\"board\":\"%s\", \"author\":\"%s\", \"thread\":%ld, \"num\":%d}",
