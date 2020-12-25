@@ -3,9 +3,11 @@
 
 #include <time.h>
 #include <stdio.h>
+#include <json-c/json.h>
 #include <onion/request.h>
 
 #include "bmy/cookie.h"
+#include "bmy/article.h"
 #include "ythtbbs/cache.h"
 #include "ythtbbs/user.h"
 #include "ythtbbs/override.h"
@@ -275,4 +277,6 @@ bool api_check_method(onion_request *req, onion_request_flags flags);
  @return 状态码，成功返回 API_RT_SUCCESSFUL
  */
 int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, struct bmy_cookie *cookie, int *utmp_idx, struct user_info **pptr_info);
+
+struct json_object *apilib_convert_fileheader_utf_to_jsonobj(struct fileheader_utf *ptr_header);
 #endif
