@@ -477,28 +477,14 @@ static int autocomplete_callback(const struct ythtbbs_cache_User *user, int curr
 
 int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * search_str = onion_request_get_query(req, "search_str");
 
-	if(!userid || !sessid || !appkey || !search_str)
+	if (!search_str)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	if(strlen(search_str) < 2)
+	if (strlen(search_str) < 2)
 		return api_error(p, req, res, API_RT_SUCCESSFUL);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	free(ue);
-	if(r != API_RT_SUCCESSFUL) {
-		return api_error(p, req, res, r);
-	}
-
-	int i;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"user_array\":[]}");
 	struct json_object *json_array_user = json_object_object_get(obj, "user_array");
 
