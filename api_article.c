@@ -1346,12 +1346,69 @@ static struct fileheader * findbarticle(struct mmapfile *mf, int filetime, int *
 
 static const int COUNT_PER_PAGE = 40;
 
+static int count_board_in_section(struct boardmem *board, int curr_idx, va_list ap) {
+	int rc = va_arg(ap, int);
+	struct user_info *ptr_info = va_arg(ap, struct user_info *);
+	int *count = va_arg(ap, int *);
+	int hasintro = va_arg(ap, int);
+	const char *secstr = va_arg(ap, const char *);
+	int len = strlen(secstr);
+
+	if (board->header.filename[0] <= 32 || board->header.filename[0] > 'z')
+		return 0;
+
+	if (hasintro) {
+		if (strcmp(secstr, board->header.sec1) && strcmp(secstr, board->header.sec2))
+			return 0;
+	} else {
+		if (strncmp(secstr, board->header.sec1, len) && strncmp(secstr, board->header.sec2, len))
+			return 0;
+	}
+
+	if (check_guest_read_perm_x(board) || (rc == API_RT_SUCCESSFUL && check_user_read_perm_x(ptr_info, board))) {
+		*count = *count + 1;
+	}
+
+	return 0;
+}
+
+static int put_boardnum_in_section(struct boardmem *board, int curr_idx, va_list ap) {
+	int rc = va_arg(ap, int);
+	struct user_info *ptr_info = va_arg(ap, struct user_info *);
+	int *count = va_arg(ap, int *);
+	int hasintro = va_arg(ap, int);
+	const char *secstr = va_arg(ap, const char *);
+	int *boardnum_array = va_arg(ap, int *);
+	int len = strlen(secstr);
+
+	if (board->header.filename[0] <= 32 || board->header.filename[0] > 'z')
+		return 0;
+
+	if (hasintro) {
+		if (strcmp(secstr, board->header.sec1) && strcmp(secstr, board->header.sec2))
+			return 0;
+	} else {
+		if (strncmp(secstr, board->header.sec1, len) && strncmp(secstr, board->header.sec2, len))
+			return 0;
+	}
+
+	if (check_guest_read_perm_x(board) || (rc == API_RT_SUCCESSFUL && check_user_read_perm_x(ptr_info, board))) {
+		boardnum_array[*count] = curr_idx + 1;
+		*count = *count + 1;
+	}
+
+	return 0;
+}
+
 static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
 	int rc;
-	size_t count, i;
+	size_t count, i, board_count;
 	time_t start;
+	int *boardnum_array;
 	char c;
+	const struct sectree *sec;
+	int hasintro = 0;
 	const char *secstr    = onion_request_get_query(req, "secstr");
 	const char *start_str = onion_request_get_query(req, "start");
 
@@ -1368,7 +1425,26 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	else
 		start = time(NULL);
 
-	struct bmy_articles *articles = bmy_article_list_section(c, COUNT_PER_PAGE, start);
+	struct bmy_articles *articles;
+
+	if (c != 'C') {
+		articles = bmy_article_list_section(c, COUNT_PER_PAGE, start);
+	} else {
+		sec = getsectree(secstr);
+		if (sec->introstr[0])
+			hasintro = 1;
+
+		board_count = 0;
+		ythtbbs_cache_Board_foreach_v(count_board_in_section, rc, ptr_info, &board_count, hasintro, secstr);
+		if (board_count == 0)
+			return api_error(p, req, res, API_RT_SUCCESSFUL);
+
+		boardnum_array = calloc(board_count, sizeof(int));
+		board_count = 0;
+		ythtbbs_cache_Board_foreach_v(put_boardnum_in_section, rc, ptr_info, &board_count, hasintro, secstr, boardnum_array);
+		articles = bmy_article_list_selected_boards(boardnum_array, board_count, COUNT_PER_PAGE, start);
+		free(boardnum_array);
+	}
 
 	if (articles == NULL || articles->count == 0) {
 		goto EMPTY;
