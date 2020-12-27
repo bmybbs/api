@@ -486,7 +486,7 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 void aha_convert(FILE *in_stream, FILE *out_stream)
 {
 	char line_break=0;
-	unsigned int c;
+	int c;
 	int fc = -1; //Standard Foreground Color //IRC-Color+8
 	int bc = -1; //Standard Background Color //IRC-Color+8
 	int ul = 0; //Not underlined
@@ -606,38 +606,38 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 					fprintf(out_stream, "</span>");
 				if ((fc!=-1) || (bc!=-1) || (ul!=0) || (bo!=0) || (bl!=0))
 				{
-					fprintf(out_stream, "<span style=\"");
+					fprintf(out_stream, "<span class=\"aha ");
 					switch (fc)
 					{
-						case	0: fprintf(out_stream, "color:black;"); break; //Black
-						case	1: fprintf(out_stream, "color:red;"); break; //Red
-						case	2: fprintf(out_stream, "color:green;"); break; //Green
-						case	3: fprintf(out_stream, "color:olive;"); break; //Yellow
-						case	4: fprintf(out_stream, "color:blue;"); break; //Blue
-						case	5: fprintf(out_stream, "color:purple;"); break; //Purple
-						case	6: fprintf(out_stream, "color:teal;"); break; //Cyan
-						case	7: fprintf(out_stream, "color:gray;"); break; //White
-						case	9: fprintf(out_stream, "color:black;"); break; //Reset
+						case	0: fprintf(out_stream, "aha-fc-black "); break; //Black
+						case	1: fprintf(out_stream, "aha-fc-red "); break; //Red
+						case	2: fprintf(out_stream, "aha-fc-green "); break; //Green
+						case	3: fprintf(out_stream, "aha-fc-olive "); break; //Yellow
+						case	4: fprintf(out_stream, "aha-fc-blue "); break; //Blue
+						case	5: fprintf(out_stream, "aha-fc-purple "); break; //Purple
+						case	6: fprintf(out_stream, "aha-fc-teal "); break; //Cyan
+						case	7: fprintf(out_stream, "aha-fc-gray "); break; //White
+						case	9: fprintf(out_stream, "aha-fc-black "); break; //Reset
 					}
 					switch (bc)
 					{
 						//case -1: printf("background-color:white; "); break; //StandardColor
-						case	0: fprintf(out_stream, "background-color:black;"); break; //Black
-						case	1: fprintf(out_stream, "background-color:red;"); break; //Red
-						case	2: fprintf(out_stream, "background-color:green;"); break; //Green
-						case	3: fprintf(out_stream, "background-color:olive;");  break; //Yellow
-						case	4: fprintf(out_stream, "background-color:blue;"); break; //Blue
-						case	5: fprintf(out_stream, "background-color:purple;"); break; //Purple
-						case	6: fprintf(out_stream, "background-color:teal;"); break; //Cyan
-						case	7: fprintf(out_stream, "background-color:gray;"); break; //White
-						case	9: fprintf(out_stream, "background-color:white;"); break; //Reset
+						case	0: fprintf(out_stream, "aha-bg-black "); break; //Black
+						case	1: fprintf(out_stream, "aha-bg-red "); break; //Red
+						case	2: fprintf(out_stream, "aha-bg-green "); break; //Green
+						case	3: fprintf(out_stream, "aha-bg-olive ");  break; //Yellow
+						case	4: fprintf(out_stream, "aha-bg-blue "); break; //Blue
+						case	5: fprintf(out_stream, "aha-bg-purple "); break; //Purple
+						case	6: fprintf(out_stream, "aha-bg-teal "); break; //Cyan
+						case	7: fprintf(out_stream, "aha-bg-gray "); break; //White
+						case	9: fprintf(out_stream, "aha-bg-white "); break; //Reset
 					}
 					if (ul)
-						fprintf(out_stream, "text-decoration:underline;");
+						fprintf(out_stream, "aha-text-underline ");
 					if (bo)
-						fprintf(out_stream, "font-weight:bold;");
+						fprintf(out_stream, "aha-text-bold ");
 					if (bl)
-						fprintf(out_stream, "text-decoration:blink;");
+						fprintf(out_stream, "aha-text-blink ");
 
 					fprintf(out_stream, "\">");
 				}
