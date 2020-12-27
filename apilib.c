@@ -489,10 +489,11 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 	int c;
 	int fc = -1; //Standard Foreground Color //IRC-Color+8
 	int bc = -1; //Standard Background Color //IRC-Color+8
+	int it = 0; //italic
 	int ul = 0; //Not underlined
 	int bo = 0; //Not bold
 	int bl = 0; //No Blinking
-	int ofc,obc,oul,obo,obl; //old values
+	int ofc,obc,oit,oul,obo,obl; //old values
 	int line=0;
 	int momline=0;
 	int newline=-1;
@@ -506,6 +507,7 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 			//Saving old values
 			ofc=fc;
 			obc=bc;
+			oit=it;
 			oul=ul;
 			obo=bo;
 			obl=bl;
@@ -536,7 +538,7 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 						mompos++;
 					if (mompos==momelem->digitcount) //only zeros => delete all
 					{
-						bo=0;ul=0;bl=0;fc=-1;bc=-1;
+						bo=0;it=0;ul=0;bl=0;fc=-1;bc=-1;
 					} else {
 						switch (momelem->digit[mompos]) {
 						case 1: bo=1; break;
@@ -546,6 +548,9 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 								case 1: //Reset blink and bold
 									bo=0;
 									bl=0;
+									break;
+								case 3: //Reset italic
+									it=0;
 									break;
 								case 4: //Reset underline
 									ul=0;
@@ -569,6 +574,8 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 							}
 							break;
 						case 3:
+							if (mompos+1==momelem->digitcount)
+								it=1;
 							if (mompos+1<momelem->digitcount)
 								fc=momelem->digit[mompos+1];
 							break;
@@ -600,11 +607,11 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 			}
 
 			//Checking the differeces
-			if ((fc!=ofc) || (bc!=obc) || (ul!=oul) || (bo!=obo) || (bl!=obl)) //ANY Change
+			if ((fc!=ofc) || (bc!=obc) || (it!=oit) || (ul!=oul) || (bo!=obo) || (bl!=obl)) //ANY Change
 			{
-				if ((ofc!=-1) || (obc!=-1) || (oul!=0) || (obo!=0) || (obl!=0))
+				if ((ofc!=-1) || (obc!=-1) || (oit!=0) || (oul!=0) || (obo!=0) || (obl!=0))
 					fprintf(out_stream, "</span>");
-				if ((fc!=-1) || (bc!=-1) || (ul!=0) || (bo!=0) || (bl!=0))
+				if ((fc!=-1) || (bc!=-1) || (it!=0) || (ul!=0) || (bo!=0) || (bl!=0))
 				{
 					fprintf(out_stream, "<span class=\"aha ");
 					switch (fc)
@@ -632,6 +639,8 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 						case	7: fprintf(out_stream, "aha-bg-gray "); break; //White
 						case	9: fprintf(out_stream, "aha-bg-white "); break; //Reset
 					}
+					if (it)
+						fprintf(out_stream, "aha-text-italic ");
 					if (ul)
 						fprintf(out_stream, "aha-text-underline ");
 					if (bo)
@@ -671,7 +680,7 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 		}
 	}
 
-	if ((fc!=-1) || (bc!=-1) || (ul!=0) || (bo!=0) || (bl!=0))
+	if ((fc!=-1) || (bc!=-1) || (it!=0) || (ul!=0) || (bo!=0) || (bl!=0))
 		fprintf(out_stream, "</span>\n");
 }
 
