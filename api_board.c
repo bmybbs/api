@@ -5,6 +5,8 @@
 #include <json-c/json.h>
 
 #include "bbs.h"
+#include "bmy/convcode.h"
+#include "ythtbbs/mybrd.h"
 #include "api.h"
 #include "apilib.h"
 #include "api_brc.h"
@@ -19,7 +21,7 @@
  * @param ui 当前会话的 user_info 指针，用于判断版面是否存在未读信息
  * @return 字符指针
  */
-static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, int sortmode, const char *fromhost, struct user_info *ui);
+static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, const char *fromhost, struct user_info *ui);
 
 /**
  * @brief 返回用户的收藏版面列表
@@ -35,32 +37,6 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR);
  * @return
  */
 static int api_board_list_sec(ONION_FUNC_PROTO_STR);
-
-/**
- * @brief 返回分区版面列表（guest权限）
- * @param ONION_FUNC_PROTO_STR
- * @return
- */
-static int api_board_list_sec_guest(ONION_FUNC_PROTO_STR);
-
-/**
- * @brief 读取收藏夹文件。
- * 该方法来自 nju09/bbsmybrd.c。
- * @param mybrd char[GOOD_BRD_NUM][STRLEN] 类型，使用前需要预先分配存储空间。
- * @param mybrdnum 收藏夹版面计数，需要预先分配存储空间。
- * @param userid
- * @return 成功返回 0.
- */
-static int readmybrd(char mybrd[GOOD_BRD_NUM][80], int *mybrdnum, const char *userid);
-
-/**
- * @brief 检查是否位于收藏夹中
- * @param board 版面名称
- * @param mybrd char[GOOD_BRD_NUM][STRLEN] 类型
- * @param mybrdnum 收藏夹版面计数
- * @return 存在返回1，否则返回0。
- */
-static int ismybrd(char *board, char (*mybrd)[80], int mybrdnum);
 
 /**
  * @brief 检查版面是否已读
@@ -95,6 +71,8 @@ static int cmpboardscore(struct boardmem **b1, struct boardmem **b2);
  */
 static int cmpboardinboard(struct boardmem **b1, struct boardmem **b2);
 
+static bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname);
+
 int api_board_list(ONION_FUNC_PROTO_STR)
 {
 	const char * secstr = onion_request_get_query(req, "secstr");
@@ -109,35 +87,23 @@ int api_board_list(ONION_FUNC_PROTO_STR)
 
 int api_board_info(ONION_FUNC_PROTO_STR)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
 	const char * bname  = onion_request_get_query(req, "bname");
 
-	if(!userid || !sessid || !appkey || !bname)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	struct boardmem *bmem = getboardbyname(bname);
+	struct boardmem *bmem = ythtbbs_cache_Board_get_board_by_name(bname);
 	if(!bmem)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
+	if (rc == API_RT_SUCCESSFUL) {
+		// 对于登录用户
+		if (!check_user_read_perm_x(ptr_info, bmem))
+			return api_error(p, req, res, API_RT_NOBRDRPERM);
+	} else {
+		// 对于 guest 用户
+		if (!check_guest_read_perm_x(bmem))
+			return api_error(p, req, res, API_RT_NOBRDRPERM);
 	}
-
-	free(ue);
-
-	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
-
-	if(!check_user_read_perm_x(ui, bmem))
-		return api_error(p, req, res, API_RT_NOBRDRPERM);
 
 	char buf[512];
 	char zh_name[80];//, type[16], keyword[128];
@@ -146,6 +112,7 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	//g2u(bmem->header.type, 5, type, 16);
 
 	int today_num=0, thread_num=0, i;
+	size_t j;
 	struct tm tm;
 	memset(&tm, 0, sizeof(tm));
 	time_t now_t = time(NULL);
@@ -171,8 +138,8 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 				today_num++;
 			}
 
-			for(i=0; i<fsize/sizeof(struct fileheader); ++i) {
-				if(data[i].filetime == data[i].thread)
+			for(j=0; j<fsize/sizeof(struct fileheader); ++j) {
+				if(data[j].filetime == data[j].thread)
 					++thread_num;
 			}
 
@@ -180,12 +147,14 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 		}
 	}
 
-	memset(filename, 0, 256);
-	sethomefile(filename, ui->userid, ".goodbrd");
+	if (rc == API_RT_SUCCESSFUL) {
+		memset(filename, 0, sizeof(filename));
+		sethomefile_s(filename, sizeof(filename), ptr_info->userid, ".goodbrd");
+	}
 	sprintf(buf, "{\"errcode\":0, \"bm\":[], \"hot_topic\":[], \"is_fav\":%d,"
 			"\"voting\":%d, \"article_num\":%d, \"thread_num\":%d, \"score\":%d,"
 			"\"inboard_num\":%d, \"secstr\":\"%s\", \"today_new\":%d}",
-			seek_in_file(filename, bmem->header.filename),
+			(rc == API_RT_SUCCESSFUL) ? seek_in_file(filename, bmem->header.filename) : 0,
 			(bmem->header.flag & VOTE_FLAG),
 			bmem->total, thread_num, bmem->score,
 			bmem->inboard, bmem->header.sec1, today_num);
@@ -203,7 +172,7 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	}
 
 	struct json_object *json_hot_topic_array = json_object_object_get(jp, "hot_topic");
-	memset(filename, 0, 256);
+	memset(filename, 0, sizeof(filename));
 	sprintf(filename, "boards/%s/TOPN", bmem->header.filename);
 
 	htmlDocPtr doc = htmlParseFile(filename, "GBK");
@@ -244,69 +213,38 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 
 int api_board_fav_add(ONION_FUNC_PROTO_STR)
 {
-	const char *board = onion_request_get_query(req, "board");
-	const char *userid = onion_request_get_query(req, "userid");
-	const char *appkey = onion_request_get_query(req, "appkey");
-	const char *sessid = onion_request_get_query(req, "sessid");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
-	if(!board || !userid || !appkey || !sessid)
+	const char *board = onion_request_get_query(req, "board");
+
+	if(!board)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	if(strcasecmp(userid, "guest")==0)
-		return api_error(p, req, res, API_RT_NOTLOGGEDIN);
+	struct goodboard g_brd;
+	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	free(ue);
-	if(r != API_RT_SUCCESSFUL) {
-		return api_error(p, req, res, r);
-	}
-
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-
-	char mybrd[GOOD_BRD_NUM][STRLEN];
-	int mybrdnum;
-	r = readmybrd(mybrd, &mybrdnum, ui->userid);
-
-	if(mybrdnum >= GOOD_BRD_NUM) {
+	if(g_brd.num >= GOOD_BRD_NUM) {
 		return api_error(p, req, res, API_RT_REACHMAXRCD);
 	}
 
-	if(ismybrd(board, mybrd, mybrdnum)) {
+	if(ythtbbs_mybrd_exists(&g_brd, board)) {
 		return api_error(p, req, res, API_RT_ALRDYINRCD);
 	}
 
-	struct boardmem * b = getboardbyname(board);
+	struct boardmem * b = ythtbbs_cache_Board_get_board_by_name(board);
 	if(b == NULL) {
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	}
 
-
-	if(!check_user_read_perm_x(ui, b)) {
+	if(!check_user_read_perm_x(ptr_info, b)) {
 		return api_error(p, req, res, API_RT_FBDNUSER);
 	}
 
 	// 所有校验通过，写入用户文件
-	strcpy(mybrd[mybrdnum], b->header.filename);
-	mybrdnum++;
-	char file[200];
-	sethomefile(file, ui->userid, ".goodbrd");
-	FILE *fp = fopen(file, "w");
-	if(!fp) {
-		return api_error(p, req, res, API_RT_NOSUCHFILE);
-	}
-
-	flock(fileno(fp), LOCK_EX);
-	int i;
-	for(i=0; i<mybrdnum; i++) {
-		fprintf(fp, "%s\n", mybrd[i]);
-	}
-	flock(fileno(fp), LOCK_UN);
-
-	fclose(fp);
+	ythtbbs_mybrd_save_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	api_set_json_header(res);
 	onion_response_printf(res, "{\"errcode\": 0, \"board\": \"%s\", \"secstr\":\"%s\"}", b->header.filename, b->header.sec1);
@@ -316,60 +254,28 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 
 int api_board_fav_del(ONION_FUNC_PROTO_STR)
 {
-	const char *board = onion_request_get_query(req, "board");
-	const char *userid = onion_request_get_query(req, "userid");
-	const char *appkey = onion_request_get_query(req, "appkey");
-	const char *sessid = onion_request_get_query(req, "sessid");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
-	if(!board || !userid || !appkey || !sessid)
+	const char *board = onion_request_get_query(req, "board");
+	if(!board)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	if(strcasecmp(userid, "guest")==0)
-		return api_error(p, req, res, API_RT_NOTLOGGEDIN);
+	struct goodboard g_brd;
+	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	free(ue);
-	if(r != API_RT_SUCCESSFUL) {
-		return api_error(p, req, res, r);
-	}
-
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-
-	char mybrd[GOOD_BRD_NUM][STRLEN];
-	int mybrdnum;
-	r = readmybrd(mybrd, &mybrdnum, ui->userid);
-
-	if(mybrdnum == 0) {
+	if(g_brd.num == 0) {
 		return api_error(p, req, res, API_RT_NOTINRCD);
 	}
 
-	if(!ismybrd(board, mybrd, mybrdnum)) {
+	if(!ythtbbs_mybrd_exists(&g_brd, board)) {
 		return api_error(p, req, res, API_RT_NOTINRCD);
 	}
 
 	// 所有校验通过，写入用户文件
-	char file[200];
-	sethomefile(file, ui->userid, ".goodbrd");
-	FILE *fp = fopen(file, "w");
-	if(!fp) {
-		return api_error(p, req, res, API_RT_NOSUCHFILE);
-	}
-
-	flock(fileno(fp), LOCK_EX);
-	int i;
-	for(i=0; i<mybrdnum; i++) {
-		if(strcasecmp(mybrd[i], board) == 0)
-			continue;
-
-		fprintf(fp, "%s\n", mybrd[i]);
-	}
-	flock(fileno(fp), LOCK_UN);
-
-	fclose(fp);
+	ythtbbs_mybrd_save_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	api_set_json_header(res);
 	onion_response_printf(res, "{\"errcode\": 0, \"board\": \"%s\"}", board);
@@ -379,49 +285,31 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 
 int api_board_fav_list(ONION_FUNC_PROTO_STR)
 {
-	const char *userid = onion_request_get_query(req, "userid");
-	const char *appkey = onion_request_get_query(req, "appkey");
-	const char *sessid = onion_request_get_query(req, "sessid");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
-	if(!userid || !appkey || !sessid)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	if(strcasecmp(userid, "guest")==0)
-		return api_error(p, req, res, API_RT_NOTLOGGEDIN);
-
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	free(ue);
-	if(r != API_RT_SUCCESSFUL) {
-		return api_error(p, req, res, r);
-	}
-
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-
-	char mybrd[GOOD_BRD_NUM][STRLEN];
-	int mybrdnum;
-	r = readmybrd(mybrd, &mybrdnum, ui->userid);
+	struct goodboard g_brd;
+	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	// 输出
 	char buf[512];
-	sprintf(buf, "{\"errcode\":0, \"board_num\":%d, \"board_array\":[]}", mybrdnum);
+	sprintf(buf, "{\"errcode\":0, \"board_num\":%d, \"board_array\":[]}", g_brd.num);
 	struct json_object * obj = json_tokener_parse(buf);
 	struct json_object * json_array_board = json_object_object_get(obj, "board_array");
 
 	int i=0;
 	struct boardmem * b = NULL;
-	for(i=0; i<mybrdnum; ++i) {
+	for(i=0; i<g_brd.num; ++i) {
 		struct json_object * item = json_object_new_object();
-		json_object_object_add(item, "name", json_object_new_string(mybrd[i]));
+		json_object_object_add(item, "name", json_object_new_string(g_brd.ID[i]));
 
-		b = getboardbyname(mybrd[i]);
+		b = ythtbbs_cache_Board_get_board_by_name(g_brd.ID[i]);
 		if(b == NULL) {
 			json_object_object_add(item, "accessible", json_object_new_int(0));
 		} else {
-			json_object_object_add(item, "accessible", json_object_new_int(check_user_read_perm_x(ui, b)));
+			json_object_object_add(item, "accessible", json_object_new_int(check_user_read_perm_x(ptr_info, b)));
 		}
 		json_object_object_add(item, "secstr", json_object_new_string(b->header.sec1));
 
@@ -437,14 +325,20 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 
 static int api_board_autocomplete_callback(struct boardmem *board, int curr_idx, va_list ap) {
 	const char *search_str = va_arg(ap, const char *);
+	int rc = va_arg(ap, int);
 	struct user_info *ui = va_arg(ap, struct user_info *);
 	struct json_object *json_array_board = va_arg(ap, struct json_object *);
 
 	if (board->header.filename[0] <= 32 || board->header.filename[0] > 'z')
 		return 0;
 
-	if (!check_user_read_perm_x(ui, board))
-		return 0;
+	if (rc == API_RT_SUCCESSFUL) {
+		if (!check_user_read_perm_x(ui, board))
+			return 0;
+	} else {
+		if (!check_guest_read_perm_x(board))
+			return 0;
+	}
 
 	if (strcasestr(board->header.filename, search_str)) {
 		struct json_object *obj = json_object_new_object();
@@ -458,32 +352,21 @@ static int api_board_autocomplete_callback(struct boardmem *board, int curr_idx,
 
 int api_board_autocomplete(ONION_FUNC_PROTO_STR)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+
 	const char * search_str = onion_request_get_query(req, "search_str");
 
-	if(!userid || !sessid || !appkey || !search_str)
+	if(!search_str)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	if(strlen(search_str) < 2)
 		return api_error(p, req, res, API_RT_SUCCESSFUL);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	free(ue);
-	if(r != API_RT_SUCCESSFUL) {
-		return api_error(p, req, res, r);
-	}
-
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"board_array\":[]}");
 	struct json_object *json_array_board = json_object_object_get(obj, "board_array");
 
-	ythtbbs_cache_Board_foreach_v(api_board_autocomplete_callback, search_str, ui, json_array_board);
+	ythtbbs_cache_Board_foreach_v(api_board_autocomplete_callback, search_str, rc, ptr_info, json_array_board);
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(obj));
 
@@ -496,8 +379,7 @@ static int api_board_fav_list_callback(struct boardmem *board, int curr_idx, va_
 	struct user_info *ui = va_arg(ap, struct user_info *);
 	struct boardmem **board_array = va_arg(ap, struct boardmem **);
 	int *count = va_arg(ap, int *);
-	char (*mybrd)[STRLEN] = va_arg(ap, char (*)[STRLEN]);
-	int mybrdnum = va_arg(ap, int);
+	struct goodboard *g_brd = va_arg(ap, struct goodboard *);
 
 	if (board->header.filename[0] <= 32 || board->header.filename[0] > 'z')
 		return 0;
@@ -505,7 +387,7 @@ static int api_board_fav_list_callback(struct boardmem *board, int curr_idx, va_
 	if (!check_user_read_perm_x(ui, board))
 		return 0;
 
-	if (!ismybrd(board->header.filename, mybrd, mybrdnum))
+	if (!ythtbbs_mybrd_exists(g_brd, board->header.filename))
 		return 0;
 
 	board_array[*count] = board;
@@ -515,54 +397,33 @@ static int api_board_fav_list_callback(struct boardmem *board, int curr_idx, va_
 
 static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
 	const char * sortmode_s = onion_request_get_query(req, "sortmode");
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
-	if(!userid || !sessid || !appkey)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
 	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
 
-	if(strcasecmp(userid, "guest")==0)
-		return api_error(p, req, res, API_RT_NOTLOGGEDIN);
-
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-
-	char mybrd[GOOD_BRD_NUM][STRLEN];
-	int mybrdnum;
-	r = readmybrd(mybrd, &mybrdnum, ue->userid);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
+	struct goodboard g_brd;
+	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	int count=0;
 	struct boardmem *board_array[MAXBOARD];
-	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 
-	ythtbbs_cache_Board_foreach_v(api_board_fav_list_callback, ui, board_array, &count, mybrd, mybrdnum);
+	ythtbbs_cache_Board_foreach_v(api_board_fav_list_callback, ptr_info, board_array, &count, &g_brd);
 
-	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ui);
+	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ptr_info);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
-	free(ue);
 	free(s);
 	return OCS_PROCESSED;
 }
 
 static int api_board_list_sec_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	int rc = va_arg(ap, int);
 	struct user_info *ui = va_arg(ap, struct user_info *);
 	struct boardmem **board_array = va_arg(ap, struct boardmem **);
 	int *count = va_arg(ap, int *);
@@ -581,8 +442,13 @@ static int api_board_list_sec_callback(struct boardmem *board, int curr_idx, va_
 			return 0;
 	}
 
-	if (!check_user_read_perm_x(ui, board))
-		return 0;
+	if (rc == API_RT_SUCCESSFUL) {
+		if (!check_user_read_perm_x(ui, board))
+			return 0;
+	} else {
+		if (!check_guest_read_perm_x(board))
+			return 0;
+	}
 
 	board_array[*count] = board;
 	*count = *count + 1;
@@ -591,106 +457,35 @@ static int api_board_list_sec_callback(struct boardmem *board, int curr_idx, va_
 
 static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+
 	const char * secstr = onion_request_get_query(req, "secstr");
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * sortmode_s = onion_request_get_query(req, "sortmode");
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
-	//const char guest_str[] = "guest";
-	const char sec_array[] = "0123456789GNHAC";
+	const char *sec_array = "0123456789GNHAC";
 
 	if(secstr == NULL || strlen(secstr)>=2 || strstr(sec_array, secstr) == NULL)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
-	if(!userid)
-		return api_error(p, req, res, API_RT_WRONGPARAM); // TODO
-		//return api_board_list_sec_guest(p, req, res);
-	if(!sessid || !appkey)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
 	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
 
 	struct boardmem *board_array[MAXBOARD];
 	int hasintro = 0, count = 0;
 	const struct sectree *sec;
-	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
 	sec = getsectree(secstr);
 	if(sec->introstr[0])
 		hasintro = 1;
 
-	ythtbbs_cache_Board_foreach_v(api_board_list_sec_callback, ui, board_array, &count, hasintro, secstr);
+	ythtbbs_cache_Board_foreach_v(api_board_list_sec_callback, rc, ptr_info, board_array, &count, hasintro, secstr);
 
-	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ui);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(ue);
-	free(s);
-	return OCS_PROCESSED;
-}
-
-static int api_board_list_sec_guest(ONION_FUNC_PROTO_STR)
-{
-	return 0;
-/*
-	int guest_uid = getusernum("guest");
-	int guest_uent_index, i;
-	struct user_info *ui=NULL;
-	for(i=0; i<6; i++) {
-		guest_uent_index = shm_uindex->user[guest_uid][i];
-		ui = ythtbbs_cache_utmp_get_by_idx(guest_uent_index-1); // TODO
-		if(strcasecmp(ui->userid, "guest")==0)
-			break;
-	}
-
-	if(strcasecmp(ui->userid, "guest")!=0)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	const char * secstr = onion_request_get_query(req, "secstr");
-	const char * sortmode_s = onion_request_get_query(req, "sortmode");
-	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
-
-	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
-	int len, hasintro=0, count=0;
-
-	struct boardmem *board_array[MAXBOARD], *x;
-	struct sectree *sec = getsectree(secstr);
-	len = strlen(secstr);
-	if(sec->introstr[0])
-		hasintro = 1;
-	for(i=0; i<MAXBOARD && i<shm_bcache->number; ++i) {
-		x = &(shm_bcache->bcache[i]);
-		if(x->header.filename[0]<=32 || x->header.filename[0]>'z')
-			continue;
-		if(hasintro) {
-			if(strcmp(secstr, x->header.sec1) && strcmp(secstr, x->header.sec2))
-				continue;
-		} else {
-			if(strncmp(secstr, x->header.sec1, len) && strncmp(secstr, x->header.sec2, len))
-				continue;
-		}
-		if(!check_user_read_perm_x(ui, x))
-			continue;
-		board_array[count] = x;
-		count++;
-	}
-
-	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ui);
+	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ptr_info);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
 	return OCS_PROCESSED;
-*/
 }
 
-static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, int sortmode, const char *fromhost, struct user_info *ui)
+static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, const char *fromhost, struct user_info *ui)
 {
 	char buf[512];
 	int i, j;
@@ -699,19 +494,16 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"boardlist\":[]}");
 	struct json_object *json_array = json_object_object_get(obj, "boardlist");
 
-	if(sortmode<=0 || sortmode>3)
-		sortmode = 2;
 	switch (sortmode) {
-	case 1:
+	case BOARD_SORT_ALPHABET:
 		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboard);
 		break;
-	case 2:
-		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardscore);
-		break;
-	case 3:
+	case BOARD_SORT_INBOARD:
 		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardinboard);
 		break;
 	default:
+	case BOARD_SORT_SCORE:
+		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardscore);
 		break;
 	}
 
@@ -730,7 +522,7 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 				"\"unread\":%d, \"voting\":%d, \"article_num\":%d, \"score\":%d,"
 				"\"inboard_num\":%d, \"secstr\":\"%s\", \"keyword\":\"%s\" }",
 				bp->header.filename, zh_name, type,
-				!board_read(bp->header.filename, bp->lastpost, fromhost, ui),
+				(ui == NULL ? 1 : !board_read(bp->header.filename, bp->lastpost, fromhost, ui)),
 				(bp->header.flag & VOTE_FLAG),
 				bp->total, bp->score,
 				bp->inboard, bp->header.sec1, keyword);
@@ -751,40 +543,6 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 	json_object_put(obj);
 
 	return r;
-}
-
-static int readmybrd(char mybrd[GOOD_BRD_NUM][80], int *mybrdnum, const char *userid)
-{
-	char file[256];
-	FILE *fp;
-	int len;
-	*mybrdnum = 0;
-	sethomefile(file, userid, ".goodbrd");
-	fp = fopen(file, "r");
-	if(fp) {
-		while(fgets(mybrd[*mybrdnum], sizeof(mybrd[0]), fp) != NULL) {
-			len = strlen(mybrd[*mybrdnum]);
-			if(mybrd[*mybrdnum][len-1] == '\n')
-				mybrd[*mybrdnum][len-1] = 0;
-			(*mybrdnum)++;
-			if(*mybrdnum >= GOOD_BRD_NUM)
-				break;
-		}
-		fclose(fp);
-		return API_RT_SUCCESSFUL;
-	} else
-		return API_RT_NOGDBRDFILE;
-}
-
-static int ismybrd(char *board, char (*mybrd)[80], int mybrdnum)
-{
-	int i;
-
-	for(i=0; i<mybrdnum; ++i)
-		if(!strcasecmp(board, mybrd[i]))
-			return 1;
-
-	return 0;
 }
 
 static int board_read(char *board, int lastpost, const char *fromhost, struct user_info *ui)
@@ -815,3 +573,8 @@ static int cmpboardinboard(struct boardmem **b1, struct boardmem **b2)
 {
 	return ((*b1)->inboard - (*b2)->inboard);
 }
+
+static bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname) {
+	return check_user_read_perm(ptr_info, boardname) > 0;
+}
+

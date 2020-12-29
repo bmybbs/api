@@ -27,6 +27,7 @@ int api_article_list(ONION_FUNC_PROTO_STR);
 int api_article_getHTMLContent(ONION_FUNC_PROTO_STR);	// 获取 HTML 格式的内容
 int api_article_getRAWContent(ONION_FUNC_PROTO_STR);	// 获取原始内容，'\033' 字符将被转为 "[ESC]" 字符串
 
+int api_article_preview(ONION_FUNC_PROTO_STR);			// 预览
 int api_article_post(ONION_FUNC_PROTO_STR);				// 发帖接口
 int api_article_reply(ONION_FUNC_PROTO_STR);			// 回帖
 
@@ -53,6 +54,8 @@ int api_attach_upload(ONION_FUNC_PROTO_STR);			// 上传附件
 
 int api_notification_list(ONION_FUNC_PROTO_STR);
 int api_notification_del(ONION_FUNC_PROTO_STR);
+
+int api_subscription_list(ONION_FUNC_PROTO_STR);
 
 /**
  * @brief 为 onion_response 添加 json 的 MIME 信息

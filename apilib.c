@@ -1,10 +1,3 @@
-/*
- * apilib.c
- *
- *  Created on: 2012-10-29
- *      Author: shenyang
- */
-#include <ctype.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -17,18 +10,17 @@
 #include "error_code.h"
 #include "ytht/strlib.h"
 #include "ytht/timeop.h"
-#include "ytht/shmop.h"
 #include "ytht/fileop.h"
 #include "ytht/numbyte.h"
+#include "bmy/convcode.h"
 #include "ythtbbs/cache.h"
 #include "ythtbbs/permissions.h"
 #include "ythtbbs/user.h"
 #include "ythtbbs/record.h"
 #include "ythtbbs/article.h"
-#include "ythtbbs/misc.h"
 #include "ythtbbs/binaryattach.h"
 #include "ythtbbs/docutil.h"
-#include "ythtbbs/override.h"
+#include "ythtbbs/session.h"
 
 char *ummap_ptr = NULL;
 int ummap_size = 0;
@@ -137,29 +129,6 @@ int getusernum(const char *id) {
 	return ythtbbs_cache_UserIDHashTable_find_idx(id);
 }
 
-/** hash user id
- * Only have 25 * 26 + 25 = 675 different hash values.
- * From nju09/BBSLIB.c
- * @param id
- * @return
- */
-int useridhash(const char *id)
-{
-	int n1 = 0;
-	int n2 = 0;
-	while(*id) {
-		n1 += ((unsigned char) toupper(*id)) % 26;
-		id ++;
-		if(!*id)
-			break;
-		n2 += ((unsigned char) toupper(*id)) % 26;
-		id ++;
-	}
-	n1 %= 26;
-	n2 %= 26;
-	return n1 *26 + n2;
-}
-
 /** 依据用户权限位获取本站职位名称
  *
  * @param userlevel
@@ -261,35 +230,6 @@ int save_user_data(struct userec *x)
 	flock(fd, LOCK_UN);
 	close(fd);
 	return 1;
-}
-
-int setbmstatus(struct userec *ue, int online)
-{
-	char path[256];
-	sethomefile(path, ue->userid, "mboard");
-
-	bmfilesync(ue);
-
-	new_apply_record(path, sizeof(struct boardmanager), (void *) setbmhat, &online);
-	return 0;
-}
-
-int setbmhat(struct boardmanager *bm, int *online)
-{
-	/*
-	if(strcmp(shm_bcache->bcache[bm->bid].header.filename, bm->board)) {
-		errlog("error board name %s, %s. user %d",
-			shm_bcache->bcache[bm->bid].header.filename,
-			bm->board, bm->bid);
-		return -1;
-	}
-	if(*online) {
-		shm_bcache->bcache[bm->bid].bmonline |= (1 << bm->bmpos);
-		if(u)
-	}*/
-
-	//TODO
-	return 0;
 }
 
 int get_user_utmp_index(const char *sessid)
@@ -546,13 +486,14 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 void aha_convert(FILE *in_stream, FILE *out_stream)
 {
 	char line_break=0;
-	unsigned int c;
+	int c;
 	int fc = -1; //Standard Foreground Color //IRC-Color+8
 	int bc = -1; //Standard Background Color //IRC-Color+8
+	int it = 0; //italic
 	int ul = 0; //Not underlined
 	int bo = 0; //Not bold
 	int bl = 0; //No Blinking
-	int ofc,obc,oul,obo,obl; //old values
+	int ofc,obc,oit,oul,obo,obl; //old values
 	int line=0;
 	int momline=0;
 	int newline=-1;
@@ -566,6 +507,7 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 			//Saving old values
 			ofc=fc;
 			obc=bc;
+			oit=it;
 			oul=ul;
 			obo=bo;
 			obl=bl;
@@ -596,112 +538,115 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 						mompos++;
 					if (mompos==momelem->digitcount) //only zeros => delete all
 					{
-						bo=0;ul=0;bl=0;fc=-1;bc=-1;
-					}
-					else
-					{
-						switch (momelem->digit[mompos])
-						{
-							case 1: bo=1; break;
-							case 2: if (mompos+1<momelem->digitcount)
-											switch (momelem->digit[mompos+1])
-											{
-												case 1: //Reset blink and bold
-													bo=0;
-													bl=0;
-													break;
-												case 4: //Reset underline
-													ul=0;
-													break;
-													case 7: //Reset Inverted
-													temp = bc;
-													if (fc == -1 || fc == 9)
-													{
-															bc = 0;
-													}
-													else
-														bc = fc;
-													if (temp == -1 || temp == 9)
-													{
-															fc = 7;
-													}
-													else
-														fc = temp;
-													break;
-											}
-											break;
-					case 3: if (mompos+1<momelem->digitcount)
-										fc=momelem->digit[mompos+1];
+						bo=0;it=0;ul=0;bl=0;fc=-1;bc=-1;
+					} else {
+						switch (momelem->digit[mompos]) {
+						case 1: bo=1; break;
+						case 2:
+							if (mompos+1<momelem->digitcount) {
+								switch (momelem->digit[mompos+1]) {
+								case 1: //Reset blink and bold
+									bo=0;
+									bl=0;
 									break;
-					case 4: if (mompos+1==momelem->digitcount)
-										ul=1;
-									else
-										bc=momelem->digit[mompos+1];
+								case 3: //Reset italic
+									it=0;
 									break;
-					case 5: bl=1; break;
-					case 7: //TODO: Inverse
+								case 4: //Reset underline
+									ul=0;
+									break;
+								case 7: //Reset Inverted
 									temp = bc;
 									if (fc == -1 || fc == 9)
 									{
-											bc = 0;
+										bc = 0;
 									}
 									else
 										bc = fc;
 									if (temp == -1 || temp == 9)
 									{
-											fc = 7;
+										fc = 7;
 									}
 									else
 										fc = temp;
 									break;
+								}
+							}
+							break;
+						case 3:
+							if (mompos+1==momelem->digitcount)
+								it=1;
+							if (mompos+1<momelem->digitcount)
+								fc=momelem->digit[mompos+1];
+							break;
+						case 4:
+							if (mompos+1==momelem->digitcount)
+								ul=1;
+							else
+								bc=momelem->digit[mompos+1];
+							break;
+						case 5: bl=1; break;
+						case 7: //TODO: Inverse
+							temp = bc;
+							if (fc == -1 || fc == 9) {
+								bc = 0;
+							} else
+								bc = fc;
+							if (temp == -1 || temp == 9) {
+								fc = 7;
+							} else
+								fc = temp;
+							break;
 						}
 					}
 					momelem=momelem->next;
 				}
 				deleteParse(elem);
-			break;
+				break;
 			case 'H': break;
 			}
 
 			//Checking the differeces
-			if ((fc!=ofc) || (bc!=obc) || (ul!=oul) || (bo!=obo) || (bl!=obl)) //ANY Change
+			if ((fc!=ofc) || (bc!=obc) || (it!=oit) || (ul!=oul) || (bo!=obo) || (bl!=obl)) //ANY Change
 			{
-				if ((ofc!=-1) || (obc!=-1) || (oul!=0) || (obo!=0) || (obl!=0))
+				if ((ofc!=-1) || (obc!=-1) || (oit!=0) || (oul!=0) || (obo!=0) || (obl!=0))
 					fprintf(out_stream, "</span>");
-				if ((fc!=-1) || (bc!=-1) || (ul!=0) || (bo!=0) || (bl!=0))
+				if ((fc!=-1) || (bc!=-1) || (it!=0) || (ul!=0) || (bo!=0) || (bl!=0))
 				{
-					fprintf(out_stream, "<span style=\"");
+					fprintf(out_stream, "<span class=\"aha ");
 					switch (fc)
 					{
-						case	0: fprintf(out_stream, "color:black;"); break; //Black
-						case	1: fprintf(out_stream, "color:red;"); break; //Red
-						case	2: fprintf(out_stream, "color:green;"); break; //Green
-						case	3: fprintf(out_stream, "color:olive;"); break; //Yellow
-						case	4: fprintf(out_stream, "color:blue;"); break; //Blue
-						case	5: fprintf(out_stream, "color:purple;"); break; //Purple
-						case	6: fprintf(out_stream, "color:teal;"); break; //Cyan
-						case	7: fprintf(out_stream, "color:gray;"); break; //White
-						case	9: fprintf(out_stream, "color:black;"); break; //Reset
+						case	0: fprintf(out_stream, "aha-fc-black "); break; //Black
+						case	1: fprintf(out_stream, "aha-fc-red "); break; //Red
+						case	2: fprintf(out_stream, "aha-fc-green "); break; //Green
+						case	3: fprintf(out_stream, "aha-fc-olive "); break; //Yellow
+						case	4: fprintf(out_stream, "aha-fc-blue "); break; //Blue
+						case	5: fprintf(out_stream, "aha-fc-purple "); break; //Purple
+						case	6: fprintf(out_stream, "aha-fc-teal "); break; //Cyan
+						case	7: fprintf(out_stream, "aha-fc-gray "); break; //White
+						case	9: fprintf(out_stream, "aha-fc-black "); break; //Reset
 					}
 					switch (bc)
 					{
 						//case -1: printf("background-color:white; "); break; //StandardColor
-						case	0: fprintf(out_stream, "background-color:black;"); break; //Black
-						case	1: fprintf(out_stream, "background-color:red;"); break; //Red
-						case	2: fprintf(out_stream, "background-color:green;"); break; //Green
-						case	3: fprintf(out_stream, "background-color:olive;");  break; //Yellow
-						case	4: fprintf(out_stream, "background-color:blue;"); break; //Blue
-						case	5: fprintf(out_stream, "background-color:purple;"); break; //Purple
-						case	6: fprintf(out_stream, "background-color:teal;"); break; //Cyan
-						case	7: fprintf(out_stream, "background-color:gray;"); break; //White
-						case	9: fprintf(out_stream, "background-color:white;"); break; //Reset
+						case	0: fprintf(out_stream, "aha-bg-black "); break; //Black
+						case	1: fprintf(out_stream, "aha-bg-red "); break; //Red
+						case	2: fprintf(out_stream, "aha-bg-green "); break; //Green
+						case	3: fprintf(out_stream, "aha-bg-olive ");  break; //Yellow
+						case	4: fprintf(out_stream, "aha-bg-blue "); break; //Blue
+						case	5: fprintf(out_stream, "aha-bg-purple "); break; //Purple
+						case	6: fprintf(out_stream, "aha-bg-teal "); break; //Cyan
+						case	7: fprintf(out_stream, "aha-bg-gray "); break; //White
+						case	9: fprintf(out_stream, "aha-bg-white "); break; //Reset
 					}
+					if (it)
+						fprintf(out_stream, "aha-text-italic ");
 					if (ul)
-						fprintf(out_stream, "text-decoration:underline;");
+						fprintf(out_stream, "aha-text-underline ");
 					if (bo)
-						fprintf(out_stream, "font-weight:bold;");
+						fprintf(out_stream, "aha-text-bold ");
 					if (bl)
-						fprintf(out_stream, "text-decoration:blink;");
+						fprintf(out_stream, "aha-text-blink ");
 
 					fprintf(out_stream, "\">");
 				}
@@ -727,14 +672,15 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 			case '<':	fprintf(out_stream, "&lt;"); break;
 			case '>':	fprintf(out_stream, "&gt;"); break;
 			case '\n':
-			case 13: 	momline++;line=0;
-						fprintf(out_stream, "<br />\n"); break;
+			case 13:
+				momline++;line=0;
+				fprintf(out_stream, "<br />\n"); break;
 			default:	fprintf(out_stream, "%c",c);
 			}
 		}
 	}
 
-	if ((fc!=-1) || (bc!=-1) || (ul!=0) || (bo!=0) || (bl!=0))
+	if ((fc!=-1) || (bc!=-1) || (it!=0) || (ul!=0) || (bo!=0) || (bl!=0))
 		fprintf(out_stream, "</span>\n");
 }
 
@@ -765,10 +711,10 @@ int mail_count(char *id, int *unread)
 	struct fileheader *x;
 	char path[80];
 	int total=0, i=0;
-	struct mmapfile mf = { ptr:NULL };
+	struct mmapfile mf = { .ptr = NULL };
 	*unread = 0;
 
-	setmailfile(path, id, ".DIR");
+	setmailfile_s(path, sizeof(path), id, ".DIR");
 
 	if(mmapfile(path, &mf)<0)
 		return 0;
@@ -785,8 +731,8 @@ int mail_count(char *id, int *unread)
 	return total;
 }
 
-int do_article_post(char *board, char *title, char *filename, char *id,
-		char *nickname, char *ip, int sig, int mark, int outgoing, char *realauthor, int thread)
+int do_article_post(const char *board, const char *title, const char *filename, const char *id,
+		const char *nickname, const char *ip, int sig, int mark, int outgoing, const char *realauthor, int thread)
 {
 	FILE *fp, *fp1, *fp2;
 	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_gbk;
@@ -871,8 +817,8 @@ int do_article_post(char *board, char *title, char *filename, char *id,
 	return t;
 }
 
-int do_mail_post(char *to_userid, char *title, char *filename, char *id,
-				char *nickname, char *ip, int sig, int mark)
+int do_mail_post(const char *to_userid, const char *title, const char *filename, const char *id,
+				const char *nickname, const char *ip, int sig, int mark)
 {
 	FILE *fp, *fp2;
 	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];
@@ -881,7 +827,7 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 
 	memset(&header, 0, sizeof(header));
 	fh_setowner(&header, id, 0);
-	setmailfile(buf, to_userid, "");
+	setmailfile_s(buf, sizeof(buf), to_userid, "");
 
 	time_t now_t = time(NULL);
 	t = trycreatefile(buf, "M.%d.A", now_t, 100);
@@ -926,13 +872,13 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
 	fwrite(tmp_gbk_buf, 1, strlen(tmp_gbk_buf), fp);
 	fclose(fp);	// 输出完成
 
-	setmailfile(buf, to_userid, ".DIR");
+	setmailfile_s(buf, sizeof(buf), to_userid, ".DIR");
 	append_record(buf, &header, sizeof(header));
 	return 0;
 }
 
-int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
-				char *nickname, char *ip, int sig, int mark)
+int do_mail_post_to_sent_box(const char *userid, const char *title, const char *filename, const char *id,
+				const char *nickname, const char *ip, int sig, int mark)
 {
 	FILE *fp, *fp2;
 	char buf[256], dir[256], tmp_utf_buf[1024], tmp_gbk_buf[1024];
@@ -993,7 +939,7 @@ int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id
 
 static int search_user_article_with_title_keywords_callback(struct boardmem *board, int curr_idx, va_list ap) {
 	struct user_info *ui = va_arg(ap, struct user_info *);
-	struct bmy_article *articles_array = va_arg(ap, struct bmy_article *);
+	struct api_article *articles_array = va_arg(ap, struct api_article *);
 	int *article_sum = va_arg(ap, int *);
 	int max_searchnum = va_arg(ap, int);
 	const char *query_userid = va_arg(ap, const char *);
@@ -1006,7 +952,7 @@ static int search_user_article_with_title_keywords_callback(struct boardmem *boa
 
 	char dir[256];
 	int nr = 0, start = 0, i;
-	struct bmy_article *tmp_ptr = NULL;
+	struct api_article *tmp_ptr = NULL;
 	struct mmapfile mf = { .ptr = NULL };
 	struct fileheader *x = NULL;
 
@@ -1037,7 +983,7 @@ static int search_user_article_with_title_keywords_callback(struct boardmem *boa
 		if (*article_sum >= max_searchnum)
 			break;
 
-		if (abs(now_t - x[i].filetime) > searchtime)
+		if (labs(now_t - x[i].filetime) > searchtime)
 			continue;
 
 		if (query_userid[0] && strcasecmp(x[i].owner, query_userid))
@@ -1066,7 +1012,7 @@ static int search_user_article_with_title_keywords_callback(struct boardmem *boa
 	return 0;
 }
 
-int search_user_article_with_title_keywords(struct bmy_article *articles_array,
+int search_user_article_with_title_keywords(struct api_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime)
@@ -1084,37 +1030,6 @@ int search_user_article_with_title_keywords(struct bmy_article *articles_array,
 	return 0;
 }
 
-int load_user_X_File(struct ythtbbs_override *array, int size, const char *userid, int mode)
-{
-	memset(array, 0, sizeof(struct ythtbbs_override) * size);
-
-	FILE *fp;
-	char file[256];
-	int num = 0;
-	if(mode == UFT_FRIENDS)
-		sethomefile(file, userid, "friends");
-	else
-		sethomefile(file, userid, "rejects");
-
-	fp = fopen(file, "r");
-	if(fp) {
-		num = fread(array, sizeof(array[0]), size, fp);
-		fclose(fp);
-	}
-
-	return num;
-}
-
-int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override *array, const int size)
-{
-	int i=0, pos=-1;
-	for(;i<size; ++i) {
-		if(strcasecmp(queryid, array[i].id) == 0)
-			pos = i;
-	}
-	return pos;
-}
-
 int file_size_s(const char *filepath)
 {
 	struct stat buf;
@@ -1123,3 +1038,51 @@ int file_size_s(const char *filepath)
 
 	return buf.st_size;
 }
+
+bool api_check_method(onion_request *req, onion_request_flags flags) {
+	return flags == (onion_request_get_flags(req) & OR_METHODS);
+}
+
+int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, struct bmy_cookie *cookie, int *utmp_idx, struct user_info **pptr_info) {
+	const char *cookie_str = onion_request_get_cookie(req, SMAGIC);
+	*pptr_info = NULL;
+	*utmp_idx = -1;
+	if(cookie_str == NULL || cookie_str[0] == '\0') {
+		return API_RT_WRONGPARAM;
+	}
+
+	strncpy(cookie_buf, cookie_str, buf_len);
+	bmy_cookie_parse(cookie_buf, cookie);
+	if (cookie->userid == NULL || cookie->sessid == NULL || strcasecmp(cookie->userid, "guest") == 0) {
+		return API_RT_NOTLOGGEDIN;
+	}
+
+	*utmp_idx = ythtbbs_session_get_utmp_idx(cookie->sessid, cookie->userid);
+	if (*utmp_idx < 0) {
+		return API_RT_NOTLOGGEDIN;
+	}
+
+	*pptr_info = ythtbbs_cache_utmp_get_by_idx(*utmp_idx);
+	return API_RT_SUCCESSFUL;
+}
+
+struct json_object *apilib_convert_fileheader_utf_to_jsonobj(struct fileheader_utf *ptr_header) {
+	struct json_object *article_obj;
+
+	if (ptr_header == NULL)
+		return NULL;
+
+	article_obj = json_object_new_object();
+	if (article_obj == NULL)
+		return NULL;
+
+	json_object_object_add(article_obj, "boardname_en", json_object_new_string(ptr_header->boardname_en));
+	json_object_object_add(article_obj, "boardname_zh", json_object_new_string(ptr_header->boardname_zh));
+	json_object_object_add(article_obj, "author", json_object_new_string(ptr_header->owner));
+	json_object_object_add(article_obj, "title", json_object_new_string(ptr_header->title));
+	json_object_object_add(article_obj, "tid", json_object_new_int64(ptr_header->thread));
+	json_object_object_add(article_obj, "count", json_object_new_int(ptr_header->count));
+	json_object_object_add(article_obj, "accessed", json_object_new_int(ptr_header->accessed));
+	return article_obj;
+}
+

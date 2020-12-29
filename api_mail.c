@@ -2,9 +2,11 @@
 #include <json-c/json.h>
 
 #include "bbs.h"
+#include "ytht/random.h"
 #include "ythtbbs/article.h"
 #include "ythtbbs/misc.h"
 #include "ythtbbs/permissions.h"
+#include "bmy/convcode.h"
 
 #include "api.h"
 #include "apilib.h"
@@ -29,7 +31,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode);
 
 static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode);
 
-static char * bmy_mail_array_to_json_string(struct bmy_article *ba_list, int count, int mode, struct userec *ue);
+static char * bmy_mail_array_to_json_string(struct api_article *ba_list, int count, int mode, struct userec *ue);
 
 static char * parse_mail(char * userid, int filetime, int mode, struct attach_link **attach_link_list);
 
@@ -62,7 +64,7 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 	int box_type_i = (box_type != NULL && box_type[0] == '1') ? API_MAIL_SENT_BOX : API_MAIL_RECIEVE_BOX;
 	if(box_type_i == API_MAIL_RECIEVE_BOX)
-		setmailfile(mail_dir, ue->userid, ".DIR");
+		setmailfile_s(mail_dir, sizeof(mail_dir), ue->userid, ".DIR");
 	else
 		setsentmailfile(mail_dir, ue->userid, ".DIR");
 
@@ -86,8 +88,8 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 	struct fileheader x;
 	int i;
-	struct bmy_article mail_list[count];
-	memset(mail_list, 0, sizeof(struct bmy_article) * count);
+	struct api_article mail_list[count];
+	memset(mail_list, 0, sizeof(struct api_article) * count);
 	fseek(fp, (startnum - 1) * sizeof(struct fileheader), SEEK_SET);
 	for(i=0; i<count; ++i) {
 		if(fread(&x, sizeof(x), 1, fp) <= 0)
@@ -154,15 +156,15 @@ static int get_user_mail_size(char * userid)
 	FILE *fp;
 	time_t t;
 
-	sethomefile(tmpmail, userid, "msgindex");
+	sethomefile_s(tmpmail, sizeof(tmpmail), userid, "msgindex");
 	if(file_time(tmpmail))
 		currsize += file_size_s(tmpmail);
 
-	sethomefile(tmpmail, userid, "msgindex2");
+	sethomefile_s(tmpmail, sizeof(tmpmail), userid, "msgindex2");
 	if(file_time(tmpmail))
 		currsize += file_size_s(tmpmail);
 
-	sethomefile(tmpmail, userid, "msgcontent");
+	sethomefile_s(tmpmail, sizeof(tmpmail), userid, "msgcontent");
 	if(file_time(tmpmail))
 		currsize += file_size_s(tmpmail);
 
@@ -176,7 +178,7 @@ static int get_user_mail_size(char * userid)
 		return (currsize/1024);
 
 	while(fread(&tmpfh, 1, sizeof(tmpfh), fp) == sizeof(tmpfh)) {
-		setmailfile(tmpmail, userid, fh2fname(&tmpfh));
+		setmailfile_s(tmpmail, sizeof(tmpmail), userid, fh2fname(&tmpfh));
 		currsize += file_size_s(tmpmail);
 	}
 
@@ -222,7 +224,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	int box_type_i = (box_type != NULL && box_type[0] == '1') ? API_MAIL_SENT_BOX : API_MAIL_RECIEVE_BOX;
 	if(box_type_i == API_MAIL_RECIEVE_BOX)
-		setmailfile(mail_dir, ue->userid, ".DIR");
+		setmailfile_s(mail_dir, sizeof(mail_dir), ue->userid, ".DIR");
 	else
 		setsentmailfile(mail_dir, ue->userid, ".DIR");
 
@@ -311,11 +313,11 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	return OCS_PROCESSED;
 }
 
-static char * bmy_mail_array_to_json_string(struct bmy_article *ba_list, int count, int mode, struct userec *ue)
+static char * bmy_mail_array_to_json_string(struct api_article *ba_list, int count, int mode, struct userec *ue)
 {
 	char buf[512];
 	int i;
-	struct bmy_article *p;
+	struct api_article *p;
 	struct json_object *jp;
 
 	sprintf(buf, "{\"errcode\":0,\"max_size\":%d, \"current_size\":%d, \"maillist\":[]}", get_user_max_mail_size(ue), get_user_mail_size(ue->userid));
@@ -328,7 +330,7 @@ static char * bmy_mail_array_to_json_string(struct bmy_article *ba_list, int cou
 			break;
 
 		memset(buf, 0, 512);
-		sprintf(buf, "{ \"num\": %d, \"mark\": %d, \"mid\":%d }",
+		sprintf(buf, "{ \"num\": %d, \"mark\": %d, \"mid\":%ld }",
 				p->sequence_num, p->mark, p->filetime);
 		jp = json_tokener_parse(buf);
 		if(jp) {

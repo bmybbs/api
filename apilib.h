@@ -3,12 +3,22 @@
 
 #include <time.h>
 #include <stdio.h>
+#include <json-c/json.h>
+#include <onion/request.h>
 
+#include "bmy/cookie.h"
+#include "bmy/article.h"
 #include "ythtbbs/cache.h"
 #include "ythtbbs/user.h"
 #include "ythtbbs/override.h"
 
 #define MAX_COMMENTER_COUNT 10
+
+typedef enum board_sort_mode_e {
+	BOARD_SORT_ALPHABET = 1,
+	BOARD_SORT_SCORE    = 2,
+	BOARD_SORT_INBOARD  = 3,
+} board_sort_mode;
 
 enum article_parse_mode {
 	ARTICLE_PARSE_WITH_ANSICOLOR,		///< 将颜色转换为 HTML 样式
@@ -20,7 +30,7 @@ enum API_POST_TYPE {
 	API_POST_TYPE_REPLY		///< 回帖模式
 };
 
-struct bmy_article {
+struct api_article {
 	int type;				///< 类型，1表示主题，0表示一般文章
 	char title[80];			///< 标题
 	char board[24];			///< 版面id
@@ -82,9 +92,6 @@ int check_user_session(struct userec *x, const char *sessid, const char *appkey)
  * @return
  */
 int check_user_session_with_mode_change(struct userec *x, const char *sessid, const char *appkey, int mode);
-
-int setbmhat(struct boardmanager *bm, int *online);
-int setbmstatus(struct userec *ue, int online);
 
 /**
  * @brief 字符串替换函数
@@ -181,9 +188,9 @@ char * calc_perf_str_utf8(int perf);
  * @param thread 主题编号
  * @return 返回文件名中实际使用的时间戳
  */
-int do_article_post(char *board, char *title, char *filename, char *id,
-					char *nickname, char *ip, int sig, int mark,
-					int outgoing, char *realauthor, int thread);
+int do_article_post(const char *board, const char *title, const char *filename, const char *id,
+					const char *nickname, const char *ip, int sig, int mark,
+					int outgoing, const char *realauthor, int thread);
 
 /**
  * @brief 实际处理发站内信的函数。
@@ -199,8 +206,8 @@ int do_article_post(char *board, char *title, char *filename, char *id,
  * @param mark fileheader 的标记
  * @return 返回文件名中实际使用的时间戳
  */
-int do_mail_post(char *to_userid, char *title, char *filename, char *id,
-				char *nickname, char *ip, int sig, int mark);
+int do_mail_post(const char *to_userid, const char *title, const char *filename, const char *id,
+				const char *nickname, const char *ip, int sig, int mark);
 
 /**
  * @brief 保存邮件到发件箱
@@ -215,8 +222,8 @@ int do_mail_post(char *to_userid, char *title, char *filename, char *id,
  * @param mark
  * @return
  */
-int do_mail_post_to_sent_box(char *userid, char *title, char *filename, char *id,
-		char *nickname, char *ip, int sig, int mark);
+int do_mail_post_to_sent_box(const char *userid, const char *title, const char *filename, const char *id,
+		const char *nickname, const char *ip, int sig, int mark);
 
 /**
  * @brief 将 ansi 颜色控制转换成 HTML 标记
@@ -239,36 +246,10 @@ void aha_convert(FILE *in_stream, FILE *out_stream);
  * @param searchtime 和当前时间相比，搜索的时间段，单位秒
  * @return 包含的记录条数
  */
-int search_user_article_with_title_keywords(struct bmy_article *articles_array,
+int search_user_article_with_title_keywords(struct api_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime);
-
-/**
- * 区分好友、黑名单操作
- */
-enum user_X_file_type {
-	UFT_FRIENDS,			//! 好友文件
-	UFT_REJECTS				//! 黑名单
-};
-
-/**
- * @brief 加载好友、黑名单文件
- * @param array 预先分配好空间
- * @param userid 用户 id
- * @param mode 模式，参见 @see enum user_X_file_type
- * @return 成功返回列表中的用户数
- */
-int load_user_X_File(struct ythtbbs_override *array, int size, const char *userid, int mode);
-
-/**
- * @brief 判断某用户名是否在用户的好友、黑名单中
- * @param queryid 查询的用户
- * @param array 已加载的好友、黑名单列表
- * @param size 已加载的好友、黑名单长度
- * @return 若存在，返回索引位置。不存在则返回 -1。
- */
-int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override *array, const int size);
 
 /**
  * @brief 获取文件的大小
@@ -278,4 +259,24 @@ int is_queryid_in_user_X_File(const char *queryid, const struct ythtbbs_override
  */
 int file_size_s(const char *filepath);
 
+bool api_check_method(onion_request *req, onion_request_flags flags);
+#define DEFINE_COMMON_SESSION_VARS \
+	char cookie_buf[512];\
+	struct bmy_cookie cookie;\
+	int utmp_idx;\
+	struct user_info *ptr_info;
+
+/**
+ @brief 检查会话状态并初始化变量
+ 如果没有正确登录，utmp_idx 和 pptr_info 会分别初始化为 -1 和 NULL。
+ @param cookie_buf 存放 cookie 的缓冲区，用于解析 cookie
+ @param buf_len cookie 缓冲区的长度
+ @param cookie 存放 cookie 的结构体指针
+ @param utmp_idx 存放 utmp_idx 的指针
+ @param pptr_info 存放会话数据指针的指针
+ @return 状态码，成功返回 API_RT_SUCCESSFUL
+ */
+int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, struct bmy_cookie *cookie, int *utmp_idx, struct user_info **pptr_info);
+
+struct json_object *apilib_convert_fileheader_utf_to_jsonobj(struct fileheader_utf *ptr_header);
 #endif
