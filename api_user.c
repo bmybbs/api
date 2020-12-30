@@ -12,6 +12,8 @@
 #include "ytht/common.h"
 #include "ytht/random.h"
 #include "bmy/convcode.h"
+#include "bmy/user.h"
+#include "bmy/2fa.h"
 #include "ythtbbs/identify.h"
 #include "ythtbbs/misc.h"
 #include "ythtbbs/user.h"
@@ -709,6 +711,40 @@ static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 	free(array);
 	free(ue);
 	free(query_ue);
+	return OCS_PROCESSED;
+}
+
+#define BMY_2FA_KEY_SIZE (32 + 1)
+
+int api_user_wx_2fa_get_key(ONION_FUNC_PROTO_STR) {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	char key[BMY_2FA_KEY_SIZE], local_buf[128];
+	bmy_2fa_status status;
+
+	if (!api_check_method(req, OR_GET))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	if (bmy_user_has_openid(utmp_idx + 1)) {
+		return api_error(p, req, res, API_RT_HASOPENID);
+	}
+
+	status = bmy_2fa_create(key, BMY_2FA_KEY_SIZE);
+	if (status != BMY_2FA_SUCCESS) {
+		snprintf(local_buf, sizeof(local_buf), "generate 2fa failed for %s, status: %d", ptr_info->userid, status);
+		newtrace(local_buf);
+		return api_error(p, req, res, API_RT_2FA_INTERNAL);
+	}
+
+	// 这里 key 的长度是明确的，且是 json 安全的字符，因此就不额外声明缓冲区了，并且直接生成 json
+	snprintf(local_buf, sizeof(local_buf), "{\"errcode\": 0, \"key\":\"%s\"}", key);
+
+	api_set_json_header(res);
+	onion_response_write0(res, local_buf);
 	return OCS_PROCESSED;
 }
 
