@@ -715,6 +715,7 @@ static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 }
 
 #define BMY_2FA_KEY_SIZE (32 + 1)
+static const char *SESSION_2FA_KEY = "TFAKEY";
 
 int api_user_wx_2fa_get_key(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
@@ -745,6 +746,8 @@ int api_user_wx_2fa_get_key(ONION_FUNC_PROTO_STR) {
 
 	api_set_json_header(res);
 	onion_response_write0(res, local_buf);
+
+	ythtbbs_session_set_value(cookie.sessid, SESSION_2FA_KEY, key);
 	return OCS_PROCESSED;
 }
 
