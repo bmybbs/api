@@ -721,6 +721,7 @@ int api_user_wx_2fa_get_key(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
 	int rc;
 	char key[BMY_2FA_KEY_SIZE], local_buf[128];
+	char *old_key = NULL;
 	bmy_2fa_status status;
 
 	if (!api_check_method(req, OR_GET))
@@ -733,6 +734,19 @@ int api_user_wx_2fa_get_key(ONION_FUNC_PROTO_STR) {
 	if (bmy_user_has_openid(utmp_idx + 1)) {
 		return api_error(p, req, res, API_RT_HASOPENID);
 	}
+
+	old_key = ythtbbs_session_get_value(cookie.sessid, SESSION_2FA_KEY);
+	if (old_key && (bmy_2fa_valid(old_key) == BMY_2FA_SUCCESS)) {
+		snprintf(local_buf, sizeof(local_buf), "{\"errcode\": 0, \"key\":\"%s\"}", old_key);
+		free(old_key);
+
+		api_set_json_header(res);
+		onion_response_write0(res, local_buf);
+		return OCS_PROCESSED;
+	}
+
+	if (old_key)
+		free(old_key);
 
 	status = bmy_2fa_create(key, BMY_2FA_KEY_SIZE);
 	if (status != BMY_2FA_SUCCESS) {
