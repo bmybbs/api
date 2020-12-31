@@ -101,3 +101,49 @@ int api_oauth_2fa_get_code(ONION_FUNC_PROTO_STR) {
 	return OCS_PROCESSED;
 }
 
+int api_oauth_2fa_check_code(ONION_FUNC_PROTO_STR) {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	char *old_key = NULL;
+	char *openid = NULL;
+	const char *code = onion_request_get_query(req, "code");
+
+	if (!api_check_method(req, OR_POST)) {
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+	}
+
+	if (code == NULL || code[0] == '\0') {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	if (bmy_user_has_openid(utmp_idx + 1)) {
+		return api_error(p, req, res, API_RT_HASOPENID);
+	}
+
+	old_key = ythtbbs_session_get_value(cookie.sessid, SESSION_2FA_KEY);
+	if (old_key == NULL || (bmy_2fa_valid(old_key) != BMY_2FA_SUCCESS)) {
+		if (old_key)
+			free(old_key);
+
+		return api_error(p, req, res, API_RT_2FA_INVALID);
+	}
+
+	openid = bmy_2fa_check_code(old_key, code);
+	if (openid == NULL) {
+		free(old_key);
+		return api_error(p, req, res, API_RT_2FA_INTERNAL);
+	}
+
+	bmy_user_associate_openid(utmp_idx + 1, openid);
+
+	ythtbbs_session_clear_key(cookie.sessid, SESSION_2FA_KEY);
+	free(old_key);
+	free(openid);
+
+	return api_error(p, req, res, API_RT_SUCCESSFUL);
+}
+

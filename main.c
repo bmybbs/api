@@ -56,6 +56,7 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^user/autocomplete$", api_user_autocomplete);
 	onion_url_add(urls, "^oauth/2fa_get_key$", api_oauth_2fa_get_key);
 	onion_url_add(urls, "^oauth/2fa_get_code$", api_oauth_2fa_get_code);
+	onion_url_add(urls, "^oauth/2fa_check_code$", api_oauth_2fa_check_code);
 	onion_url_add(urls, "^article/list$", api_article_list);
 	onion_url_add(urls, "^article/getHTMLContent$", api_article_getHTMLContent);
 	onion_url_add(urls, "^article/getRAWContent$", api_article_getRAWContent);
