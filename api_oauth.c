@@ -1,9 +1,11 @@
+#include <string.h>
 #include <onion/request.h>
 #include <onion/response.h>
 #include "ytht/msg.h"
 #include "bmy/2fa.h"
 #include "bmy/wechat.h"
 #include "bmy/user.h"
+#include "ythtbbs/cache.h"
 #include "ythtbbs/session.h"
 #include "api.h"
 #include "apilib.h"
@@ -166,5 +168,67 @@ int api_oauth_remove_wx(ONION_FUNC_PROTO_STR) {
 
 	bmy_user_dissociate_openid(utmp_idx + 1);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
+}
+
+int api_oauth_login(ONION_FUNC_PROTO_STR) {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	int usernum;
+	const char *code = onion_request_get_query(req, "code");
+	const char *fromhost = onion_request_get_header(req, "X-Real-IP");
+
+	if (!api_check_method(req, OR_POST))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc == API_RT_SUCCESSFUL) {
+		// 已登录
+		return api_error(p, req, res, API_RT_SUCCESSFUL);
+	}
+
+	if (code == NULL || code[0] == '\0') {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	struct bmy_wechat_session wx_session = {
+		.openid = NULL,
+		.session_key = NULL
+	};
+
+	rc = bmy_wechat_session_get(code, &wx_session);
+	if (rc != BMY_WECHAT_ERRCODE_SUCCESS) {
+		bmy_wechat_session_free(&wx_session);
+		return api_error(p, req, res, API_RT_WXAPIERROR);
+	}
+
+	usernum = bmy_user_getusernum_by_openid(wx_session.openid);
+	bmy_wechat_session_free(&wx_session);
+
+	if (usernum == 0) {
+		return api_error(p, req, res, API_RT_NOOPENID);
+	}
+
+	// 验证通过，登录
+	struct user_info ui;
+	struct userec ue;
+	char userid[IDLEN + 2];
+	memset(userid, 0, sizeof(userid));
+	ythtbbs_cache_UserTable_resolve();
+	ythtbbs_cache_UserTable_getuserid(usernum, userid, sizeof(userid));
+	rc = ythtbbs_user_login(userid, NULL, fromhost, YTHTBBS_LOGIN_OAUTH, &ui, &ue, &utmp_idx);
+	if (rc != YTHTBBS_USER_LOGIN_OK) {
+		return api_error(p, req, res, rc); // 暂时偷懒不定义对应的错误码了
+	}
+
+	cookie.userid = ui.userid;
+	cookie.sessid = ui.sessionid;
+	cookie.token  = "";
+	bmy_cookie_gen(cookie_buf, sizeof(cookie_buf), &cookie);
+
+	api_set_json_header(res);
+	onion_response_add_cookie(res, SMAGIC, cookie_buf, -1, NULL, NULL, 0);
+	onion_response_write0(res, "{\"errcode\": 0}");
+
+	return OCS_PROCESSED;
 }
 
