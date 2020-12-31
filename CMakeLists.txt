@@ -12,6 +12,7 @@ add_executable(bmyapi
 	api_mail.c
 	api_notification.c
 	api_subscription.c
+	api_oauth.c
 )
 
 target_link_libraries(bmyapi ythtbbs ytht onion json-c hiredis)
