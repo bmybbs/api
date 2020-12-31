@@ -38,6 +38,7 @@ enum api_error_code {
 	API_RT_HASOPENID    = 100012,   ///< 已关联了 openid
 	API_RT_2FA_INTERNAL = 100013,   ///< 2fa 创建失败，检查日志
 	API_RT_2FA_INVALID  = 100014,   ///< 2fa 不存在或者无效
+	API_RT_NOOPENID     = 100015,   ///< 没有关联 openid
 	API_RT_NOSUCHBRD	= 110000,	///< 没有此版面
 	API_RT_NOBRDRPERM	= 110001,	///< 没有该版面的阅读权限
 	API_RT_EMPTYBRD		= 110002,	///< 版面没有文章

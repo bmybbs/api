@@ -147,3 +147,24 @@ int api_oauth_2fa_check_code(ONION_FUNC_PROTO_STR) {
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 
+int api_oauth_remove_wx(ONION_FUNC_PROTO_STR) {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+
+	if (!api_check_method(req, OR_POST)) {
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+	}
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, rc);
+	}
+
+	if (!bmy_user_has_openid(utmp_idx + 1)) {
+		return api_error(p, req, res, API_RT_NOOPENID);
+	}
+
+	bmy_user_dissociate_openid(utmp_idx + 1);
+	return api_error(p, req, res, API_RT_SUCCESSFUL);
+}
+
