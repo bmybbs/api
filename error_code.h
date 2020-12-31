@@ -21,6 +21,7 @@ enum api_error_code {
 	API_RT_NOTLOGGEDIN	= 1002,		///< 没有登录
 	API_RT_FUNCNOTIMPL	= 1003,		///< 功能未实现
 	API_RT_WRONGMETHOD	= 1004,		///< 错误的 HTTP 方法
+	API_RT_WXAPIERROR   = 1005,     ///< 微信服务调用错误
 	API_RT_NOTEMPLATE	= 1100,		///< 没有模板
 	API_RT_NOSUCHUSER 	= 100000, 	///< 没有此用户
 	API_RT_SITEFBDIP	= 100001,	///< 站点禁用IP
