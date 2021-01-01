@@ -4,7 +4,7 @@
 enum api_error_code {
 	API_RT_SUCCESSFUL 	= 0, 		///< 成功调用
 	API_RT_NOEMTSESS	= 1,		///< 系统用户已满
-	API_RT_CNTLGOTGST	= 2,		///< 不能注销guest用户
+	API_RT_CNTLGOUTGST	= 2,		///< 不能注销guest用户
 	API_RT_NOTOP10FILE	= 3,		///< 没有十大文件
 	API_RT_XMLFMTERROR	= 4,		///< 十大、分区热门话题文件格式有误
 	API_RT_NOSUCHFILE	= 5,		///< 没有找到对应文件，谨慎使用此错误码
@@ -54,7 +54,7 @@ enum api_error_code {
 	API_RT_MAILNOPPERM	= 130003,	///< 用户没有发邮件的权限
 	API_RT_MAILFULL		= 130004,	///< 邮箱已满
 	API_RT_INUSERBLIST	= 130005,	///< 在对方黑名单中
-	API_RT_ATTITNERR	= 140000,	///< 附件区内部错误（例如文件名）
+	API_RT_ATTINNERR	= 140000,	///< 附件区内部错误（例如文件名）
 	API_RT_ATTNOSPACE	= 140001,	///< 附件区没有足够控件
 	API_RT_ATTTOOBIG	= 140002,	///< 附件过大
 };

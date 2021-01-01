@@ -151,7 +151,7 @@ int api_attach_upload(ONION_FUNC_PROTO_STR)
 
 		if(strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
 			closedir(pdir);
-			return api_error(p, req, res, API_RT_ATTITNERR);
+			return api_error(p, req, res, API_RT_ATTINNERR);
 		}
 
 		sprintf(fname, "%s/%s", userattachpath, pdent->d_name);
