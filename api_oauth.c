@@ -18,6 +18,7 @@ int api_oauth_2fa_get_key(ONION_FUNC_PROTO_STR) {
 	int rc;
 	char key[BMY_2FA_KEY_SIZE], local_buf[128];
 	char *old_key = NULL;
+	int usernum;
 	bmy_2fa_status status;
 
 	if (!api_check_method(req, OR_GET))
@@ -27,7 +28,8 @@ int api_oauth_2fa_get_key(ONION_FUNC_PROTO_STR) {
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
 
-	if (bmy_user_has_openid(utmp_idx + 1)) {
+	usernum = 1 + ythtbbs_cache_UserIDHashTable_find_idx(ptr_info->userid);
+	if (bmy_user_has_openid(usernum)) {
 		return api_error(p, req, res, API_RT_HASOPENID);
 	}
 
@@ -108,6 +110,7 @@ int api_oauth_2fa_check_code(ONION_FUNC_PROTO_STR) {
 	int rc;
 	char *old_key = NULL;
 	char *openid = NULL;
+	int usernum;
 	const char *code = onion_request_get_query(req, "code");
 
 	if (!api_check_method(req, OR_POST)) {
@@ -122,7 +125,8 @@ int api_oauth_2fa_check_code(ONION_FUNC_PROTO_STR) {
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
 
-	if (bmy_user_has_openid(utmp_idx + 1)) {
+	usernum = 1 + ythtbbs_cache_UserIDHashTable_find_idx(ptr_info->userid);
+	if (bmy_user_has_openid(usernum)) {
 		return api_error(p, req, res, API_RT_HASOPENID);
 	}
 
@@ -140,7 +144,7 @@ int api_oauth_2fa_check_code(ONION_FUNC_PROTO_STR) {
 		return api_error(p, req, res, API_RT_2FA_INTERNAL);
 	}
 
-	bmy_user_associate_openid(utmp_idx + 1, openid);
+	bmy_user_associate_openid(usernum, openid);
 
 	ythtbbs_session_clear_key(cookie.sessid, SESSION_2FA_KEY);
 	free(old_key);
@@ -151,6 +155,7 @@ int api_oauth_2fa_check_code(ONION_FUNC_PROTO_STR) {
 
 int api_oauth_remove_wx(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
+	int usernum;
 	int rc;
 
 	if (!api_check_method(req, OR_POST)) {
@@ -162,11 +167,12 @@ int api_oauth_remove_wx(ONION_FUNC_PROTO_STR) {
 		return api_error(p, req, res, rc);
 	}
 
-	if (!bmy_user_has_openid(utmp_idx + 1)) {
+	usernum = 1 + ythtbbs_cache_UserIDHashTable_find_idx(ptr_info->userid);
+	if (!bmy_user_has_openid(usernum)) {
 		return api_error(p, req, res, API_RT_NOOPENID);
 	}
 
-	bmy_user_dissociate_openid(utmp_idx + 1);
+	bmy_user_dissociate_openid(usernum);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 
