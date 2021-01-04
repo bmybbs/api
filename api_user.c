@@ -4,6 +4,7 @@
 #include <json-c/json.h>
 #include <hiredis/hiredis.h>
 #include <onion/dict.h>
+#include <onion/block.h>
 
 #include "bbs.h"
 #include "ytht/crypt.h"
@@ -71,10 +72,26 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
 
-	const onion_dict *param_dict = onion_request_get_query_dict(req);
-	const char * userid = onion_dict_get(param_dict, "userid");
-	const char * passwd = onion_dict_get(param_dict, "passwd");
-	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
+	const char *body = onion_block_data(onion_request_get_data(req));
+	if (body == NULL || body[0] == '\0') {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	struct json_object *req_json = json_tokener_parse(body);
+	if (req_json == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	struct json_object *req_json_userid = json_object_object_get(req_json, "userid");
+	struct json_object *req_json_passwd = json_object_object_get(req_json, "passwd");
+	if (req_json_userid == NULL || req_json_passwd == NULL) {
+		json_object_put(req_json);
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	const char *userid = json_object_get_string(req_json_userid);
+	const char *passwd = json_object_get_string(req_json_passwd);
+	const char *fromhost = onion_request_get_header(req, "X-Real-IP");
 
 	time_t now_t = time(NULL);
 	time_t dtime;
@@ -83,6 +100,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	int utmp_index;
 
 	if(userid == NULL || passwd == NULL) {
+		json_object_put(req_json);
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
@@ -92,14 +110,12 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	struct userec ue;
 	struct user_info ui;
 	int r = ythtbbs_user_login(userid, passwd, fromhost, YTHTBBS_LOGIN_API, &ui, &ue, &utmp_index);
+	json_object_put(req_json);
 	if(r != YTHTBBS_USER_LOGIN_OK) { // TODO: 检查是否还有未释放的资源
 		return api_error(p, req, res, r);
 	}
 
-	struct json_object *obj = json_object_new_object();
-	json_object_object_add(obj, "userid", json_object_new_string(ue.userid));
-	json_object_object_add(obj, "sessid", json_object_new_string(ui.sessionid));
-
+	// 不应该再使用 userid / passwd 指针
 	struct bmy_cookie cookie = {
 		.userid = ui.userid,
 		.sessid = ui.sessionid,
@@ -109,10 +125,8 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	bmy_cookie_gen(buf, sizeof(buf), &cookie);
 	api_set_json_header(res);
 	onion_response_add_cookie(res, SMAGIC, buf, -1, NULL, NULL, 0); // TODO 检查 cookie 的有效期
-	onion_response_write0(res, json_object_to_json_string(obj));
 
-	json_object_put(obj);
-	return OCS_PROCESSED;
+	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 
 int api_user_query(ONION_FUNC_PROTO_STR)
