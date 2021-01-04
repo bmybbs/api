@@ -257,8 +257,7 @@ int check_user_session_with_mode_change(struct userec *x, const char *sessid, co
 
 	if(ui->pid == APPPID
 			&& strcasecmp(ui->userid, x->userid)==0
-			&& strcasecmp(ui->sessionid, ssid)==0
-			&& strcasecmp(ui->appkey, appkey)==0) {
+			&& strcasecmp(ui->sessionid, ssid)==0) {
 		if(mode > 0) {
 			ui->mode = mode;
 		}
