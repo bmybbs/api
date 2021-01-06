@@ -1047,7 +1047,7 @@ int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, stru
 	*pptr_info = NULL;
 	*utmp_idx = -1;
 	if(cookie_str == NULL || cookie_str[0] == '\0') {
-		return API_RT_WRONGPARAM;
+		return API_RT_NOTLOGGEDIN;
 	}
 
 	strncpy(cookie_buf, cookie_str, buf_len);
