@@ -57,6 +57,7 @@ enum api_error_code {
 	API_RT_ATTINNERR	= 140000,	///< 附件区内部错误（例如文件名）
 	API_RT_ATTNOSPACE	= 140001,	///< 附件区没有足够控件
 	API_RT_ATTTOOBIG	= 140002,	///< 附件过大
+	API_RT_NOMOREFEED   = 150001,   ///< 没有数据
 };
 
 #endif

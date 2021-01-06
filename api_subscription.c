@@ -39,9 +39,7 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	if (articles == NULL || articles->count == 0) {
 		bmy_article_list_free(articles);
 
-		api_set_json_header(res);
-		onion_response_write0(res, "{ \"error_code\": 0}"); // TODO
-		return OCS_PROCESSED;
+		return api_error(p, req, res, API_RT_NOMOREFEED);
 	}
 
 	struct json_object *obj = json_object_new_object();
@@ -57,6 +55,7 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	}
 
 	json_object_object_add(obj, "articles", article_array);
+	json_object_object_add(obj, "errcode", json_object_new_int(API_RT_SUCCESSFUL));
 
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE));
