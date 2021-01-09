@@ -161,8 +161,7 @@ char * getuserlevelname(unsigned userlevel)
 		return "";
 }
 
-char * calc_exp_str_utf8(int exp)
-{
+const char *calc_exp_str_utf8(int exp) {
 	int expbase = 0;
 
 	if (exp == -9999)
@@ -184,8 +183,7 @@ char * calc_exp_str_utf8(int exp)
 	return "开国大老";
 }
 
-char * calc_perf_str_utf8(int perf)
-{
+const char *calc_perf_str_utf8(int perf) {
 	if (perf == -9999)
 		return "没等级";
 	if (perf <= 5)
