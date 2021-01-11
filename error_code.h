@@ -4,7 +4,7 @@
 enum api_error_code {
 	API_RT_SUCCESSFUL 	= 0, 		///< 成功调用
 	API_RT_NOEMTSESS	= 1,		///< 系统用户已满
-	API_RT_CNTLGOTGST	= 2,		///< 不能注销guest用户
+	API_RT_CNTLGOUTGST	= 2,		///< 不能注销guest用户
 	API_RT_NOTOP10FILE	= 3,		///< 没有十大文件
 	API_RT_XMLFMTERROR	= 4,		///< 十大、分区热门话题文件格式有误
 	API_RT_NOSUCHFILE	= 5,		///< 没有找到对应文件，谨慎使用此错误码
@@ -21,6 +21,7 @@ enum api_error_code {
 	API_RT_NOTLOGGEDIN	= 1002,		///< 没有登录
 	API_RT_FUNCNOTIMPL	= 1003,		///< 功能未实现
 	API_RT_WRONGMETHOD	= 1004,		///< 错误的 HTTP 方法
+	API_RT_WXAPIERROR   = 1005,     ///< 微信服务调用错误
 	API_RT_NOTEMPLATE	= 1100,		///< 没有模板
 	API_RT_NOSUCHUSER 	= 100000, 	///< 没有此用户
 	API_RT_SITEFBDIP	= 100001,	///< 站点禁用IP
@@ -34,6 +35,10 @@ enum api_error_code {
 	API_RT_REACHMAXRCD	= 100009,	///< 达到最大记录数
 	API_RT_ALRDYINRCD	= 100010,	///< 已存在记录中
 	API_RT_NOTINRCD		= 100011,	///< 不存在记录中
+	API_RT_HASOPENID    = 100012,   ///< 已关联了 openid
+	API_RT_2FA_INTERNAL = 100013,   ///< 2fa 创建失败，检查日志
+	API_RT_2FA_INVALID  = 100014,   ///< 2fa 不存在或者无效
+	API_RT_NOOPENID     = 100015,   ///< 没有关联 openid
 	API_RT_NOSUCHBRD	= 110000,	///< 没有此版面
 	API_RT_NOBRDRPERM	= 110001,	///< 没有该版面的阅读权限
 	API_RT_EMPTYBRD		= 110002,	///< 版面没有文章
@@ -49,9 +54,10 @@ enum api_error_code {
 	API_RT_MAILNOPPERM	= 130003,	///< 用户没有发邮件的权限
 	API_RT_MAILFULL		= 130004,	///< 邮箱已满
 	API_RT_INUSERBLIST	= 130005,	///< 在对方黑名单中
-	API_RT_ATTITNERR	= 140000,	///< 附件区内部错误（例如文件名）
+	API_RT_ATTINNERR	= 140000,	///< 附件区内部错误（例如文件名）
 	API_RT_ATTNOSPACE	= 140001,	///< 附件区没有足够控件
 	API_RT_ATTTOOBIG	= 140002,	///< 附件过大
+	API_RT_NOMOREFEED   = 150001,   ///< 没有数据
 };
 
 #endif

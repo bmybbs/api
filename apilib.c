@@ -161,8 +161,7 @@ char * getuserlevelname(unsigned userlevel)
 		return "";
 }
 
-char * calc_exp_str_utf8(int exp)
-{
+const char *calc_exp_str_utf8(int exp) {
 	int expbase = 0;
 
 	if (exp == -9999)
@@ -184,8 +183,7 @@ char * calc_exp_str_utf8(int exp)
 	return "开国大老";
 }
 
-char * calc_perf_str_utf8(int perf)
-{
+const char *calc_perf_str_utf8(int perf) {
 	if (perf == -9999)
 		return "没等级";
 	if (perf <= 5)
@@ -257,8 +255,7 @@ int check_user_session_with_mode_change(struct userec *x, const char *sessid, co
 
 	if(ui->pid == APPPID
 			&& strcasecmp(ui->userid, x->userid)==0
-			&& strcasecmp(ui->sessionid, ssid)==0
-			&& strcasecmp(ui->appkey, appkey)==0) {
+			&& strcasecmp(ui->sessionid, ssid)==0) {
 		if(mode > 0) {
 			ui->mode = mode;
 		}
@@ -1048,7 +1045,7 @@ int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, stru
 	*pptr_info = NULL;
 	*utmp_idx = -1;
 	if(cookie_str == NULL || cookie_str[0] == '\0') {
-		return API_RT_WRONGPARAM;
+		return API_RT_NOTLOGGEDIN;
 	}
 
 	strncpy(cookie_buf, cookie_str, buf_len);

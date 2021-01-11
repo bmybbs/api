@@ -162,7 +162,7 @@ int mail_count(char *id, int *unread);
  * @param exp 输入经验值
  * @return
  */
-char * calc_exp_str_utf8(int exp);
+const char *calc_exp_str_utf8(int exp);
 
 /**
  * @brief 评价用户经验值
@@ -170,7 +170,7 @@ char * calc_exp_str_utf8(int exp);
  * @param perf
  * @return
  */
-char * calc_perf_str_utf8(int perf);
+const char *calc_perf_str_utf8(int perf);
 
 /**
  * @brief 实际处理发文的函数。

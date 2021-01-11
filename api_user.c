@@ -1,24 +1,21 @@
 #include <onion/response.h>
 #include <time.h>
 #include <string.h>
-#include <sys/file.h>
 #include <json-c/json.h>
 #include <hiredis/hiredis.h>
 #include <onion/dict.h>
+#include <onion/block.h>
 
 #include "bbs.h"
 #include "ytht/crypt.h"
 #include "ytht/strlib.h"
-#include "ytht/common.h"
 #include "ytht/random.h"
 #include "bmy/convcode.h"
 #include "ythtbbs/identify.h"
-#include "ythtbbs/misc.h"
 #include "ythtbbs/user.h"
 #include "ythtbbs/override.h"
 #include "ythtbbs/notification.h"
 #include "ythtbbs/permissions.h"
-#include "ythtbbs/session.h"
 #include "bmy/cookie.h"
 
 #include "api.h"
@@ -75,10 +72,26 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
 
-	const onion_dict *param_dict = onion_request_get_query_dict(req);
-	const char * userid = onion_dict_get(param_dict, "userid");
-	const char * passwd = onion_dict_get(param_dict, "passwd");
-	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
+	const char *body = onion_block_data(onion_request_get_data(req));
+	if (body == NULL || body[0] == '\0') {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	struct json_object *req_json = json_tokener_parse(body);
+	if (req_json == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	struct json_object *req_json_userid = json_object_object_get(req_json, "userid");
+	struct json_object *req_json_passwd = json_object_object_get(req_json, "passwd");
+	if (req_json_userid == NULL || req_json_passwd == NULL) {
+		json_object_put(req_json);
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	const char *userid = json_object_get_string(req_json_userid);
+	const char *passwd = json_object_get_string(req_json_passwd);
+	const char *fromhost = onion_request_get_header(req, "X-Real-IP");
 
 	time_t now_t = time(NULL);
 	time_t dtime;
@@ -87,6 +100,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	int utmp_index;
 
 	if(userid == NULL || passwd == NULL) {
+		json_object_put(req_json);
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
@@ -96,14 +110,12 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	struct userec ue;
 	struct user_info ui;
 	int r = ythtbbs_user_login(userid, passwd, fromhost, YTHTBBS_LOGIN_API, &ui, &ue, &utmp_index);
+	json_object_put(req_json);
 	if(r != YTHTBBS_USER_LOGIN_OK) { // TODO: 检查是否还有未释放的资源
 		return api_error(p, req, res, r);
 	}
 
-	struct json_object *obj = json_object_new_object();
-	json_object_object_add(obj, "userid", json_object_new_string(ue.userid));
-	json_object_object_add(obj, "sessid", json_object_new_string(ui.sessionid));
-
+	// 不应该再使用 userid / passwd 指针
 	struct bmy_cookie cookie = {
 		.userid = ui.userid,
 		.sessid = ui.sessionid,
@@ -112,11 +124,9 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	char buf[60];
 	bmy_cookie_gen(buf, sizeof(buf), &cookie);
 	api_set_json_header(res);
-	onion_response_add_cookie(res, SMAGIC, buf, -1, NULL, NULL, 0); // TODO 检查 cookie 的有效期
-	onion_response_write0(res, json_object_to_json_string(obj));
+	onion_response_add_cookie(res, SMAGIC, buf, MAX_SESS_TIME - 10, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY);
 
-	json_object_put(obj);
-	return OCS_PROCESSED;
+	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 
 int api_user_query(ONION_FUNC_PROTO_STR)
@@ -142,12 +152,12 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 			return api_error(p, req, res, API_RT_NOSUCHUSER);
 
 		int unread_mail;
-		mail_count(ue->userid, &unread_mail);
+		int total_mail = mail_count(ue->userid, &unread_mail);
 		sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
-				"\"post_counts\":%d, \"unread_mail\":%d, \"unread_notify\":%d,"
+				"\"post_counts\":%d, \"total_mail\":%d, \"unread_mail\":%d, \"unread_notify\":%d,"
 				"\"job\":\"%s\", \"exp\":%d, \"perf\":%d,"
 				"\"exp_level\":\"%s\", \"perf_level\":\"%s\"}",
-				ue->userid, ue->numlogins, ue->numposts, unread_mail,
+				ue->userid, ue->numlogins, ue->numposts, total_mail, unread_mail,
 				count_notification_num(ue->userid), getuserlevelname(ue->userlevel),
 				countexp(ue), countperf(ue),
 				calc_exp_str_utf8(countexp(ue)), calc_perf_str_utf8(countperf(ue)));
@@ -190,7 +200,7 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 
 	ythtbbs_user_logout(ptr_info->userid, utmp_idx); // TODO return value
 
-	onion_response_add_cookie(res, SMAGIC, "", 0, NULL, NULL, 0);
+	onion_response_add_cookie(res, SMAGIC, "", 0, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 

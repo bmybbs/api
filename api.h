@@ -21,6 +21,11 @@ int api_user_rejects_list(ONION_FUNC_PROTO_STR);
 int api_user_rejects_add(ONION_FUNC_PROTO_STR);
 int api_user_rejects_del(ONION_FUNC_PROTO_STR);
 int api_user_autocomplete(ONION_FUNC_PROTO_STR);
+int api_oauth_2fa_get_key(ONION_FUNC_PROTO_STR);
+int api_oauth_2fa_get_code(ONION_FUNC_PROTO_STR);
+int api_oauth_2fa_check_code(ONION_FUNC_PROTO_STR);
+int api_oauth_remove_wx(ONION_FUNC_PROTO_STR);
+int api_oauth_login(ONION_FUNC_PROTO_STR);
 
 int api_article_list(ONION_FUNC_PROTO_STR);
 
