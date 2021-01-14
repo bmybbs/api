@@ -224,6 +224,7 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	struct goodboard g_brd;
+	memset(&g_brd, 0, sizeof(struct goodboard));
 	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	if(g_brd.num >= GOOD_BRD_NUM) {
@@ -264,6 +265,7 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	struct goodboard g_brd;
+	memset(&g_brd, 0, sizeof(struct goodboard));
 	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	if(g_brd.num == 0) {

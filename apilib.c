@@ -796,6 +796,10 @@ int do_article_post(const char *board, const char *title, const char *filename, 
 	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len*2);
 	fprintf(fp1, "%s", content_gbk_buf);
 	fclose(fp1);
+	free(content_gbk_buf);
+	content_gbk_buf = NULL;
+	free(content_utf8_buf);
+	content_utf8_buf = NULL;
 
 	sprintf(buf3, "boards/%s/M.%d.A", board, t);
 	header.sizebyte = ytht_num2byte(eff_size(buf3));

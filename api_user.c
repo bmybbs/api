@@ -638,7 +638,7 @@ static int api_user_override_File_add(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 	}
 
 	struct ythtbbs_override of;
-	strcpy(of.id, query_ue->userid);
+	strncpy(of.id, query_ue->userid, IDLEN);
 	u2g(exp_utf, strlen(exp_utf), of.exp, sizeof(of.exp));
 
 	ythtbbs_override_add(ue->userid, &of, mode);
@@ -703,7 +703,7 @@ static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 
 	int i;
 	for (i = 0; i < size - 1; ++i) {
-		if (strcasecmp(array[i].id, queryid) == 0) {
+		if (strncasecmp(array[i].id, queryid, IDLEN) == 0) {
 			array[i].id[0] = '\0';
 			size--;
 			break;
