@@ -369,6 +369,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	fp = fopen(dir, "r");
 	if(!fp || fsize == 0) {
 		free(commend_list);
+		if (fp) fclose(fp);
 		return api_error(p, req, res, API_RT_NOCMMNDFILE);
 	}
 
