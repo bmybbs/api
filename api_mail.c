@@ -25,7 +25,7 @@ static int get_user_max_mail_size(struct userec * ue);
 
 static int get_user_mail_size(char * userid);
 
-static int check_user_maxmail(struct userec currentuser);
+static int check_user_maxmail(struct userec *currentuser);
 
 static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode);
 
@@ -186,15 +186,15 @@ static int get_user_mail_size(char * userid)
 	return (currsize/1024);
 }
 
-static int check_user_maxmail(struct userec currentuser)
+static int check_user_maxmail(struct userec *currentuser)
 {
 	int currsize, maxsize;
-	if(HAS_PERM(PERM_SYSOP|PERM_OBOARDS, currentuser))
+	if(HAS_PERM(PERM_SYSOP|PERM_OBOARDS, (*currentuser)))
 		return 0;
 
 	currsize = 0;
-	maxsize = get_user_max_mail_size(&currentuser);
-	currsize = get_user_mail_size(currentuser.userid);
+	maxsize = get_user_max_mail_size(currentuser);
+	currsize = get_user_mail_size(currentuser->userid);
 
 	return (currsize > (maxsize + 20));
 }
@@ -388,7 +388,7 @@ static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode)
 	memset(ui->from, 0, 20);
 	strncpy(ui->from, fromhost, 20);
 
-	if(check_user_maxmail(currentuser)) {
+	if(check_user_maxmail(&currentuser)) {
 		return api_error(p, req, res, API_RT_MAILFULL);
 	}
 
