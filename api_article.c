@@ -1094,7 +1094,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		free(ue);
 		free(title_gbk);
 		unlink(filename);
-		api_error(p, req, res, API_RT_ATCLINNERR);
+		return api_error(p, req, res, API_RT_ATCLINNERR);
 	}
 
 	// TODO: 更新未读标记
