@@ -487,6 +487,7 @@ static char * parse_mail(char * userid, int filetime, int mode, struct attach_li
 			fflush(mem_stream);
 			fclose(mem_stream);
 			free(mem_buf);
+			fclose(article_stream);
 			return NULL;
 		} else if(checkbinaryattach(buf, article_stream, &attach_file_size)) {
 			attach_no++;
