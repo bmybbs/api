@@ -590,6 +590,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	int fsize = file_size_s(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
+		if (fd) close(fd);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
