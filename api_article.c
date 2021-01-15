@@ -291,7 +291,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 			snprintf(tmp, strlen(num)-1, "%s", num+1);
 			top_list[i].th_num = atoi(tmp);
 		}
-		strncpy(top_list[i].title, (const char*)xmlNodeGetContent(cur_link), 80);
+		ytht_strsncpy(top_list[i].title, (const char*)xmlNodeGetContent(cur_link), 80);
 
 		memset(buf, 0, 256);
 		memcpy(buf, link, 256);
