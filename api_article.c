@@ -291,7 +291,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 			snprintf(tmp, strlen(num)-1, "%s", num+1);
 			top_list[i].th_num = atoi(tmp);
 		}
-		strncpy(top_list[i].title, (const char*)xmlNodeGetContent(cur_link), 80);
+		ytht_strsncpy(top_list[i].title, (const char*)xmlNodeGetContent(cur_link), 80);
 
 		memset(buf, 0, 256);
 		memcpy(buf, link, 256);
@@ -322,7 +322,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 			}
 		} else {
 			get_fileheader_by_filetime_thread(0, top_list[i].board, top_list[i].filetime, &fh);
-			if(fh.filetime != 0) {
+			if(fh.thread != 0) {
 				top_list[i].thread = fh.thread;
 				strcpy(top_list[i].author, fh2owner(&fh));
 			}
@@ -369,6 +369,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	fp = fopen(dir, "r");
 	if(!fp || fsize == 0) {
 		free(commend_list);
+		if (fp) fclose(fp);
 		return api_error(p, req, res, API_RT_NOCMMNDFILE);
 	}
 
@@ -460,6 +461,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
 		free(board_list);
+		if (fd) close(fd);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 
@@ -589,6 +591,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	int fsize = file_size_s(dir);
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
+		if (fd) close(fd);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
@@ -730,6 +733,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 
 		strcpy(board_list[i].board, b->header.filename);
 		strcpy(board_list[i].author, fh2owner(&x));
+		x.title[sizeof(x.title) - 1] = 0;
 		g2u(x.title, strlen(x.title), board_list[i].title, 80);
 	}
 
@@ -1094,7 +1098,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		free(ue);
 		free(title_gbk);
 		unlink(filename);
-		api_error(p, req, res, API_RT_ATCLINNERR);
+		return api_error(p, req, res, API_RT_ATCLINNERR);
 	}
 
 	// TODO: 更新未读标记

@@ -240,6 +240,7 @@ static void output_binary_attach(onion_response *res, const char *filename, cons
 	onion_response_write(res, mf.ptr+attachpos+4, size);
 
 	mmapfile(NULL, &mf);
+	free(body);
 }
 
 static char * get_mime_type(const char *name)

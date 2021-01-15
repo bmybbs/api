@@ -293,6 +293,7 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, rc);
 
 	struct goodboard g_brd;
+	memset(&g_brd, 0, sizeof(struct goodboard));
 	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	// 输出
@@ -410,6 +411,7 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
 
 	struct goodboard g_brd;
+	memset(&g_brd, 0, sizeof(struct goodboard));
 	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	int count=0;
@@ -554,10 +556,10 @@ static int board_read(char *board, int lastpost, const char *fromhost, struct us
 	struct onebrc *pbrc, brc;
 
 	memset(&allbrc, 0, sizeof(allbrc));
-	memset(allbrcuser, 0, STRLEN);
+	memset(allbrcuser, 0, sizeof(allbrcuser));
 	memset(&brc, 0, sizeof(brc));
 
-	brc_initial(NULL, board, &allbrc, allbrcuser, fromhost, ui, &pbrc, &brc);
+	brc_initial(NULL, board, &allbrc, allbrcuser, sizeof(allbrcuser), fromhost, ui, &pbrc, &brc);
 	return !brc_unreadt(pbrc, lastpost);
 }
 

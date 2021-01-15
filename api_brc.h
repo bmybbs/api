@@ -7,7 +7,10 @@
  * @date	2013-11-01
  */
 
-#ifndef __BMYBBS_API_BRC_H
-#define __BMYBBS_API_BRC_H
-int brc_initial(char *userid, char *boardname,struct allbrc *allbrc, char *allbrcuser, const char *fromhost, struct user_info *u_info, struct onebrc **pbrc, struct onebrc *brc);
+#ifndef BMYBBS_API_BRC_H
+#define BMYBBS_API_BRC_H
+#include <stddef.h>
+#include "ythtbbs/cache.h"
+
+int brc_initial(char *userid, char *boardname,struct allbrc *allbrc, char *allbrcuser, size_t allbrcuser_size, const char *fromhost, struct user_info *u_info, struct onebrc **pbrc, struct onebrc *brc);
 #endif
