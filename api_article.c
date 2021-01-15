@@ -322,7 +322,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 			}
 		} else {
 			get_fileheader_by_filetime_thread(0, top_list[i].board, top_list[i].filetime, &fh);
-			if(fh.filetime != 0) {
+			if(fh.thread != 0) {
 				top_list[i].thread = fh.thread;
 				strcpy(top_list[i].author, fh2owner(&fh));
 			}
