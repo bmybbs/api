@@ -554,10 +554,10 @@ static int board_read(char *board, int lastpost, const char *fromhost, struct us
 	struct onebrc *pbrc, brc;
 
 	memset(&allbrc, 0, sizeof(allbrc));
-	memset(allbrcuser, 0, STRLEN);
+	memset(allbrcuser, 0, sizeof(allbrcuser));
 	memset(&brc, 0, sizeof(brc));
 
-	brc_initial(NULL, board, &allbrc, allbrcuser, fromhost, ui, &pbrc, &brc);
+	brc_initial(NULL, board, &allbrc, allbrcuser, sizeof(allbrcuser), fromhost, ui, &pbrc, &brc);
 	return !brc_unreadt(pbrc, lastpost);
 }
 

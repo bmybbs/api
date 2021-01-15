@@ -4,7 +4,7 @@
 //static char allbrcuser[STRLEN];
 //static struct onebrc *pbrc, brc;
 
-int readuserallbrc(char *userid, struct allbrc *allbrc, char *allbrcuser, const char *fromhost, int must)
+static int readuserallbrc(char *userid, struct allbrc *allbrc, char *allbrcuser, size_t allbrcuser_size, const char *fromhost, int must)
 {
 	char buf[STRLEN];
 	if (!userid)
@@ -20,17 +20,17 @@ int readuserallbrc(char *userid, struct allbrc *allbrc, char *allbrcuser, const 
 		if (!must && !strncmp(allbrcuser, userid, STRLEN))
 			return 0;
 		sethomefile_s(buf, sizeof(buf), userid, "brc");
-		ytht_strsncpy(allbrcuser, userid, sizeof (allbrcuser));
+		ytht_strsncpy(allbrcuser, userid, allbrcuser_size);
 		brc_init(allbrc, userid, buf);
 	}
 	return 0;
 }
 
-void brc_update(char *userid, struct allbrc *allbrc, char *allbrcuser, struct onebrc *pbrc, const char *fromhost)
+void brc_update(char *userid, struct allbrc *allbrc, char *allbrcuser, size_t allbrcuser_size, struct onebrc *pbrc, const char *fromhost)
 {
 	if (!pbrc->changed)
 		return;
-	readuserallbrc(userid, allbrc, allbrcuser, fromhost, 0);
+	readuserallbrc(userid, allbrc, allbrcuser, allbrcuser_size, fromhost, 0);
 	brc_putboard(allbrc, pbrc);
 	if (strcasecmp(userid, "guest")==0) {
 		char str[STRLEN];
@@ -40,7 +40,7 @@ void brc_update(char *userid, struct allbrc *allbrc, char *allbrcuser, struct on
 		brc_fini(allbrc, userid);
 }
 
-int brc_initial(char *userid, char *boardname,struct allbrc *allbrc, char *allbrcuser, const char *fromhost, struct user_info *u_info, struct onebrc **pbrc, struct onebrc *brc)
+int brc_initial(char *userid, char *boardname, struct allbrc *allbrc, char *allbrcuser, size_t allbrcuser_size, const char *fromhost, struct user_info *u_info, struct onebrc **pbrc, struct onebrc *brc)
 {
 	if (u_info)
 		*pbrc = &u_info->brc;
@@ -50,7 +50,7 @@ int brc_initial(char *userid, char *boardname,struct allbrc *allbrc, char *allbr
 	}
 	if (boardname && !strncmp(boardname, (*pbrc)->board, sizeof ((*pbrc)->board)))
 		return 0;
-	readuserallbrc(userid, allbrc, allbrcuser, fromhost, 1);
+	readuserallbrc(userid, allbrc, allbrcuser, allbrcuser_size, fromhost, 1);
 	if (boardname)
 		brc_getboard(allbrc, *pbrc, boardname);
 	return 0;
