@@ -730,6 +730,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 
 		strcpy(board_list[i].board, b->header.filename);
 		strcpy(board_list[i].author, fh2owner(&x));
+		x.title[sizeof(x.title) - 1] = 0;
 		g2u(x.title, strlen(x.title), board_list[i].title, 80);
 	}
 
