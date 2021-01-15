@@ -461,6 +461,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	fd = open(dir, O_RDONLY);
 	if(0 == fd || 0 == fsize) {
 		free(board_list);
+		if (fd) close(fd);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 
