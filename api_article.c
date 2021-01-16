@@ -490,6 +490,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	if(startnum <= 0)
 		startnum = 1;
 	int sum = 0, num = 0;
+	struct api_article EMPTY_ARTICLE;
 	for(i = 0; i < total; ++i) {
 		// TODO: 高亮标题处理
 		if(0 == mode)
@@ -529,8 +530,8 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		board_list[num].type = mode;
 		board_list[num].sequence_num = i;
 
-		strcpy(board_list[num].board, board);
-		strcpy(board_list[num].author, data[i].owner);
+		ytht_strsncpy(board_list[num].board, board, sizeof(EMPTY_ARTICLE.board));
+		ytht_strsncpy(board_list[num].author, data[i].owner, sizeof(EMPTY_ARTICLE.author));
 		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
 		++num;
 		if(num >= count) {
