@@ -588,18 +588,13 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	char dir[80], filename[80];
 	int i = 0, total = 0, total_article = 0;
 	sprintf(dir, "boards/%s/.DIR", board);
-	int fsize = file_size_s(dir);
-	fd = open(dir, O_RDONLY);
-	if(0 == fd || 0 == fsize) {
-		if (fd) close(fd);
+	struct mmapfile mf = { .ptr = NULL };
+	if (mmapfile(dir, &mf) == -1) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
-	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-	if(MAP_FAILED == data)
-		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 
-	total = fsize / sizeof(struct fileheader);
+	data = (struct fileheader *) mf.ptr;
+	total = mf.size / sizeof(struct fileheader);
 	total_article = 0;
 	for(i = 0; i < total; ++i) {
 		if(data[i].thread == thread)
@@ -611,7 +606,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 
 	struct api_article *board_list = calloc(count, sizeof(struct api_article));
 	if (board_list == NULL) {
-		munmap(data, fsize);
+		mmapfile(NULL, &mf);
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
 
@@ -660,7 +655,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 			break;
 	}
 
-	munmap(data, fsize);
+	mmapfile(NULL, &mf);
 	for(i = 0; i < num; ++i){
 		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 	}
