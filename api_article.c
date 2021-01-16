@@ -988,18 +988,17 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		}
 
 		struct fileheader *x = findbarticle(&mf, ref, &rid, 1);
+		if (x) {
+			if (x->accessed & FH_NOREPLY) {
+				mmapfile(NULL, &mf);
+				free(ue);
+				return api_error(p, req, res, API_RT_ATCLFBDREPLY);
+			}
 
-		if(x->accessed & FH_NOREPLY) {
-			mmapfile(NULL, &mf);
-			free(ue);
-			return api_error(p, req, res, API_RT_ATCLFBDREPLY);
-		}
+			if (x->accessed & FH_ALLREPLY) {
+				mark |= FH_ALLREPLY;
+			}
 
-		if(x && (x->accessed & FH_ALLREPLY)) {
-			mark |= FH_ALLREPLY;
-		}
-
-		if(x) {
 			thread = x->thread;
 			if(strchr(x->owner, '.') == NULL) {
 				if(x->owner[0] == '\0') {
