@@ -1369,8 +1369,6 @@ static void get_fileheader_by_filetime_thread(int mode, char *board, int id, str
 
 	for(; i < num_records; ++i) {
 		p_fh = (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader));
-		if(p_fh == NULL)
-			return;
 		if((mode == 0 && p_fh->filetime == id) ||
 				(mode == 1 && p_fh->thread == id)) {
 			memcpy(fh_for_return, (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)), sizeof(struct fileheader));
