@@ -581,7 +581,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	int i = 0, total = 0, total_article = 0;
 	sprintf(dir, "boards/%s/.DIR", board);
 	struct mmapfile mf = { .ptr = NULL };
-	if (mmapfile(dir, &mf) == -1) {
+	if (mmapfile(dir, &mf) == -1 || mf.size == 0) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 
