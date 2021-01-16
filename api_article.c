@@ -457,22 +457,14 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	int i = 0, total = 0, total_article = 0;
 
 	snprintf(dir, sizeof(dir), "boards/%s/.DIR", board);
-	int fsize = file_size_s(dir);
-	fd = open(dir, O_RDONLY);
-	if(0 == fd || 0 == fsize) {
+	struct mmapfile mf = { .ptr = NULL };
+	if (mmapfile(dir, &mf) == -1 || mf.size == 0) {
 		free(board_list);
-		if (fd) close(fd);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 
-	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-	if(MAP_FAILED == data) {
-		free(board_list);
-		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
-	}
-
-	total = fsize / sizeof(struct fileheader);
+	data = (struct fileheader *) mf.ptr;
+	total = mf.size / sizeof(struct fileheader);
 	if(0 == mode) {				// 一般模式
 		total_article = total;
 	} else if(1 == mode) {		// 主题模式
@@ -537,7 +529,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 			break;
 		}
 	}
-	munmap(data, fsize);
+	mmapfile(NULL, &mf);
 	for(i = 0; i < num; ++i){
 		parse_thread_info(&board_list[i]);
 	}
