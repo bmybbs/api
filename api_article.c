@@ -1221,11 +1221,6 @@ static int get_thread_by_filetime(char *board, int filetime)
 	if(num >=  0){
 		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
 
-		if(p_fh == NULL) {
-			mmapfile(NULL, &mf);
-			return 0;
-		}
-
 		thread = p_fh->thread;
 		mmapfile(NULL, &mf);
 		return thread;
