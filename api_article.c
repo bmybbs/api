@@ -350,7 +350,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 {
 	if(0 >= number)
 		number = 20;
-	struct api_article *commend_list;
+	struct api_article *commend_list, EMPTY_ARTICLE;
 	struct commend x;
 	char dir[80];
 	FILE *fp = NULL;
@@ -383,13 +383,21 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	for(i=0; i<number; i++) {
 		if(fread(&x, sizeof(struct commend), 1, fp)<=0)
 			break;
+
+		// 显示添加字符串终止符
+		x.board[sizeof(x.board) - 1] = 0;
+		x.userid[IDLEN + 1] = 0;
+		x.com_user[IDLEN + 1] = 0;
+		x.title[sizeof(x.title) - 1] = 0;
+		x.filename[sizeof(x.filename) - 1] = 0;
+
 		if(x.accessed & FH_ALLREPLY)
 			commend_list[i].mark = x.accessed;
 		commend_list[i].type = 0;
 		length = strlen(x.title);
 		g2u(x.title, length, commend_list[i].title, 80);
-		strcpy(commend_list[i].author, x.userid);
-		strcpy(commend_list[i].board, x.board);
+		ytht_strsncpy(commend_list[i].author, x.userid, sizeof(EMPTY_ARTICLE.author));
+		ytht_strsncpy(commend_list[i].board, x.board, sizeof(EMPTY_ARTICLE.board));
 		commend_list[i].filetime = atoi((char *)x.filename + 2);
 		commend_list[i].thread = get_thread_by_filetime(commend_list[i].board, commend_list[i].filetime);
 		commend_list[i].th_num = get_number_of_articles_in_thread(commend_list[i].board, commend_list[i].thread);
@@ -457,22 +465,14 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	int i = 0, total = 0, total_article = 0;
 
 	snprintf(dir, sizeof(dir), "boards/%s/.DIR", board);
-	int fsize = file_size_s(dir);
-	fd = open(dir, O_RDONLY);
-	if(0 == fd || 0 == fsize) {
+	struct mmapfile mf = { .ptr = NULL };
+	if (mmapfile(dir, &mf) == -1 || mf.size == 0) {
 		free(board_list);
-		if (fd) close(fd);
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
 
-	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-	if(MAP_FAILED == data) {
-		free(board_list);
-		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
-	}
-
-	total = fsize / sizeof(struct fileheader);
+	data = (struct fileheader *) mf.ptr;
+	total = mf.size / sizeof(struct fileheader);
 	if(0 == mode) {				// 一般模式
 		total_article = total;
 	} else if(1 == mode) {		// 主题模式
@@ -490,6 +490,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	if(startnum <= 0)
 		startnum = 1;
 	int sum = 0, num = 0;
+	struct api_article EMPTY_ARTICLE;
 	for(i = 0; i < total; ++i) {
 		// TODO: 高亮标题处理
 		if(0 == mode)
@@ -529,15 +530,15 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		board_list[num].type = mode;
 		board_list[num].sequence_num = i;
 
-		strcpy(board_list[num].board, board);
-		strcpy(board_list[num].author, data[i].owner);
+		ytht_strsncpy(board_list[num].board, board, sizeof(EMPTY_ARTICLE.board));
+		ytht_strsncpy(board_list[num].author, data[i].owner, sizeof(EMPTY_ARTICLE.author));
 		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
 		++num;
 		if(num >= count) {
 			break;
 		}
 	}
-	munmap(data, fsize);
+	mmapfile(NULL, &mf);
 	for(i = 0; i < num; ++i){
 		parse_thread_info(&board_list[i]);
 	}
@@ -588,18 +589,13 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	char dir[80], filename[80];
 	int i = 0, total = 0, total_article = 0;
 	sprintf(dir, "boards/%s/.DIR", board);
-	int fsize = file_size_s(dir);
-	fd = open(dir, O_RDONLY);
-	if(0 == fd || 0 == fsize) {
-		if (fd) close(fd);
+	struct mmapfile mf = { .ptr = NULL };
+	if (mmapfile(dir, &mf) == -1 || mf.size == 0) {
 		return api_error(p, req, res, API_RT_EMPTYBRD);
 	}
-	data = mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-	if(MAP_FAILED == data)
-		return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 
-	total = fsize / sizeof(struct fileheader);
+	data = (struct fileheader *) mf.ptr;
+	total = mf.size / sizeof(struct fileheader);
 	total_article = 0;
 	for(i = 0; i < total; ++i) {
 		if(data[i].thread == thread)
@@ -611,7 +607,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 
 	struct api_article *board_list = calloc(count, sizeof(struct api_article));
 	if (board_list == NULL) {
-		munmap(data, fsize);
+		mmapfile(NULL, &mf);
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
 
@@ -621,6 +617,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		startnum = 1;
 
 	int sum = 0, num = 0;
+	struct api_article EMPTY_ARTICLE;
 	for(i = 0; i < total; ++i) {
 		if(data[i].thread != thread)
 			continue;
@@ -652,15 +649,15 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		board_list[num].thread = data[i].thread;
 		board_list[num].type = 0;
 
-		strcpy(board_list[num].board, board);
-		strcpy(board_list[num].author, data[i].owner);
+		ytht_strsncpy(board_list[num].board, board, sizeof(EMPTY_ARTICLE.board));
+		ytht_strsncpy(board_list[num].author, data[i].owner, sizeof(EMPTY_ARTICLE.author));
 		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
 		++num;
 		if(num >= count)
 			break;
 	}
 
-	munmap(data, fsize);
+	mmapfile(NULL, &mf);
 	for(i = 0; i < num; ++i){
 		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 	}
@@ -993,18 +990,17 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		}
 
 		struct fileheader *x = findbarticle(&mf, ref, &rid, 1);
+		if (x) {
+			if (x->accessed & FH_NOREPLY) {
+				mmapfile(NULL, &mf);
+				free(ue);
+				return api_error(p, req, res, API_RT_ATCLFBDREPLY);
+			}
 
-		if(x->accessed & FH_NOREPLY) {
-			mmapfile(NULL, &mf);
-			free(ue);
-			return api_error(p, req, res, API_RT_ATCLFBDREPLY);
-		}
+			if (x->accessed & FH_ALLREPLY) {
+				mark |= FH_ALLREPLY;
+			}
 
-		if(x && (x->accessed & FH_ALLREPLY)) {
-			mark |= FH_ALLREPLY;
-		}
-
-		if(x) {
 			thread = x->thread;
 			if(strchr(x->owner, '.') == NULL) {
 				if(x->owner[0] == '\0') {
@@ -1234,11 +1230,6 @@ static int get_thread_by_filetime(char *board, int filetime)
 	if(num >=  0){
 		p_fh = (struct fileheader *)(mf.ptr + num * sizeof(struct fileheader));
 
-		if(p_fh == NULL) {
-			mmapfile(NULL, &mf);
-			return 0;
-		}
-
 		thread = p_fh->thread;
 		mmapfile(NULL, &mf);
 		return thread;
@@ -1374,8 +1365,6 @@ static void get_fileheader_by_filetime_thread(int mode, char *board, int id, str
 
 	for(; i < num_records; ++i) {
 		p_fh = (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader));
-		if(p_fh == NULL)
-			return;
 		if((mode == 0 && p_fh->filetime == id) ||
 				(mode == 1 && p_fh->thread == id)) {
 			memcpy(fh_for_return, (struct fileheader *)(mf.ptr + i * sizeof(struct fileheader)), sizeof(struct fileheader));

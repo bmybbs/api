@@ -418,6 +418,7 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 			// TODO: 老方式暂不实现
 			fflush(mem_stream);
 			fclose(mem_stream);
+			fclose(article_stream);
 			free(mem_buf);
 			return NULL;
 		} else if(checkbinaryattach(buf, article_stream, &attach_file_size)) {
