@@ -616,6 +616,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		startnum = 1;
 
 	int sum = 0, num = 0;
+	struct api_article EMPTY_ARTICLE;
 	for(i = 0; i < total; ++i) {
 		if(data[i].thread != thread)
 			continue;
@@ -647,8 +648,8 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		board_list[num].thread = data[i].thread;
 		board_list[num].type = 0;
 
-		strcpy(board_list[num].board, board);
-		strcpy(board_list[num].author, data[i].owner);
+		ytht_strsncpy(board_list[num].board, board, sizeof(EMPTY_ARTICLE.board));
+		ytht_strsncpy(board_list[num].author, data[i].owner, sizeof(EMPTY_ARTICLE.author));
 		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
 		++num;
 		if(num >= count)
