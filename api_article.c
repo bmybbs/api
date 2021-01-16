@@ -350,7 +350,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 {
 	if(0 >= number)
 		number = 20;
-	struct api_article *commend_list;
+	struct api_article *commend_list, EMPTY_ARTICLE;
 	struct commend x;
 	char dir[80];
 	FILE *fp = NULL;
@@ -383,13 +383,21 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	for(i=0; i<number; i++) {
 		if(fread(&x, sizeof(struct commend), 1, fp)<=0)
 			break;
+
+		// 显示添加字符串终止符
+		x.board[sizeof(x.board) - 1] = 0;
+		x.userid[IDLEN + 1] = 0;
+		x.com_user[IDLEN + 1] = 0;
+		x.title[sizeof(x.title) - 1] = 0;
+		x.filename[sizeof(x.filename) - 1] = 0;
+
 		if(x.accessed & FH_ALLREPLY)
 			commend_list[i].mark = x.accessed;
 		commend_list[i].type = 0;
 		length = strlen(x.title);
 		g2u(x.title, length, commend_list[i].title, 80);
-		strcpy(commend_list[i].author, x.userid);
-		strcpy(commend_list[i].board, x.board);
+		ytht_strsncpy(commend_list[i].author, x.userid, sizeof(EMPTY_ARTICLE.author));
+		ytht_strsncpy(commend_list[i].board, x.board, sizeof(EMPTY_ARTICLE.board));
 		commend_list[i].filetime = atoi((char *)x.filename + 2);
 		commend_list[i].thread = get_thread_by_filetime(commend_list[i].board, commend_list[i].filetime);
 		commend_list[i].th_num = get_number_of_articles_in_thread(commend_list[i].board, commend_list[i].thread);
