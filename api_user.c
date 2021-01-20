@@ -566,6 +566,7 @@ static int api_user_override_File_list(ONION_FUNC_PROTO_STR, enum ythtbbs_overri
 	size = ythtbbs_override_get_records(ue->userid, array, size, mode);
 
 	char exp_utf[2*sizeof(array[0].exp)];
+	struct ythtbbs_override EMPTY;
 	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"users\":[]}");
 	struct json_object * json_array_users = json_object_object_get(obj, "users");
 
@@ -575,6 +576,7 @@ static int api_user_override_File_list(ONION_FUNC_PROTO_STR, enum ythtbbs_overri
 		json_object_object_add(user, "userid", json_object_new_string(array[i].id));
 
 		memset(exp_utf, 0, sizeof(exp_utf));
+		array[i].exp[sizeof(EMPTY.exp) - 1] = 0;
 		g2u(array[i].exp, strlen(array[i].exp), exp_utf, sizeof(exp_utf));
 		json_object_object_add(user, "explain", json_object_new_string(exp_utf));
 		json_object_array_add(json_array_users, user);
