@@ -293,7 +293,7 @@ void add_attach_link(struct attach_link **attach_link_list, const char *str_link
 {
 	struct attach_link *a = (struct attach_link *)malloc(sizeof(struct attach_link));
 	memset(a, 0, sizeof(*a));
-	strncpy(a->link, str_link, 256);
+	ytht_strsncpy(a->link, str_link, sizeof(a->link));
 	a->size = size;
 
 	if(!(*attach_link_list))
