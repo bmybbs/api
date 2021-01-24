@@ -253,6 +253,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	fclose(fp);
 
 	char title_utf[240];
+	fh.title[sizeof(fh.title) - 1] = 0;
 	g2u(fh.title, strlen(fh.title), title_utf, 240);
 
 	struct attach_link *attach_link_list = NULL;
