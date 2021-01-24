@@ -97,8 +97,9 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 		mail_list[i].sequence_num = i + startnum;
 		mail_list[i].mark = x.accessed;
-		strncpy(mail_list[i].author, fh2owner(&x), sizeof(mail_list[i].author));
+		ytht_strsncpy(mail_list[i].author, fh2owner(&x), sizeof(mail_list[i].author));
 		mail_list[i].filetime = x.filetime;
+		x.title[sizeof(x.title) - 1] = 0;
 		g2u(x.title, strlen(x.title), mail_list[i].title, sizeof(mail_list[i].title));
 	}
 
@@ -252,6 +253,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	fclose(fp);
 
 	char title_utf[240];
+	fh.title[sizeof(fh.title) - 1] = 0;
 	g2u(fh.title, strlen(fh.title), title_utf, 240);
 
 	struct attach_link *attach_link_list = NULL;

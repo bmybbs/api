@@ -84,16 +84,6 @@ int get_user_utmp_index(const char *sessid);
 int check_user_session(struct userec *x, const char *sessid, const char *appkey);
 
 /**
- * @brief 检查用户 session 是否有效，并变更用户状态
- * @param x
- * @param sessid
- * @param appkey
- * @param mode 参阅 libythtbbs/modes.h 中的定义
- * @return
- */
-int check_user_session_with_mode_change(struct userec *x, const char *sessid, const char *appkey, int mode);
-
-/**
  * @brief 字符串替换函数
  * @param ori 原始字符串
  * @param old 需要替换的字符串
@@ -267,14 +257,14 @@ bool api_check_method(onion_request *req, onion_request_flags flags);
 	struct user_info *ptr_info;
 
 /**
- @brief 检查会话状态并初始化变量
- 如果没有正确登录，utmp_idx 和 pptr_info 会分别初始化为 -1 和 NULL。
- @param cookie_buf 存放 cookie 的缓冲区，用于解析 cookie
- @param buf_len cookie 缓冲区的长度
- @param cookie 存放 cookie 的结构体指针
- @param utmp_idx 存放 utmp_idx 的指针
- @param pptr_info 存放会话数据指针的指针
- @return 状态码，成功返回 API_RT_SUCCESSFUL
+ * @brief 检查会话状态并初始化变量
+ * 如果没有正确登录，utmp_idx 和 pptr_info 会分别初始化为 -1 和 NULL。
+ * @param cookie_buf 存放 cookie 的缓冲区，用于解析 cookie
+ * @param buf_len cookie 缓冲区的长度
+ * @param cookie 存放 cookie 的结构体指针
+ * @param utmp_idx 存放 utmp_idx 的指针
+ * @param pptr_info 存放会话数据指针的指针
+ * @return 状态码，成功返回 API_RT_SUCCESSFUL
  */
 int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, struct bmy_cookie *cookie, int *utmp_idx, struct user_info **pptr_info);
 
