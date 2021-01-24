@@ -84,16 +84,6 @@ int get_user_utmp_index(const char *sessid);
 int check_user_session(struct userec *x, const char *sessid, const char *appkey);
 
 /**
- * @brief 检查用户 session 是否有效，并变更用户状态
- * @param x
- * @param sessid
- * @param appkey
- * @param mode 参阅 libythtbbs/modes.h 中的定义
- * @return
- */
-int check_user_session_with_mode_change(struct userec *x, const char *sessid, const char *appkey, int mode);
-
-/**
  * @brief 字符串替换函数
  * @param ori 原始字符串
  * @param old 需要替换的字符串

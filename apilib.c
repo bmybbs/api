@@ -239,29 +239,7 @@ int get_user_utmp_index(const char *sessid)
 
 int check_user_session(struct userec *x, const char *sessid, const char *appkey)
 {
-	return check_user_session_with_mode_change(x, sessid, appkey, -1);
-}
-
-int check_user_session_with_mode_change(struct userec *x, const char *sessid, const char *appkey, int mode)
-{
-	if(!x || !sessid || !appkey)
-		return API_RT_WRONGSESS;
-
-	int uent_index = get_user_utmp_index(sessid);
-	char ssid[30];
-	strncpy(ssid, sessid+3, 30);
-
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
-
-	if(ui->pid == APPPID
-			&& strcasecmp(ui->userid, x->userid)==0
-			&& strcasecmp(ui->sessionid, ssid)==0) {
-		if(mode > 0) {
-			ui->mode = mode;
-		}
-		return API_RT_SUCCESSFUL;
-	} else
-		return API_RT_WRONGSESS;
+	return 0;
 }
 
 char *string_replace(char *ori, const char *old, const char *new)
