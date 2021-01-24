@@ -97,7 +97,7 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 		mail_list[i].sequence_num = i + startnum;
 		mail_list[i].mark = x.accessed;
-		strncpy(mail_list[i].author, fh2owner(&x), sizeof(mail_list[i].author));
+		ytht_strsncpy(mail_list[i].author, fh2owner(&x), sizeof(mail_list[i].author));
 		mail_list[i].filetime = x.filetime;
 		g2u(x.title, strlen(x.title), mail_list[i].title, sizeof(mail_list[i].title));
 	}
