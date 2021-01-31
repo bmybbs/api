@@ -4,6 +4,7 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <arpa/inet.h>
 
 #include "config.h"
 #include "apilib.h"
@@ -269,6 +270,7 @@ char *string_replace(char *ori, const char *old, const char *new)
 
 void add_attach_link(struct attach_link **attach_link_list, const char *str_link, const unsigned int size)
 {
+	struct attach_link *end;
 	struct attach_link *a = (struct attach_link *)malloc(sizeof(struct attach_link));
 	memset(a, 0, sizeof(*a));
 	ytht_strsncpy(a->link, str_link, sizeof(a->link));
@@ -276,18 +278,39 @@ void add_attach_link(struct attach_link **attach_link_list, const char *str_link
 
 	if(!(*attach_link_list))
 		*attach_link_list = a;
-	else
-		(*attach_link_list)->next = a;
+	else {
+		end = *attach_link_list;
+		while (end->next) {
+			end = end->next;
+		}
+		end->next = a;
+	}
 }
 
-void free_attach_link_list(struct attach_link *attach_link_list)
+void add_attach_entity(struct attach_link **root, struct attach_link *node) {
+	struct attach_link *end;
+
+	if (*root == NULL) {
+		*root = node;
+	} else {
+		end = *root;
+		while (end->next) {
+			end = end->next;
+		}
+		end->next = node;
+	}
+}
+
+void free_attach_link_list(struct attach_link *root)
 {
-	struct attach_link *cur=NULL, *p=NULL;
-	cur = attach_link_list;
-	while(cur) {
-		p = cur->next;
-		free(cur);
-		cur = p;
+	struct attach_link *curr = NULL, *next = NULL;
+	curr = root;
+	while(curr) {
+		next = curr->next;
+		if (curr->name)
+			free(curr->name);
+		free(curr);
+		curr = next;
 	}
 }
 
@@ -457,6 +480,132 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 	free(mem_buf);
 
 	return utf_content;
+}
+
+#define YTHTBBS_ATTACH_HEADER "beginbinaryattach "
+
+char *parse_article_js(const char *bname, const char *fname, struct attach_link **attach_link_list) {
+	if (!bname || !fname)
+		return NULL;
+
+	char article_filename[256], *content = NULL, *content_utf8 = NULL, *token;
+	size_t content_utf8_size, i, j, m, n, line, pos;
+	unsigned int attach_size = 0;
+	struct attach_link *attach = NULL;
+	struct mmapfile mf = { .ptr = NULL };
+	snprintf(article_filename, sizeof(article_filename), MY_BBS_HOME "/boards/%s/%s", bname, fname);
+	if (mmapfile(article_filename, &mf) < 0)
+		return NULL;
+
+	content = calloc(mf.size, 1); // content < 文章长度
+	if (content == NULL) {
+		mmapfile(NULL, &mf);
+		return NULL;
+	}
+
+	// TODO 处理 content 和 attach 链表
+	i = 0; // 用于 mf 索引
+	j = 0; // 用于 content
+	line = 0; // 行号，用于跳过开头
+	while (i < mf.size && line < 4) {
+		if (mf.ptr[i++] == '\n')
+			line++;
+	}
+
+	while (i < mf.size) {
+		if (mf.ptr[i] == '\n') {
+			// 换行符，先拷贝
+			content[j++] = mf.ptr[i++];
+
+			// 判断新行是否为签名档，目前跳过
+			if (mf.size - i > 3 && strncmp(mf.ptr + i, "--\n", 3) == 0) {
+				break;
+			}
+
+			if (mf.size - i > 18) {
+				// 判断新行是否为附件
+				if (strncmp(mf.ptr + i, YTHTBBS_ATTACH_HEADER, strlen(YTHTBBS_ATTACH_HEADER)) == 0) {
+					m = i + strlen(YTHTBBS_ATTACH_HEADER);
+					if (m < mf.size) {
+						token = mf.ptr + m;
+						n = m;
+						while (n < mf.size - 6 /* 终止符 + 大小 + 换行符 */) {
+							if (mf.ptr[n] == '\n') {
+								if (mf.ptr[n + 1] != 0) {
+									// 不是附件模式，跳出
+									break;
+								}
+								// 确实存在附件，输出 content
+								j += sprintf(content + j, "#attach %s", token);
+
+								// 追加附件链表
+								attach = malloc(sizeof(struct attach_link));
+								if (attach == NULL) {
+									goto ERROR;
+								}
+								memset(attach, 0, sizeof(struct attach_link));
+								attach->name = malloc(n - m + 1);
+								if (attach->name == NULL) {
+									goto ERROR;
+								}
+								strncpy(attach->name, token, n - m);
+								attach->name[n - m] = 0;
+
+								pos = n + 2;
+								memcpy(&attach->size, mf.ptr + pos, sizeof(unsigned int));
+								attach->size = ntohl(attach->size);
+
+								// link: char[256] 和 nju09 一样，如果溢出，则 nju09 也需要更新
+								snprintf(attach->link, sizeof(attach->link), "/%s/bbscon/%s?B=%s&F=%s&attachpos=%zu&attachname=/%s", SMAGIC, attach->name, bname, fname, pos, attach->name);
+
+								// 拷贝文件头部的 file signature
+								memcpy(attach->signature, mf.ptr + pos + 4 /* sizeof int */, (attach->size > BMY_SIGNATURE_LEN) ? BMY_SIGNATURE_LEN : attach->size);
+
+								add_attach_entity(attach_link_list, attach);
+
+								// 偏移 i
+								i = pos + 4 /* sizeof int */ + attach->size;
+
+								// 跳出 while
+								break;
+							} else {
+								n++;
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// 普通内容，直接拷贝
+			content[j++] = mf.ptr[i++];
+		}
+	}
+
+	// 处理转码
+	mmapfile(NULL, &mf);
+	content_utf8_size = strlen(content) * 2;
+	content_utf8 = calloc(content_utf8_size, 1);
+	if (content_utf8 == NULL) {
+		free(content);
+		return NULL;
+	}
+
+	g2u(content, strlen(content), content_utf8, content_utf8_size);
+	free(content);
+	return content_utf8;
+
+ERROR:
+	mmapfile(NULL, &mf);
+	if (content)
+		free(content);
+	if (content_utf8)
+		free(content_utf8);
+	if (attach) {
+		if (attach->name)
+			free(attach->name);
+		free(attach);
+	}
+	return NULL;
 }
 
 void aha_convert(FILE *in_stream, FILE *out_stream)

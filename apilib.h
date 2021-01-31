@@ -21,8 +21,9 @@ typedef enum board_sort_mode_e {
 } board_sort_mode;
 
 enum article_parse_mode {
-	ARTICLE_PARSE_WITH_ANSICOLOR,		///< 将颜色转换为 HTML 样式
-	ARTICLE_PARSE_WITHOUT_ANSICOLOR		///< 将 \033 字符转换为 [ESC]
+	ARTICLE_PARSE_WITH_ANSICOLOR,     ///< 将颜色转换为 HTML 样式
+	ARTICLE_PARSE_WITHOUT_ANSICOLOR,  ///< 将 \033 字符转换为 [ESC]
+	ARTICLE_PARSE_JAVASCRIPT,         ///< 配合 bmybbs-content-parser
 };
 
 enum API_POST_TYPE {
@@ -45,9 +46,12 @@ struct api_article {
 	char th_commenter[MAX_COMMENTER_COUNT][16];	///< 参与评论的用户id，仅适用于主题模式
 };
 
+#define BMY_SIGNATURE_LEN 10
 struct attach_link {
+	char *name;
 	char link[256];
 	unsigned int size;
+	unsigned char signature[BMY_SIGNATURE_LEN]; // 用于判断文件格式，输出为无符号数组，而非当作字符串
 	struct attach_link *next;
 };
 
@@ -103,6 +107,7 @@ char *string_replace(char *ori, const char *old, const char *new);
  * @warning 在使用完成后记得 free。
  */
 char *parse_article(const char *bname, const char *fname, int mode, struct attach_link **attach_link_list);
+char *parse_article_js(const char *bname, const char *fname, struct attach_link **attach_link_list);
 
 /**
  * @brief 将文章中的附件链接单独存放在 attach_link 链表中。
@@ -111,6 +116,8 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
  * @param size 附件大小
  */
 void add_attach_link(struct attach_link **attach_link_list, const char *link, const unsigned int size);
+
+void add_attach_entity(struct attach_link **root, struct attach_link *node);
 
 /**
  * @brief 释放附件链表
