@@ -1,9 +1,10 @@
+add_library(apilib STATIC apilib.c)
+
 add_executable(bmyapi
 	main.c
 	api_error.c
 	api_template.c
 	api_user.c
-	apilib.c
 	api_article.c
 	api_board.c
 	api_brc.c
@@ -15,4 +16,4 @@ add_executable(bmyapi
 	api_oauth.c
 )
 
-target_link_libraries(bmyapi ythtbbs ytht onion json-c hiredis)
+target_link_libraries(bmyapi apilib ythtbbs ytht onion json-c hiredis)
