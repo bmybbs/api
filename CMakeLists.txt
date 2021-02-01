@@ -17,3 +17,10 @@ add_executable(bmyapi
 )
 
 target_link_libraries(bmyapi apilib ythtbbs ytht onion json-c hiredis)
+
+add_executable(bmybbs.api.test
+	tests/main.c
+	tests/apilib.test.c
+)
+
+target_link_libraries(bmybbs.api.test check apilib ythtbbs ytht onion json-c)
