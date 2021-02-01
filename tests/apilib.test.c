@@ -97,6 +97,149 @@ START_TEST(parse_article_js_internal_content_with_attach) {
 	ck_assert_ptr_null(root->next);
 
 	ck_assert_str_eq(result, "foo\n#attach 1.txt\n\n");
+	free(s);
+	free(result);
+	free_attach_link_list(root);
+}
+
+START_TEST(parse_article_js_internal_content_with_2_png_attaches) {
+	unsigned int bin[] = {
+		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52
+	};
+
+	char *s = strdup("AUTHOR BOARD\n"
+		"TITLE\n"
+		"SITE\n"
+		"\n"
+		"foo\n"
+		"beginbinaryattach 1.png\n"
+		DELIMITER
+		"SIZE"
+		"0123456789ABCDEF\n"
+		"beginbinaryattach 2.png\n"
+		DELIMITER
+		"SIZE"
+		"0123456789ABCDEF\n"
+		"\n"
+		"--\n"
+		"FROM");
+	ck_assert_ptr_nonnull(s);
+
+	struct mmapfile mf = { .ptr = s, .size = strlen(s) };
+	struct attach_link *root = NULL;
+
+	unsigned int pos1, pos2;
+
+	char *dilimiter = strrchr(s, 0xFF);
+	dilimiter[0] = 0;
+	unsigned int size_n = htonl(16);
+	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(dilimiter + 5, bin, 16);
+	pos2 = dilimiter + 1 - s;
+
+	dilimiter = strchr(s, 0xFF);
+	dilimiter[0] = 0;
+	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(dilimiter + 5, bin, 16);
+	pos1 = dilimiter + 1 - s;
+
+	char *result = parse_article_js_internal(&mf, &root, "b", "f");
+
+	ck_assert_ptr_nonnull(result);
+	ck_assert_ptr_nonnull(root);
+	ck_assert_ptr_nonnull(root->next);
+	ck_assert_ptr_null(root->next->next);
+
+	struct attach_link *a_1st = root;
+	struct attach_link *a_2nd = root->next;
+
+	ck_assert_str_eq(a_1st->name, "1.png");
+	ck_assert_str_eq(a_2nd->name, "2.png");
+
+	char link[256];
+	snprintf(link, sizeof(link), "/" SMAGIC "/bbscon/1.png?B=b&F=f&attachpos=%u&attachname=/1.png", pos1);
+	ck_assert_str_eq(a_1st->link, link);
+	snprintf(link, sizeof(link), "/" SMAGIC "/bbscon/2.png?B=b&F=f&attachpos=%u&attachname=/2.png", pos2);
+	ck_assert_str_eq(a_2nd->link, link);
+
+	ck_assert_int_eq(a_1st->size, 16);
+	ck_assert_int_eq(a_2nd->size, 16);
+
+	ck_assert_int_eq(memcmp(a_1st->signature, bin, BMY_SIGNATURE_LEN), 0);
+	ck_assert_int_eq(memcmp(a_2nd->signature, bin, BMY_SIGNATURE_LEN), 0);
+
+	ck_assert_str_eq(result, "foo\n#attach 1.png\n\n#attach 2.png\n\n\n");
+
+	free(s);
+	free(result);
+	free_attach_link_list(root);
+}
+
+START_TEST(parse_article_js_internal_content_check_attach_linked_list) {
+	unsigned int bin[] = {
+		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52
+	};
+
+	char *s = strdup("AUTHOR BOARD\n"
+		"TITLE\n"
+		"SITE\n"
+		"\n"
+		"foo\n"
+		"beginbinaryattach 1.png\n"
+		DELIMITER
+		"SIZE"
+		"0123456789ABCDEF\n"
+		"beginbinaryattach 2.png\n"
+		DELIMITER
+		"SIZE"
+		"0123456789ABCDEF\n"
+		"beginbinaryattach 3.png\n"
+		DELIMITER
+		"SIZE"
+		"0123456789ABCDEF\n"
+		"\n"
+		"--\n"
+		"FROM");
+
+	ck_assert_ptr_nonnull(s);
+
+	struct mmapfile mf = { .ptr = s, .size = strlen(s) };
+	struct attach_link *root = NULL;
+	unsigned int pos1, pos2, pos3;
+	char *dilimiter;
+	unsigned int size_n = htonl(16);
+
+	dilimiter = strchr(s, 0xFF);
+	dilimiter[0] = 0;
+	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(dilimiter + 5, bin, 16);
+	pos1 = dilimiter + 1 - s;
+
+	dilimiter = strchr(dilimiter + 21, 0xFF);
+	dilimiter[0] = 0;
+	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(dilimiter + 5, bin, 16);
+	pos2 = dilimiter + 1 - s;
+
+	dilimiter = strchr(dilimiter + 21, 0xFF);
+	dilimiter[0] = 0;
+	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(dilimiter + 5, bin, 16);
+	pos3 = dilimiter + 1 - s;
+
+	char *result = parse_article_js_internal(&mf, &root, "b", "f");
+
+	ck_assert_ptr_nonnull(result);
+	ck_assert_ptr_nonnull(root);
+	ck_assert_ptr_nonnull(root->next);
+	ck_assert_ptr_nonnull(root->next->next);
+	ck_assert_ptr_null(root->next->next->next);
+
+	ck_assert_str_eq(root->name, "1.png");
+	ck_assert_str_eq(root->next->name, "2.png");
+	ck_assert_str_eq(root->next->next->name, "3.png");
+
+	free(s);
 	free(result);
 	free_attach_link_list(root);
 }
@@ -109,6 +252,8 @@ Suite *test_article_parser_js_internal(void) {
 	tcase_add_test(tc, parse_article_js_internal_plain_content);
 	tcase_add_test(tc, parse_article_js_internal_plain_content_with_ansi);
 	tcase_add_test(tc, parse_article_js_internal_content_with_attach);
+	tcase_add_test(tc, parse_article_js_internal_content_with_2_png_attaches);
+	tcase_add_test(tc, parse_article_js_internal_content_check_attach_linked_list);
 	suite_add_tcase(s, tc);
 
 	return s;
