@@ -71,14 +71,14 @@ START_TEST(parse_article_js_internal_content_with_attach) {
 	struct attach_link *root = NULL;
 
 	// 更新附件
-	char *dilimiter = strchr(s, 0xFF);
-	dilimiter[0] = 0;
+	char *delimiter = strchr(s, 0xFF);
+	delimiter[0] = 0;
 	unsigned int size_n = htonl(4 /* "bar\n" */);
-	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
-	ck_assert_int_eq(dilimiter[1], 0);
-	ck_assert_int_eq(dilimiter[2], 0);
-	ck_assert_int_eq(dilimiter[3], 0);
-	ck_assert_int_eq(dilimiter[4], 4);
+	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
+	ck_assert_int_eq(delimiter[1], 0);
+	ck_assert_int_eq(delimiter[2], 0);
+	ck_assert_int_eq(delimiter[3], 0);
+	ck_assert_int_eq(delimiter[4], 4);
 
 	char *result = parse_article_js_internal(&mf, &root, "b", "f");
 	ck_assert_ptr_nonnull(result);
@@ -87,7 +87,7 @@ START_TEST(parse_article_js_internal_content_with_attach) {
 	ck_assert_int_eq(root->size, 4);
 	ck_assert_str_eq(root->name, "1.txt");
 	char link[256];
-	snprintf(link, sizeof(link), "/" SMAGIC "/bbscon/1.txt?B=b&F=f&attachpos=%zu&attachname=/1.txt", dilimiter + 1 - s);
+	snprintf(link, sizeof(link), "/" SMAGIC "/bbscon/1.txt?B=b&F=f&attachpos=%zu&attachname=/1.txt", delimiter + 1 - s);
 	ck_assert_str_eq(root->link, link);
 	ck_assert_int_eq(root->signature[0], 'b');
 	ck_assert_int_eq(root->signature[1], 'a');
@@ -130,18 +130,18 @@ START_TEST(parse_article_js_internal_content_with_2_png_attaches) {
 
 	unsigned int pos1, pos2;
 
-	char *dilimiter = strrchr(s, 0xFF);
-	dilimiter[0] = 0;
+	char *delimiter = strrchr(s, 0xFF);
+	delimiter[0] = 0;
 	unsigned int size_n = htonl(16);
-	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
-	memcpy(dilimiter + 5, bin, 16);
-	pos2 = dilimiter + 1 - s;
+	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(delimiter + 5, bin, 16);
+	pos2 = delimiter + 1 - s;
 
-	dilimiter = strchr(s, 0xFF);
-	dilimiter[0] = 0;
-	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
-	memcpy(dilimiter + 5, bin, 16);
-	pos1 = dilimiter + 1 - s;
+	delimiter = strchr(s, 0xFF);
+	delimiter[0] = 0;
+	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(delimiter + 5, bin, 16);
+	pos1 = delimiter + 1 - s;
 
 	char *result = parse_article_js_internal(&mf, &root, "b", "f");
 
@@ -206,26 +206,26 @@ START_TEST(parse_article_js_internal_content_check_attach_linked_list) {
 	struct mmapfile mf = { .ptr = s, .size = strlen(s) };
 	struct attach_link *root = NULL;
 	unsigned int pos1, pos2, pos3;
-	char *dilimiter;
+	char *delimiter;
 	unsigned int size_n = htonl(16);
 
-	dilimiter = strchr(s, 0xFF);
-	dilimiter[0] = 0;
-	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
-	memcpy(dilimiter + 5, bin, 16);
-	pos1 = dilimiter + 1 - s;
+	delimiter = strchr(s, 0xFF);
+	delimiter[0] = 0;
+	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(delimiter + 5, bin, 16);
+	pos1 = delimiter + 1 - s;
 
-	dilimiter = strchr(dilimiter + 21, 0xFF);
-	dilimiter[0] = 0;
-	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
-	memcpy(dilimiter + 5, bin, 16);
-	pos2 = dilimiter + 1 - s;
+	delimiter = strchr(delimiter + 21, 0xFF);
+	delimiter[0] = 0;
+	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(delimiter + 5, bin, 16);
+	pos2 = delimiter + 1 - s;
 
-	dilimiter = strchr(dilimiter + 21, 0xFF);
-	dilimiter[0] = 0;
-	memcpy(dilimiter + 1, &size_n, sizeof(unsigned int));
-	memcpy(dilimiter + 5, bin, 16);
-	pos3 = dilimiter + 1 - s;
+	delimiter = strchr(delimiter + 21, 0xFF);
+	delimiter[0] = 0;
+	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
+	memcpy(delimiter + 5, bin, 16);
+	pos3 = delimiter + 1 - s;
 
 	char *result = parse_article_js_internal(&mf, &root, "b", "f");
 
