@@ -53,6 +53,27 @@ START_TEST(parse_article_js_internal_plain_content_with_ansi) {
 	free(result);
 }
 
+START_TEST(parse_article_js_internal_plain_content_with_binaryattach_txt) {
+	char *s = "AUTHOR BOARD\n"
+		"TITLE\n"
+		"SITE\n"
+		"\n"
+		"foo\n"
+		"beginbinaryattach 1.txt\n"
+		"bar\n"
+		"--\n"
+		"FROM";
+	struct mmapfile mf = { .ptr = s, .size = strlen(s) };
+	struct attach_link *root = NULL;
+
+	char *result = parse_article_js_internal(&mf, &root, "", "");
+	ck_assert_ptr_nonnull(result);
+	ck_assert_ptr_null(root);
+	ck_assert_str_eq(result, "foo\nbeginbinaryattach 1.txt\nbar\n");
+
+	free(result);
+}
+
 START_TEST(parse_article_js_internal_content_with_attach) {
 	char *s = strdup("AUTHOR BOARD\n"
 		"TITLE\n"
@@ -251,6 +272,7 @@ Suite *test_article_parser_js_internal(void) {
 	TCase *tc = tcase_create("");
 	tcase_add_test(tc, parse_article_js_internal_plain_content);
 	tcase_add_test(tc, parse_article_js_internal_plain_content_with_ansi);
+	tcase_add_test(tc, parse_article_js_internal_plain_content_with_binaryattach_txt);
 	tcase_add_test(tc, parse_article_js_internal_content_with_attach);
 	tcase_add_test(tc, parse_article_js_internal_content_with_2_png_attaches);
 	tcase_add_test(tc, parse_article_js_internal_content_check_attach_linked_list);
