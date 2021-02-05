@@ -204,6 +204,10 @@ int api_article_getRAWContent(ONION_FUNC_PROTO_STR)
 	return api_article_get_content(p, req, res, ARTICLE_PARSE_WITHOUT_ANSICOLOR);
 }
 
+int api_article_getContent(ONION_FUNC_PROTO_STR) {
+	return api_article_get_content(p, req, res, ARTICLE_PARSE_JAVASCRIPT);
+}
+
 static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const char *secstr)
 {
 	int listmax;
@@ -809,8 +813,11 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	g2u(fh->title, strlen(fh->title), title_utf8, 180);
 
 	struct attach_link *attach_link_list=NULL;
-	char * article_content_utf8 = parse_article(bmem->header.filename,
-			filename, mode, &attach_link_list);
+	char *article_content_utf8;
+	if (mode == ARTICLE_PARSE_JAVASCRIPT)
+		article_content_utf8 = parse_article_js(bmem->header.filename, filename, &attach_link_list);
+	else
+		article_content_utf8 = parse_article(bmem->header.filename, filename, mode, &attach_link_list);
 
 	char * article_json_str = (char *)malloc(strlen(article_content_utf8) + 512);
 	memset(article_json_str, 0, strlen(article_content_utf8) + 512);
