@@ -204,6 +204,10 @@ int api_article_getRAWContent(ONION_FUNC_PROTO_STR)
 	return api_article_get_content(p, req, res, ARTICLE_PARSE_WITHOUT_ANSICOLOR);
 }
 
+int api_article_getContent(ONION_FUNC_PROTO_STR) {
+	return api_article_get_content(p, req, res, ARTICLE_PARSE_JAVASCRIPT);
+}
+
 static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const char *secstr)
 {
 	int listmax;
@@ -809,13 +813,15 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	g2u(fh->title, strlen(fh->title), title_utf8, 180);
 
 	struct attach_link *attach_link_list=NULL;
-	char * article_content_utf8 = parse_article(bmem->header.filename,
-			filename, mode, &attach_link_list);
+	char *article_content_utf8;
+	if (mode == ARTICLE_PARSE_JAVASCRIPT)
+		article_content_utf8 = parse_article_js(bmem->header.filename, filename, &attach_link_list);
+	else
+		article_content_utf8 = parse_article(bmem->header.filename, filename, mode, &attach_link_list);
 
-	char * article_json_str = (char *)malloc(strlen(article_content_utf8) + 512);
-	memset(article_json_str, 0, strlen(article_content_utf8) + 512);
+	char article_json_str[256];
 	int curr_permission = (rc == API_RT_SUCCESSFUL) ? !strncmp(ptr_info->userid, fh->owner, IDLEN+1) : 0;
-	sprintf(article_json_str, "{\"errcode\":0, \"attach\":[], "
+	snprintf(article_json_str, sizeof(article_json_str), "{\"errcode\":0, \"attach\":[], "
 			"\"can_edit\":%d, \"can_delete\":%d, \"can_reply\":%d, "
 			"\"board\":\"%s\", \"author\":\"%s\", \"thread\":%ld, \"num\":%d}",
 			curr_permission, curr_permission,
@@ -826,14 +832,26 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	json_object_object_add(jp, "content", json_object_new_string(article_content_utf8));
 	json_object_object_add(jp, "title", json_object_new_string(title_utf8));
 	if (attach_link_list) {
-		struct json_object * attach_array = json_object_object_get(jp, "attach");
-		char at_buf[320];
-		struct attach_link * alp = attach_link_list;
-		while(alp) {
-			memset(at_buf, 0, 320);
-			sprintf(at_buf, "{\"link\":\"%s\", \"size\":%d}", alp->link, alp->size);
-			json_object_array_add(attach_array, json_tokener_parse(at_buf));
-			alp=alp->next;
+		struct attach_link *alp = attach_link_list;
+		struct json_object *attach_array = json_object_object_get(jp, "attach");
+		struct json_object *attach = NULL;
+		struct json_object *signature = NULL;
+		while (alp) {
+			if ((attach = json_object_new_object()) != NULL) {
+				json_object_object_add(attach, "link", json_object_new_string(alp->link));
+				json_object_object_add(attach, "size", json_object_new_int(alp->size));
+				if (alp->name) {
+					json_object_object_add(attach, "name", json_object_new_string(alp->name));
+					if ((signature = json_object_new_array_ext(BMY_SIGNATURE_LEN)) != NULL) {
+						for (size_t idx = 0; idx < BMY_SIGNATURE_LEN; idx++) {
+							json_object_array_put_idx(signature, idx, json_object_new_int(alp->signature[idx]));
+						}
+						json_object_object_add(attach, "signature", signature);
+					}
+				}
+				json_object_array_add(attach_array, attach);
+			}
+			alp = alp->next;
 		}
 	}
 
@@ -841,7 +859,6 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	mmapfile(NULL, &mf);
 	free(article_content_utf8);
-	free(article_json_str);
 	json_object_put(jp);
 	free_attach_link_list(attach_link_list);
 

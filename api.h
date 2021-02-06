@@ -31,6 +31,7 @@ int api_article_list(ONION_FUNC_PROTO_STR);
 
 int api_article_getHTMLContent(ONION_FUNC_PROTO_STR);	// 获取 HTML 格式的内容
 int api_article_getRAWContent(ONION_FUNC_PROTO_STR);	// 获取原始内容，'\033' 字符将被转为 "[ESC]" 字符串
+int api_article_getContent(ONION_FUNC_PROTO_STR);       // 获取内容，'\033' 字符不做转换，也不处理 html 格式，仅将附件内容进行剥离
 
 int api_article_preview(ONION_FUNC_PROTO_STR);			// 预览
 int api_article_post(ONION_FUNC_PROTO_STR);				// 发帖接口
