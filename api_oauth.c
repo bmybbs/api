@@ -217,7 +217,7 @@ int api_oauth_login(ONION_FUNC_PROTO_STR) {
 	// 验证通过，登录
 	struct user_info ui;
 	struct userec ue;
-	char userid[IDLEN + 2];
+	char userid[IDLEN + 1];
 	memset(userid, 0, sizeof(userid));
 	ythtbbs_cache_UserTable_resolve();
 	ythtbbs_cache_UserTable_getuserid(usernum, userid, sizeof(userid));
