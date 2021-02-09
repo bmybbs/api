@@ -5,6 +5,7 @@
 #include "ytht/strlib.h"
 #include "bmy/cookie.h"
 #include "bmy/article.h"
+#include "ythtbbs/mybrd.h"
 #include "ythtbbs/session.h"
 #include "ythtbbs/cache.h"
 #include "api.h"
@@ -12,6 +13,8 @@
 #include "error_code.h"
 
 static const int COUNT_PER_PAGE = 40;
+// api_board
+extern bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname);
 
 int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
@@ -34,7 +37,20 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	else
 		start_time = atol(start_str); // TODO
 
-	struct bmy_articles *articles = bmy_article_list_subscription_by_time(ptr_info->userid, COUNT_PER_PAGE, start_time);
+	struct goodboard g_brd;
+	memset(&g_brd, 0, sizeof(struct goodboard));
+	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
+
+	int *bid_arr = malloc(g_brd.num);
+	if (bid_arr == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+	for (int i = 0; i < g_brd.num; i++) {
+		bid_arr[i] = ythtbbs_cache_Board_get_idx_by_name(g_brd.ID[i]);
+	}
+
+	struct bmy_articles *articles = bmy_article_list_selected_boards(bid_arr, g_brd.num, COUNT_PER_PAGE, start_time);
+	free(bid_arr);
 
 	if (articles == NULL || articles->count == 0) {
 		bmy_article_list_free(articles);
