@@ -1509,24 +1509,20 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 
 	struct bmy_articles *articles;
 
-	if (c != 'C') {
-		articles = bmy_article_list_section(c, COUNT_PER_PAGE, start);
-	} else {
-		sec = getsectree(secstr);
-		if (sec->introstr[0])
-			hasintro = 1;
+	sec = getsectree(secstr);
+	if (sec->introstr[0])
+		hasintro = 1;
 
-		board_count = 0;
-		ythtbbs_cache_Board_foreach_v(count_board_in_section, rc, ptr_info, &board_count, hasintro, secstr);
-		if (board_count == 0)
-			return api_error(p, req, res, API_RT_SUCCESSFUL);
+	board_count = 0;
+	ythtbbs_cache_Board_foreach_v(count_board_in_section, rc, ptr_info, &board_count, hasintro, secstr);
+	if (board_count == 0)
+		return api_error(p, req, res, API_RT_SUCCESSFUL);
 
-		boardnum_array = calloc(board_count, sizeof(int));
-		board_count = 0;
-		ythtbbs_cache_Board_foreach_v(put_boardnum_in_section, rc, ptr_info, &board_count, hasintro, secstr, boardnum_array);
-		articles = bmy_article_list_selected_boards(boardnum_array, board_count, COUNT_PER_PAGE, start);
-		free(boardnum_array);
-	}
+	boardnum_array = calloc(board_count, sizeof(int));
+	board_count = 0;
+	ythtbbs_cache_Board_foreach_v(put_boardnum_in_section, rc, ptr_info, &board_count, hasintro, secstr, boardnum_array);
+	articles = bmy_article_list_selected_boards(boardnum_array, board_count, COUNT_PER_PAGE, start);
+	free(boardnum_array);
 
 	if (articles == NULL || articles->count == 0) {
 		goto EMPTY;
