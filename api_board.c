@@ -71,7 +71,7 @@ static int cmpboardscore(struct boardmem **b1, struct boardmem **b2);
  */
 static int cmpboardinboard(struct boardmem **b1, struct boardmem **b2);
 
-static bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname);
+bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname);
 
 int api_board_list(ONION_FUNC_PROTO_STR)
 {
@@ -578,7 +578,7 @@ static int cmpboardinboard(struct boardmem **b1, struct boardmem **b2)
 	return ((*b1)->inboard - (*b2)->inboard);
 }
 
-static bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname) {
+bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname) {
 	return check_user_read_perm(ptr_info, boardname) > 0;
 }
 
