@@ -47,26 +47,37 @@ int api_attach_list(ONION_FUNC_PROTO_STR) {
 	char fname[1024];
 
 	pdir = opendir(userattachpath);
-	if(!pdir)
+	if (!pdir)
 		return api_error(p, req, res, API_RT_NOSUCHFILE);
 
 	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"attach_array\":[]}");
 	struct json_object * aa = json_object_object_get(obj, "attach_array");
 
-	while((pdent = readdir(pdir))) {
-		if(!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
+	while ((pdent = readdir(pdir))) {
+		if (!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
 			continue;
 
-		if(strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
+		if (strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
 			break;
 		}
 
 		snprintf(fname, sizeof(fname), "%s/%s", userattachpath, pdent->d_name);
 
 		struct json_object * attach_obj = json_object_new_object();
-		json_object_object_add(attach_obj, "file_name", json_object_new_string(pdent->d_name));
-		json_object_object_add(attach_obj, "size", json_object_new_int(ytht_file_size_s(fname)));
-		json_object_array_add(aa, attach_obj);
+		if (attach_obj) {
+			struct json_object *tmp_obj;
+			if ((tmp_obj = json_object_new_string(pdent->d_name)) != NULL) {
+				json_object_object_add(attach_obj, "file_name", tmp_obj);
+				if ((tmp_obj = json_object_new_int(ytht_file_size_s(fname))) != NULL) {
+					json_object_object_add(attach_obj, "size", tmp_obj);
+					json_object_array_add(aa, attach_obj);
+				} else {
+					json_object_put(attach_obj);
+				}
+			} else {
+				json_object_put(attach_obj);
+			}
+		}
 	}
 
 	closedir(pdir);
