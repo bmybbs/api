@@ -1169,15 +1169,6 @@ int search_user_article_with_title_keywords(struct api_article *articles_array,
 	return 0;
 }
 
-int file_size_s(const char *filepath)
-{
-	struct stat buf;
-	if(stat(filepath, &buf) == -1)
-		memset(&buf, 0, sizeof(buf));
-
-	return buf.st_size;
-}
-
 bool api_check_method(onion_request *req, onion_request_flags flags) {
 	return flags == (onion_request_get_flags(req) & OR_METHODS);
 }

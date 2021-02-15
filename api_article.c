@@ -362,7 +362,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		strcpy(dir, ".COMMEND");
 	else if(1 == mode)
 		strcpy(dir, ".COMMEND2");
-	int fsize = file_size_s(dir);
+	int fsize = ytht_file_size_s(dir);
 	int total = fsize / sizeof(struct commend);
 
 	commend_list = calloc(number, sizeof(struct api_article));
@@ -715,7 +715,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 	if(fp == 0)
 		return api_error(p, req, res, API_RT_NOBRDTPFILE);
 
-	int count = file_size_s(topdir) / sizeof(struct fileheader);
+	int count = ytht_file_size_s(topdir) / sizeof(struct fileheader);
 	struct api_article *board_list = calloc(count, sizeof(struct api_article));
 	if (board_list == NULL) {
 		fclose(fp);

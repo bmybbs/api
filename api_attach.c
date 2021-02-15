@@ -65,7 +65,7 @@ int api_attach_list(ONION_FUNC_PROTO_STR) {
 
 		struct json_object * attach_obj = json_object_new_object();
 		json_object_object_add(attach_obj, "file_name", json_object_new_string(pdent->d_name));
-		json_object_object_add(attach_obj, "size", json_object_new_int(file_size_s(fname)));
+		json_object_object_add(attach_obj, "size", json_object_new_int(ytht_file_size_s(fname)));
 		json_object_array_add(aa, attach_obj);
 	}
 
@@ -144,7 +144,7 @@ int api_attach_upload(ONION_FUNC_PROTO_STR)
 		}
 
 		sprintf(fname, "%s/%s", userattachpath, pdent->d_name);
-		current_size += file_size_s(fname);
+		current_size += ytht_file_size_s(fname);
 	}
 
 	closedir(pdir);

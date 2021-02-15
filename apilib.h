@@ -248,14 +248,6 @@ int search_user_article_with_title_keywords(struct api_article *articles_array,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime);
 
-/**
- * @brief 获取文件的大小
- * 参考 ythtlib.h/file_size 宏，本方法线程安全。
- * @param filepath 文件路径
- * @return 文件大小
- */
-int file_size_s(const char *filepath);
-
 bool api_check_method(onion_request *req, onion_request_flags flags);
 #define DEFINE_COMMON_SESSION_VARS \
 	char cookie_buf[512];\

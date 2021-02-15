@@ -121,7 +121,7 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	char filename[256];
 
 	sprintf(filename, "boards/%s/.DIR", bmem->header.filename);
-	int fsize = file_size_s(filename);
+	int fsize = ytht_file_size_s(filename);
 	int fd = open(filename, O_RDONLY);
 	if(fd==0 || fsize==0)
 		today_num = 0;
