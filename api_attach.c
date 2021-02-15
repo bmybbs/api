@@ -29,29 +29,18 @@ int api_attach_show(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 }
 
-int api_attach_list(ONION_FUNC_PROTO_STR)
-{
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
+int api_attach_list(ONION_FUNC_PROTO_STR) {
+	DEFINE_COMMON_SESSION_VARS;
+	if (!api_check_method(req, OR_GET))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
 
-	if(!userid || !sessid || !appkey)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
 	char userattachpath[256];
-	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ue->userid);
+	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
 	mkdir(userattachpath, 0760);
-	free(ue);
 
 	DIR *pdir;
 	struct dirent *pdent;
@@ -72,7 +61,7 @@ int api_attach_list(ONION_FUNC_PROTO_STR)
 			break;
 		}
 
-		sprintf(fname, "%s/%s", userattachpath, pdent->d_name);
+		snprintf(fname, sizeof(fname), "%s/%s", userattachpath, pdent->d_name);
 
 		struct json_object * attach_obj = json_object_new_object();
 		json_object_object_add(attach_obj, "file_name", json_object_new_string(pdent->d_name));
