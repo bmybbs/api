@@ -204,18 +204,18 @@ static void output_binary_attach(onion_response *res, const char *filename, cons
 {
 	struct mmapfile mf = {.ptr = NULL};
 
-	if(mmapfile(filename, &mf) < 0) {
+	if (mmapfile(filename, &mf) < 0) {
 		api_error(NULL, NULL, res, API_RT_MAILATTERR);
 		return ;
 	}
 
-	if(attachpos >= mf.size-4 || attachpos < 1) {
+	if (attachpos < 1 || ((unsigned int) attachpos /* safe */) >= mf.size-4) {
 		mmapfile(NULL, &mf);
 		api_error(NULL, NULL, res, API_RT_MAILATTERR);
 		return ;
 	}
 
-	if(mf.ptr[attachpos-1] != 0) {
+	if (mf.ptr[attachpos-1] != 0) {
 		mmapfile(NULL, &mf);
 		api_error(NULL, NULL, res, API_RT_MAILATTERR);
 		return ;
@@ -230,7 +230,7 @@ static void output_binary_attach(onion_response *res, const char *filename, cons
 	unsigned int size = ntohl(*(unsigned int *)(mf.ptr + attachpos));
 	char * body = (char *)malloc(size);
 
-	if(body==NULL) {
+	if (body == NULL) {
 		mmapfile(NULL, &mf);
 		api_error(NULL, NULL, res, API_RT_NOTENGMEM);
 		return ;
