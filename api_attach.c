@@ -124,7 +124,9 @@ int api_attach_get(ONION_FUNC_PROTO_STR) {
 		return api_error(p, req, res, API_RT_NOSUCHFILE);
 	}
 
+	snprintf(finalname, sizeof(finalname), "filename=\"%s\"", name);
 	onion_response_set_header(res, "Content-Type", get_mime_type(name));
+	onion_response_set_header(res, "Content-Disposition", finalname);
 	onion_response_write_headers(res);
 	onion_response_write(res, mf.ptr, mf.size);
 	mmapfile(NULL, &mf);
