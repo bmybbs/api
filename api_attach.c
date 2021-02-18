@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 
@@ -156,6 +157,38 @@ int api_attach_upload(ONION_FUNC_PROTO_STR) {
 	onion_shortcut_rename(filename, finalname);
 
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
+}
+
+int api_attach_delete(ONION_FUNC_PROTO_STR) {
+	char userattachpath[256], finalname[1024];
+	DEFINE_COMMON_SESSION_VARS;
+
+	if (!api_check_method(req, OR_DELETE))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	const char *name = onion_request_get_query(req, "file");
+	if (!name || !strcmp(name, ".") || !strcmp(name, ".."))
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	const char *c = name;
+	while (*c) {
+		if (*c == '/')
+			return api_error(p, req, res, API_RT_WRONGPARAM);
+		c++;
+	}
+
+	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
+	if (strlen(userattachpath) + (c - name) + 2 /* '/' + '\0' */ > sizeof(finalname))
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	snprintf(finalname, sizeof(finalname), "%s/%s", userattachpath, name);
+	rc = unlink(finalname);
+
+	return api_error(p, req, res, (rc == 0) ? API_RT_SUCCESSFUL : API_RT_ATTINNERR);
 }
 
 static int api_attach_show_mail(ONION_FUNC_PROTO_STR)
