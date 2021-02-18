@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^mail/reply$", api_mail_reply);
 	onion_url_add(urls, "^attach/show$", api_attach_show);
 	onion_url_add(urls, "^attach/list$", api_attach_list);
+	onion_url_add(urls, "^attach/get$", api_attach_get);
 	onion_url_add(urls, "^attach/upload$", api_attach_upload);
 	onion_url_add(urls, "^attach/delete$", api_attach_delete);
 	onion_url_add(urls, "^notification/list$", api_notification_list);
