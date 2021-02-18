@@ -91,7 +91,6 @@ int api_attach_list(ONION_FUNC_PROTO_STR) {
 
 int api_attach_get(ONION_FUNC_PROTO_STR) {
 	char userattachpath[256], finalname[1024];
-	char length[24];
 	struct mmapfile mf = {
 		.ptr = NULL,
 		.size = 0
@@ -125,9 +124,8 @@ int api_attach_get(ONION_FUNC_PROTO_STR) {
 		return api_error(p, req, res, API_RT_NOSUCHFILE);
 	}
 
-	snprintf(length, sizeof(length), "%zu", mf.size);
 	onion_response_set_header(res, "Content-Type", get_mime_type(name));
-	onion_response_set_header(res, "Content-Length", length);
+	onion_response_write_headers(res);
 	onion_response_write(res, mf.ptr, mf.size);
 	mmapfile(NULL, &mf);
 
