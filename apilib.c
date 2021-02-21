@@ -112,18 +112,29 @@ int ummap()
  */
 struct userec * getuser(const char *id)
 {
+	struct userec local_ue, *user = NULL;
+	if (getuser_s(&local_ue, id) < 0)
+		return NULL;
+	if ((user = malloc(sizeof(struct userec))) > 0) {
+		memcpy(user, &local_ue, sizeof(struct userec));
+	}
+	return user;
+}
+
+int getuser_s(struct userec *user, const char *id) {
 	int uid;
 	uid = getusernum(id);
-	if(uid<0)
-		return NULL;
-	if((uid+1) * sizeof(struct userec) > ummap_size)
-		ummap(); // 重新 mmap PASSWDS 文件到内存
-	if(!ummap_ptr)
-		return 0;
+	if (uid < 0 || user == NULL)
+		return -1;
 
-	struct userec *user = malloc(sizeof(struct userec));
-	memcpy(user, ummap_ptr + sizeof(*user) * uid, sizeof(*user));
-	return user;
+	if (uid + 1 > ythtbbs_cache_UserTable_get_number())
+		ythtbbs_cache_UserTable_resolve();
+
+	if (get_record(PASSFILE, user, sizeof(struct userec), uid) < 0) {
+		return -2;
+	}
+
+	return 0;
 }
 
 int getusernum(const char *id) {

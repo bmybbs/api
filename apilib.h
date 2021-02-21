@@ -68,6 +68,7 @@ int ummap();
 
 int getusernum(const char *id);
 struct userec * getuser(const char *id);
+int getuser_s(struct userec *user, const char *id);
 char * getuserlevelname(unsigned userlevel);
 int save_user_data(struct userec *x);
 
