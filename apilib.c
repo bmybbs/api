@@ -193,18 +193,7 @@ int save_user_data(struct userec *x)
 	n = getusernum(x->userid);
 	if(n < 0 || n > 1000000)
 		return 0;
-	fd = open(".PASSWDS", O_WRONLY);
-	if(fd < 0)
-		return 0;
-	flock(fd, LOCK_EX);
-	if(lseek(fd, n*sizeof(struct userec), SEEK_SET) < 0) {
-		close(fd);
-		return 0;
-	}
-	write(fd, x, sizeof(struct userec));
-	flock(fd, LOCK_UN);
-	close(fd);
-	return 1;
+	return substitute_record(PASSFILE, x, sizeof(struct userec), n + 1);
 }
 
 int get_user_utmp_index(const char *sessid)
