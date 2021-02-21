@@ -62,10 +62,6 @@ void api_template_free(api_template_t tpl);
 
 int shm_init();
 
-extern char *ummap_ptr;
-extern int ummap_size;
-int ummap();
-
 int getusernum(const char *id);
 struct userec * getuser(const char *id);
 int getuser_s(struct userec *user, const char *id);

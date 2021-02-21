@@ -23,9 +23,6 @@
 #include "ythtbbs/docutil.h"
 #include "ythtbbs/session.h"
 
-char *ummap_ptr = NULL;
-int ummap_size = 0;
-
 typedef struct selem *pelem;
 typedef struct selem {
 	unsigned char digit[8];
@@ -67,38 +64,6 @@ int shm_init()
 	ythtbbs_cache_utmp_resolve();
 	ythtbbs_cache_UserTable_resolve();
 	ythtbbs_cache_Board_resolve();
-	return 0;
-}
-
-/** 映射 .PASSWDS 文件到内存
- * 设置 ummap_ptr 地址为文件映射的地址，并且
- * 设置 ummap_size 为文件大小。
- * 该方法来自于 nju09/BBSLIB.c 。
- * @warning 尚未确定该方法是否线程安全。
- * @return <ul><li>0: 成功</li><li>-1: 失败</li></ul>
- */
-int ummap()
-{
-	int fd;
-	struct stat st;
-	if(ummap_ptr)
-		munmap(ummap_ptr, ummap_size);
-	ummap_ptr = NULL;
-	ummap_size = 0;
-	fd = open(".PASSWDS", O_RDONLY);
-	if(fd<0)
-		return -1;
-	if(fstat(fd, &st)<0 || !S_ISREG(st.st_mode) || st.st_size<=0) {
-		close(fd);
-		return -1;
-	}
-	ummap_ptr = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-
-	if(ummap_ptr == MAP_FAILED)
-		return -1;
-
-	ummap_size = st.st_size;
 	return 0;
 }
 

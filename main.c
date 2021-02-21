@@ -23,10 +23,6 @@ int main(int argc, char *argv[])
 
 	if(shm_init()<0)
 		return -1;
-	/*
-	if(ummap()<0)
-		return -1;
-	*/
 
 	signal(SIGINT, shutdown_server);
 	signal(SIGTERM, shutdown_server);
