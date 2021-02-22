@@ -1146,7 +1146,7 @@ int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, stru
 		return API_RT_NOTLOGGEDIN;
 	}
 
-	strncpy(cookie_buf, cookie_str, buf_len);
+	ytht_strsncpy(cookie_buf, cookie_str, buf_len);
 	bmy_cookie_parse(cookie_buf, cookie);
 	if (cookie->userid == NULL || cookie->sessid == NULL || strcasecmp(cookie->userid, "guest") == 0) {
 		return API_RT_NOTLOGGEDIN;
