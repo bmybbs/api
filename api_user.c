@@ -119,7 +119,8 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	struct bmy_cookie cookie = {
 		.userid = ui.userid,
 		.sessid = ui.sessionid,
-		.token  = ""
+		.token  = "",
+		.extraparam = ""
 	};
 	char buf[60];
 	bmy_cookie_gen(buf, sizeof(buf), &cookie);
