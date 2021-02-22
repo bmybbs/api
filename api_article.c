@@ -676,36 +676,28 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 
 static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 {
-	const char * board	= onion_request_get_query(req, "board");
-	const char * userid	= onion_request_get_query(req, "userid");
-	const char * appkey	= onion_request_get_query(req, "appkey");
-	const char * sessid	= onion_request_get_query(req, "sessid");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	struct userec ue;
+	const char *board = onion_request_get_query(req, "board");
 	//判断必要参数
-	if(!(board && userid && appkey && sessid))
+	if (!board)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	//TODO: 签名检查
-	//...
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
 	//判断版面访问权
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
+	if (getuser_s(&ue, ptr_info->userid) < 0)
 		return api_error(p, req, res, API_RT_NOSUCHUSER);
 
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL){
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-
-	if(ue != NULL)
-		free(ue);
-
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-	struct boardmem *b   = ythtbbs_cache_Board_get_board_by_name(board);
-	if(b == NULL)
+	struct boardmem *b = ythtbbs_cache_Board_get_board_by_name(board);
+	if (b == NULL)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 
-	if(!check_user_read_perm_x(ui, b))
+	ptr_info->userlevel = ue.userlevel;
+	if (!check_user_read_perm_x(ptr_info, b))
 		return api_error(p, req, res, API_RT_NOBRDRPERM);
 
 	char topdir[80];
@@ -713,7 +705,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 	struct fileheader x;
 	sprintf(topdir, "boards/%s/.TOPFILE", b->header.filename);
 	fp = fopen(topdir, "r");
-	if(fp == 0)
+	if (fp == 0)
 		return api_error(p, req, res, API_RT_NOBRDTPFILE);
 
 	int count = ytht_file_size_s(topdir) / sizeof(struct fileheader);
@@ -724,7 +716,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 	}
 
 	int i;
-	for(i = 0; i<count; ++i) {
+	for (i = 0; i < count; ++i) {
 		fread(&x, sizeof(x), 1, fp);
 
 		board_list[i].filetime = x.filetime;
