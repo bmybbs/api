@@ -38,25 +38,24 @@ static char * parse_mail(char * userid, int filetime, int mode, struct attach_li
 
 int api_mail_list(ONION_FUNC_PROTO_STR)
 {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	struct userec ue;
+
+	if (!api_check_method(req, OR_GET))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	if (getuser_s(&ue, ptr_info->userid) < 0) {
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
-	const char * userid   = onion_request_get_query(req, "userid");
-	const char * appkey   = onion_request_get_query(req, "appkey");
-	const char * sessid   = onion_request_get_query(req, "sessid");
 	const char * box_type  = onion_request_get_query(req, "box_type");
-
-	if(!userid || !appkey || !sessid)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	struct userec *ue = getuser(userid);
-	if(!ue)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
 
 	int startnum = (str_startnum) ? atoi(str_startnum) : 999999;
 	int count = (str_count) ? atoi(str_count) : 20;
@@ -64,27 +63,25 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 	char mail_dir[80];
 
 	int box_type_i = (box_type != NULL && box_type[0] == '1') ? API_MAIL_SENT_BOX : API_MAIL_RECIEVE_BOX;
-	if(box_type_i == API_MAIL_RECIEVE_BOX)
-		setmailfile_s(mail_dir, sizeof(mail_dir), ue->userid, ".DIR");
+	if (box_type_i == API_MAIL_RECIEVE_BOX)
+		setmailfile_s(mail_dir, sizeof(mail_dir), ptr_info->userid, ".DIR");
 	else
-		setsentmailfile(mail_dir, ue->userid, ".DIR");
+		setsentmailfile(mail_dir, ptr_info->userid, ".DIR");
 
 	int total = ytht_file_size_s(mail_dir) / sizeof(struct fileheader);
 
-	if(!total) {
-		free(ue);
+	if (!total) {
 		return api_error(p, req, res, API_RT_MAILEMPTY);
 	}
 
 	FILE *fp = fopen(mail_dir, "r");
-	if(fp==0) {
-		free(ue);
+	if (fp == NULL) {
 		return api_error(p, req, res, API_RT_MAILDIRERR);
 	}
 
-	if(startnum == 0 || startnum > total-count+1)
+	if (startnum == 0 || startnum > total-count+1)
 		startnum = total - count + 1;
-	if(startnum <= 0)
+	if (startnum <= 0)
 		startnum = 1;
 
 	struct fileheader x;
@@ -92,7 +89,7 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 	struct api_article mail_list[count];
 	memset(mail_list, 0, sizeof(struct api_article) * count);
 	fseek(fp, (startnum - 1) * sizeof(struct fileheader), SEEK_SET);
-	for(i=0; i<count; ++i) {
+	for (i = 0; i < count; ++i) {
 		if(fread(&x, sizeof(x), 1, fp) <= 0)
 			break;
 
@@ -106,12 +103,11 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 	fclose(fp);
 
-	char *s = bmy_mail_array_to_json_string(mail_list, count, 0, ue);
+	char *s = bmy_mail_array_to_json_string(mail_list, count, 0, &ue);
 
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
-	free(ue);
 	return OCS_PROCESSED;
 }
 
