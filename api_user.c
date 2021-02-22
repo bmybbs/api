@@ -17,6 +17,7 @@
 #include "ythtbbs/notification.h"
 #include "ythtbbs/permissions.h"
 #include "bmy/cookie.h"
+#include "bmy/redis.h"
 
 #include "api.h"
 #include "apilib.h"
@@ -289,55 +290,46 @@ int api_user_register(ONION_FUNC_PROTO_STR)
 
 int api_user_articlequery(ONION_FUNC_PROTO_STR)
 {
-	const char *userid = onion_request_get_query(req, "userid");
-	const char *sessid = onion_request_get_query(req, "sessid");
-	const char *appkey = onion_request_get_query(req, "appkey");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	struct userec query_ue;
+
 	const char *qryuid = onion_request_get_query(req, "query_user");
 	const char *qryday_str = onion_request_get_query(req, "query_day");
 
-	if(userid == NULL || sessid == NULL || appkey == NULL || qryuid == NULL)
+	if(qryuid == NULL)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0) {
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	}
-
-	struct userec *query_ue = getuser(qryuid);
-	if(query_ue == 0) {
+	if(getuser_s(&query_ue, qryuid) < 0) {
 		// 查询的对方用户不存在
-		free(ue);
 		return api_error(p, req, res, API_RT_NOSUCHUSER);
 	}
 
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		free(query_ue);
-		return api_error(p, req, res, r);
+	if((rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info)) != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, rc);
 	}
 
 	// 通过权限检验，从 redis 中寻找缓存，若成功则使用缓存中的内容
 	redisContext * rContext;
 	redisReply * rReplyOut, * rReplyTime;
-	rContext = redisConnect((char *)"127.0.0.1", 6379);
+	rContext = bmy_redisConnect();
 
 	time_t now_t = time(NULL);
-	if(rContext!=NULL && rContext->err ==0) {
+	if (rContext != NULL && rContext->err == 0) {
 		// 连接成功的情况下才执行
 
 		rReplyTime = redisCommand(rContext, "GET useractivities-%s-%s-timestamp",
-				ue->userid, query_ue->userid);
+				ptr_info->userid, query_ue.userid);
 
-		if(rReplyTime->str != NULL) {
+		if (rReplyTime->str != NULL) {
 			// 存在缓存
 			time_t cache_time = atol(rReplyTime->str);
 			freeReplyObject(rReplyTime);
 
-			if(now_t - cache_time < 300) {
+			if (now_t - cache_time < 300) {
 				// 缓存时间小于 5min 才使用缓存
 				rReplyOut = redisCommand(rContext, "GET useractivities-%s-%s",
-						ue->userid, query_ue->userid);
+						ptr_info->userid, query_ue.userid);
 
 				// 输出
 				api_set_json_header(res);
@@ -346,15 +338,13 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 				// 释放资源并结束
 				freeReplyObject(rReplyOut);
 				redisFree(rContext);
-				free(query_ue);
-				free(ue);
 
 				return OCS_PROCESSED;
 			}
 		}
 	}
 
-	if(rContext) {
+	if (rContext) {
 		redisFree(rContext);
 	}
 
@@ -366,19 +356,19 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	if(qryday_str != NULL && atoi(qryday_str) > 0)
 		qryday = atoi(qryday_str);
 
-	struct user_info * ui = ythtbbs_cache_utmp_get_by_idx(get_user_utmp_index(sessid));
-	int num = search_user_article_with_title_keywords(articles, MAX_SEARCH_NUM, ui,
-			query_ue->userid, NULL, NULL, NULL, qryday * 86400);
+	int num = search_user_article_with_title_keywords(articles, MAX_SEARCH_NUM, ptr_info,
+			query_ue.userid, NULL, NULL, NULL, qryday * 86400);
 
 	// 输出
+	// TODO 指针检查
 	char * tmp_buf = NULL;
 	asprintf(&tmp_buf, "{\"errcode\":0, \"userid\":\"%s\", \"total\":%d, \"articles\":[]}",
-			query_ue->userid, num);
+			query_ue.userid, num);
 	struct json_object *output_obj = json_tokener_parse(tmp_buf);
 	free(tmp_buf);
 
 	struct json_object *output_array = json_object_object_get(output_obj, "articles");
-	struct json_object *json_board_obj=NULL, *json_articles_array=NULL, *json_article_obj=NULL;
+	struct json_object *json_board_obj = NULL, *json_articles_array = NULL, *json_article_obj = NULL;
 
 	int i;
 	char * curr_board = NULL;	// 判断版面名
@@ -417,13 +407,13 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	onion_response_write0(res, s);
 
 	// 缓存到 redis
-	rContext = redisConnect((char *)"127.0.0.1", 6379);
+	rContext = bmy_redisConnect();
 	if(rContext!=NULL && rContext->err ==0) {
 		// 连接成功的情况下才执行
 		rReplyTime = redisCommand(rContext, "SET useractivities-%s-%s-timestamp %d",
-				ue->userid, query_ue->userid, now_t);
+				ptr_info->userid, query_ue.userid, now_t);
 		rReplyOut = redisCommand(rContext, "SET useractivities-%s-%s %s",
-				ue->userid, query_ue->userid, s);
+				ptr_info->userid, query_ue.userid, s);
 
 		asprintf(&tmp_buf, "[redis] SET %s and %s", rReplyTime->str, rReplyOut->str);
 		newtrace(tmp_buf);
@@ -440,8 +430,6 @@ int api_user_articlequery(ONION_FUNC_PROTO_STR)
 	free(s);
 	json_object_put(output_obj);
 	free(articles);
-	free(query_ue);
-	free(ue);
 
 	return OCS_PROCESSED;
 }
