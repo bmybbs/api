@@ -69,22 +69,6 @@ char * getuserlevelname(unsigned userlevel);
 int save_user_data(struct userec *x);
 
 /**
- * @brief 从 sessid 中获取 utmp 的索引值
- * @param sessid 前三位为索引的sessionid
- * @return utmp 的索引值，注意是从0开始。
- */
-int get_user_utmp_index(const char *sessid);
-
-/**
- * @brief 检查用户 session 是否有效
- * @param x
- * @param sessid
- * @param appkey
- * @return api_error_code
- */
-int check_user_session(struct userec *x, const char *sessid, const char *appkey);
-
-/**
  * @brief 字符串替换函数
  * @param ori 原始字符串
  * @param old 需要替换的字符串

@@ -196,18 +196,6 @@ int save_user_data(struct userec *x)
 	return substitute_record(PASSFILE, x, sizeof(struct userec), n + 1);
 }
 
-int get_user_utmp_index(const char *sessid)
-{
-	return (sessid[0] - 'A') * 26 * 26
-			+(sessid[1] - 'A') * 26
-			+(sessid[2] - 'A');
-}
-
-int check_user_session(struct userec *x, const char *sessid, const char *appkey)
-{
-	return 0;
-}
-
 char *string_replace(char *ori, const char *old, const char *new)
 {
 	int tmp_string_length = strlen(ori) + strlen(new) - strlen(old) + 1;
