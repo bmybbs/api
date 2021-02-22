@@ -22,6 +22,7 @@
 #include "ythtbbs/docutil.h"
 #include "ythtbbs/article.h"
 #include "ythtbbs/notification.h"
+#include "ythtbbs/session.h"
 
 #include "api.h"
 #include "apilib.h"
@@ -951,6 +952,13 @@ int api_article_reply(ONION_FUNC_PROTO_STR)
 
 static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 {
+	DEFINE_COMMON_SESSION_VARS;
+	struct userec local_ue;
+	int rc;
+	const char *cookie_token;
+	char session_token[TOKENLENGTH + 1];
+	char cookie_buf2[512];
+
 	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD);
 
@@ -959,40 +967,32 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	const char * ref_str = onion_request_get_query(req, "ref"); // 回复的文章时间
 	const char * rid_str = onion_request_get_query(req, "rid");	// 回复的文章编号
 	const char * th_str = onion_request_get_query(req, "th");	// 回复的主题
-
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
-	const char * token  = onion_request_get_query(req, "token");
-
-	if(!board || !title || !userid || !sessid || !appkey || !token)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	if(mode==API_POST_TYPE_REPLY && (!ref_str || !rid_str || !th_str))
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	if(title[0]==0)
-		return api_error(p, req, res, API_RT_ATCLNOTITLE);
-
-	struct userec *ue = getuser(userid);
-	if(ue==NULL)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	if(check_user_session(ue, sessid, appkey) != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, API_RT_WRONGSESS);
-	}
-
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	if (!board || !title)
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	if (mode == API_POST_TYPE_REPLY && (!ref_str || !rid_str || !th_str))
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	if (title[0] == 0)
+		return api_error(p, req, res, API_RT_ATCLNOTITLE);
+
 	struct boardmem * bmem = ythtbbs_cache_Board_get_board_by_name(board);
-	if(bmem==NULL) {
-		free(ue);
+	if (bmem == NULL) {
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	}
 
+	if (getuser_s(&local_ue, ptr_info->userid) < 0) {
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
 	int thread = -1;
-	int mark=0;
+	int mark = 0;
 	char noti_userid[14] = { '\0' };
 	if(mode == API_POST_TYPE_REPLY) { // 已通过参数校验
 		char dir[80];
@@ -1001,8 +1001,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		int rid = atoi(rid_str);
 
 		struct mmapfile mf = { .ptr = NULL };
-		if(mmapfile(dir, &mf) == -1) {
-			free(ue);
+		if (mmapfile(dir, &mf) == -1) {
 			return api_error(p, req, res, API_RT_CNTMAPBRDIR);
 		}
 
@@ -1010,7 +1009,6 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		if (x) {
 			if (x->accessed & FH_NOREPLY) {
 				mmapfile(NULL, &mf);
-				free(ue);
 				return api_error(p, req, res, API_RT_ATCLFBDREPLY);
 			}
 
@@ -1019,8 +1017,8 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 			}
 
 			thread = x->thread;
-			if(strchr(x->owner, '.') == NULL) {
-				if(x->owner[0] == '\0') {
+			if (strchr(x->owner, '.') == NULL) {
+				if (x->owner[0] == '\0') {
 					memcpy(noti_userid, &x->owner[1], IDLEN);
 				} else {
 					memcpy(noti_userid, x->owner, IDLEN);
@@ -1033,30 +1031,41 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		mmapfile(NULL, &mf);
 	}
 
-	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
-
-	if(!check_user_post_perm_x(ui, bmem)) {
-		free(ue);
+	ptr_info->userlevel = local_ue.userlevel;
+	if (!check_user_post_perm_x(ptr_info, bmem)) {
 		return api_error(p, req, res, API_RT_NOBRDPPERM);
 	}
 
-	if(strcmp(ui->token, token) !=0 ) {
-		free(ue);
-		return api_error(p, req, res, API_RT_WRONGTOKEN);
+	// TOKEN 相关开始
+	int ulock = userlock(ptr_info->userid, LOCK_EX);
+	if (ulock < 0) {
+		return api_error(p, req, res, API_RT_USERLOCKFAIL);
 	}
 
-	if(!strcasecmp(ue->userid, "guest") && seek_in_file(MY_BBS_HOME "/etc/guestbanip", fromhost)) {
-		free(ue);
+	// 不管是否正确，生成新的 token
+	cookie_token = cookie.token;
+	ytht_strsncpy(session_token, ptr_info->token, sizeof(session_token));
+	ythtbbs_session_generate_id(ptr_info->token, sizeof(ptr_info->token));
+	userunlock(ptr_info->userid, LOCK_UN);
+
+	cookie.token = ptr_info->token;
+	bmy_cookie_gen(cookie_buf2, sizeof(cookie_buf2), &cookie);
+	onion_response_add_cookie(res, SMAGIC, cookie_buf2, MAX_SESS_TIME - 10, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY);
+	if (strcmp(session_token, cookie_token) != 0) {
+		return api_error(p, req, res, API_RT_WRONGTOKEN);
+	}
+	// TOKEN 相关结束
+
+	if (!strcasecmp(ptr_info->userid, "guest") && seek_in_file(MY_BBS_HOME "/etc/guestbanip", fromhost)) {
 		return api_error(p, req, res, API_RT_FBDGSTPIP);
 	}
 
 	const char *data = onion_request_get_post(req, "content");
-	if(data==NULL)
+	if(data == NULL)
 		data = " ";
 
 	char filename[80];
-	sprintf(filename, "bbstmpfs/tmp/%s_%s.tmp", ue->userid, appkey); // line:141
+	sprintf(filename, "bbstmpfs/tmp/%s_%s.tmp", ptr_info->userid, cookie.token); // line:141
 
 	char *data2 = strdup(data);
 	while(strstr(data2, "[ESC]")!=NULL)
@@ -1065,28 +1074,29 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	f_write(filename, data2);
 	free(data2);
 
-	int is_anony = (onion_request_get_query(req, "anony")==NULL) ? 0 : 1;
-	int is_norep = (onion_request_get_query(req, "norep")==NULL) ? 0 : 1;
-	if(is_norep)
+	int is_anony = (onion_request_get_query(req, "anony") == NULL) ? 0 : 1;
+	int is_norep = (onion_request_get_query(req, "norep") == NULL) ? 0 : 1;
+	if (is_norep)
 		mark |= FH_NOREPLY;
 
-	if(is_anony && (bmem->header.flag & ANONY_FLAG))
+	if (is_anony && (bmem->header.flag & ANONY_FLAG))
 		is_anony = 1;
 	else
 		is_anony = 0;
 
 	int is_1984 = (bmem->header.flag & IS1984_FLAG) ? 1 : 0;
 
-	char * title_gbk = (char *)malloc(strlen(title)*2);
-	memset(title_gbk, 0, strlen(title)*2);
-	u2g(title, strlen(title), title_gbk, strlen(title)*2);
+	size_t title_len = strlen(title);
+	char * title_gbk = (char *) malloc(title_len * 2);
+	memset(title_gbk, 0, title_len * 2);
+	u2g(title, title_len, title_gbk, title_len * 2);
 	size_t i;
-	for(i = 0; i < strlen(title_gbk); ++i) {
-		if(title_gbk[i]<=27 && title_gbk[i]>=-1)
+	for (i = 0; i < strlen(title_gbk); ++i) {
+		if (title_gbk[i] <= 27 && title_gbk[i] >= -1)
 			title_gbk[i] = ' ';
 	}
 	i = strlen(title_gbk) - 1;
-	while(i>0 && isspace(title_gbk[i]))
+	while (i > 0 && isspace(title_gbk[i]))
 		title_gbk[i--] = 0;
 
 	// TODO: 处理签名档
@@ -1097,18 +1107,17 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		//mark = mark | FH_ATTACHED;
 
 	int r;
-	if(is_anony) {
+	if (is_anony) {
 		r = do_article_post(bmem->header.filename, title, filename, "Anonymous",
 				"我是匿名天使", "匿名天使的家", 0, mark,
-				0, ui->userid, thread);
+				0, ptr_info->userid, thread);
 	} else {
-		r = do_article_post(bmem->header.filename, title, filename, ui->userid,
-				ui->username, fromhost, 0, mark,
-				0, ui->userid, thread);
+		r = do_article_post(bmem->header.filename, title, filename, ptr_info->userid,
+				ptr_info->username, fromhost, 0, mark,
+				0, ptr_info->userid, thread);
 	}
 
-	if(r<=0) {
-		free(ue);
+	if (r <= 0) {
 		free(title_gbk);
 		unlink(filename);
 		return api_error(p, req, res, API_RT_ATCLINNERR);
@@ -1120,30 +1129,28 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	unlink(filename);
 
 	char buf[256];
-	sprintf(buf, "%s post %s %s", ui->userid, bmem->header.filename, title_gbk);
+	snprintf(buf, sizeof(buf), "%s post %s %s", ptr_info->userid, bmem->header.filename, title_gbk);
 	newtrace(buf);
 
-	if(bmem->header.clubnum == 0 && !board_is_junkboard(bmem->header.filename)) {
-		ue->numposts++;
-		save_user_data(ue);
+	if (bmem->header.clubnum == 0 && !board_is_junkboard(bmem->header.filename)) {
+		local_ue.numposts++;
+		save_user_data(&local_ue);
 	}
 
 	//回帖提醒
-	if(mode==API_POST_TYPE_REPLY && !strcmp(ue->userid, noti_userid)) {
-		add_post_notification(noti_userid, (is_anony) ? "Anonymous" : ue->userid,
+	if(mode == API_POST_TYPE_REPLY && !strcmp(ptr_info->userid, noti_userid)) {
+		add_post_notification(noti_userid, (is_anony) ? "Anonymous" : ptr_info->userid,
 				bmem->header.filename, r, title_gbk);
 	}
 
-	free(ue);
 	free(title_gbk);
-	ytht_get_random_str_r(ui->token, TOKENLENGTH+1);
-	memset(ui->from, 0, 20);
-	strncpy(ui->from, fromhost, 20);
+	ytht_get_random_str_r(ptr_info->token, TOKENLENGTH+1);
+	memset(ptr_info->from, 0, sizeof(ptr_info->from));
+	ytht_strsncpy(ptr_info->from, fromhost, sizeof(ptr_info->from));
 	api_set_json_header(res);
-	onion_response_printf(res, "{ \"errcode\":0, \"aid\":%d, \"token\":\"%s\" }",
-			r, ui->token);
+	onion_response_printf(res, "{ \"errcode\":0, \"aid\":%d }", r);
 
-	return OCS_NOT_IMPLEMENTED;
+	return OCS_PROCESSED;
 }
 
 static char* api_article_array_to_json_string(struct api_article *ba_list, int count, int mode)
