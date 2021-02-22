@@ -80,7 +80,7 @@ struct userec * getuser(const char *id)
 	struct userec local_ue, *user = NULL;
 	if (getuser_s(&local_ue, id) < 0)
 		return NULL;
-	if ((user = malloc(sizeof(struct userec))) > 0) {
+	if ((user = malloc(sizeof(struct userec))) != NULL) {
 		memcpy(user, &local_ue, sizeof(struct userec));
 	}
 	return user;
