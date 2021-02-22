@@ -626,53 +626,46 @@ static int api_user_override_File_add(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 
 static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
-	const char * queryid = onion_request_get_query(req, "queryid");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	struct userec query_ue;
+
+	if (!api_check_method(req, OR_POST))
+		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	const char *queryid = onion_request_get_query(req, "queryid");
 	int lockfd;
 
-	if(!userid || !sessid || !appkey || !queryid)
+	if (!queryid)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	struct userec *query_ue = getuser(queryid);
-	if(query_ue == 0) {
-		free(ue);
+	if (getuser_s(&query_ue, queryid) == 0) {
 		return api_error(p, req, res, API_RT_NOSUCHUSER);
 	}
 
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		free(query_ue);
-		return api_error(p, req, res, r);
-	}
-
-	if(!ythtbbs_override_included(ue->userid, mode, queryid)) {
+	if (!ythtbbs_override_included(ptr_info->userid, mode, queryid)) {
 		// queryid 不存在
-		free(ue);
-		free(query_ue);
 		return api_error(p, req, res, API_RT_NOTINRCD);
 	}
 
-	struct ythtbbs_override * array;
-	int size;
-	if (mode == YTHTBBS_OVERRIDE_FRIENDS) {
-		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
-		size = MAXFRIENDS;
-	} else {
-		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
-		size = MAXREJECTS;
+	struct ythtbbs_override *array = NULL;
+	size_t size = (mode == YTHTBBS_OVERRIDE_FRIENDS) ? MAXFRIENDS : MAXREJECTS;
+	if ((array = (struct ythtbbs_override *) malloc(sizeof(struct ythtbbs_override) * size)) == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
+	lockfd = ythtbbs_override_lock(ptr_info->userid, mode);
+	rc = ythtbbs_override_get_records(ptr_info->userid, array, size, mode);
+	if (rc < 0) {
+		free(array);
+		return api_error(p, req, res, API_RT_NOSUCHFILE);
+	}
+	size = (unsigned int) rc; /* safe */
 
-	lockfd = ythtbbs_override_lock(ue->userid, mode);
-	size = ythtbbs_override_get_records(ue->userid, array, size, mode);
-
-	int i;
+	size_t i;
 	for (i = 0; i < size - 1; ++i) {
 		if (strncasecmp(array[i].id, queryid, IDLEN) == 0) {
 			array[i].id[0] = '\0';
@@ -681,15 +674,13 @@ static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 		}
 	}
 
-	ythtbbs_override_set_records(ue->userid, array, size, mode);
+	ythtbbs_override_set_records(ptr_info->userid, array, size, mode);
 	ythtbbs_override_unlock(lockfd);
 
 	api_set_json_header(res);
-	onion_response_printf(res, "{ \"errcode\": 0, \"userid\": \"%s\" }", query_ue->userid);
+	onion_response_printf(res, "{ \"errcode\": 0, \"userid\": \"%s\" }", query_ue.userid);
 
 	free(array);
-	free(ue);
-	free(query_ue);
 	return OCS_PROCESSED;
 }
 
