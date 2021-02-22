@@ -526,46 +526,39 @@ static void api_newcomer(struct userec *x, const char *fromhost, char *words)
 
 static int api_user_override_File_list(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
 
-	if(!userid || !sessid || !appkey)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
+	if ((rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info)) != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, rc);
 	}
 
-	struct ythtbbs_override * array;
-	int size=0;
-	if(mode == YTHTBBS_OVERRIDE_FRIENDS) {
-		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXFRIENDS);
-		size = MAXFRIENDS;
-	} else {
-		array = (struct ythtbbs_override *)malloc(sizeof(struct ythtbbs_override) * MAXREJECTS);
-		size = MAXREJECTS;
+	struct ythtbbs_override *array = NULL;
+	size_t size = (mode == YTHTBBS_OVERRIDE_FRIENDS) ? MAXFRIENDS : MAXREJECTS;
+	if ((array = (struct ythtbbs_override *) malloc(sizeof(struct ythtbbs_override) * size)) == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
-	size = ythtbbs_override_get_records(ue->userid, array, size, mode);
+	rc = ythtbbs_override_get_records(ptr_info->userid, array, size, mode);
+	if (rc < 0) {
+		free(array);
+		return api_error(p, req, res, API_RT_NOSUCHFILE);
+	}
+	size = (unsigned int) rc; /* safe */
 
-	char exp_utf[2*sizeof(array[0].exp)];
+	char exp_utf[2 * sizeof(array[0].exp)];
 	struct ythtbbs_override EMPTY;
-	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"users\":[]}");
-	struct json_object * json_array_users = json_object_object_get(obj, "users");
+	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"users\":[]}");
+	struct json_object *json_array_users = json_object_object_get(obj, "users");
 
-	int i;
-	for(i=0; i<size; ++i) {
-		struct json_object * user = json_object_new_object();
+	size_t i;
+	for (i = 0; i < size; ++i) {
+		array[i].id[sizeof(EMPTY.id) - 1] = 0;
+		array[i].exp[sizeof(EMPTY.exp) - 1] = 0;
+
+		struct json_object *user = json_object_new_object();
 		json_object_object_add(user, "userid", json_object_new_string(array[i].id));
 
 		memset(exp_utf, 0, sizeof(exp_utf));
-		array[i].exp[sizeof(EMPTY.exp) - 1] = 0;
 		g2u(array[i].exp, strlen(array[i].exp), exp_utf, sizeof(exp_utf));
 		json_object_object_add(user, "explain", json_object_new_string(exp_utf));
 		json_object_array_add(json_array_users, user);
@@ -576,7 +569,6 @@ static int api_user_override_File_list(ONION_FUNC_PROTO_STR, enum ythtbbs_overri
 
 	json_object_put(obj);
 	free(array);
-	free(ue);
 
 	return OCS_PROCESSED;
 }
