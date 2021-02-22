@@ -238,33 +238,24 @@ int api_attach_delete(ONION_FUNC_PROTO_STR) {
 
 static int api_attach_show_mail(ONION_FUNC_PROTO_STR)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * str_mid = onion_request_get_query(req, "mid");
 	const char * str_pos = onion_request_get_query(req, "pos");
 	const char * attname = onion_request_get_query(req, "attname");
+	DEFINE_COMMON_SESSION_VARS;
 
-	if(!userid || !sessid || !appkey || !str_mid || !str_pos || !attname)
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	if (!str_mid || !str_pos || !attname)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-
-	char mailfilename[STRLEN];
-	sprintf(mailfilename, MY_BBS_HOME "/mail/%c/%s/M.%s.A", mytoupper(ue->userid[0]), ue->userid, str_mid);
-
+	char mailfilename[STRLEN], filename[24];
+	snprintf(filename, sizeof(filename), "M.%s.A", str_mid);
+	setmailfile_s(mailfilename, sizeof(mailfilename), ptr_info->userid, filename);
 
 	output_binary_attach(res, mailfilename, attname, atoi(str_pos));
 
-	free(ue);
 	return OCS_PROCESSED;
 }
 
