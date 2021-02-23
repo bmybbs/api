@@ -819,10 +819,10 @@ int mail_count(char *id, int *unread)
 	return total;
 }
 
-time_t do_article_post(const char *board, const char *title, const char *filename, const char *id,
+time_t do_article_post(const char *board, const char *title, const char *content, const char *id,
 		const char *nickname, const char *ip, int sig, int mark, int outgoing, const char *realauthor, time_t thread)
 {
-	FILE *fp, *fp1, *fp2;
+	FILE *fp_final;
 	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_gbk;
 	size_t content_utf8_buf_len;
 	struct fileheader header;
@@ -834,66 +834,67 @@ time_t do_article_post(const char *board, const char *title, const char *filenam
 	else
 		fh_setowner(&header, realauthor, 1);
 
-	sprintf(buf3, "boards/%s/", board);
+	snprintf(buf3, sizeof(buf3), "boards/%s/", board);
 
 	time_t now_t = time(NULL);
 	t = trycreatefile(buf3, "M.%ld.A", now_t, 100);
-	if(t<0)
+	if (t < 0)
 		return -1;
 
 	header.filetime = t;
 	header.accessed |= mark;
 
-	if(outgoing)
-		header.accessed |= FH_INND;
-
-	fp1 = fopen(buf3, "w");
-	if (NULL == fp1)
+	if (NULL == (fp_final = fopen(buf3, "w")))
 		return -1;
-	title_gbk = (char *)malloc(strlen(title)*2);
-	memset(title_gbk, 0, strlen(title)*2);
-	u2g(title, strlen(title), title_gbk, strlen(title)*2);
-	ytht_strsncpy(header.title, title_gbk, sizeof(header.title));
-	fp = open_memstream(&content_utf8_buf, &content_utf8_buf_len);
-	fprintf(fp,
-			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n",
-			id, nickname, board, title, ytht_ctime(now_t),
-			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
-	free(title_gbk);
-	fp2 = fopen(filename, "r");
-	if (fp2!=0) {
-		while (1) {  // 将 bbstmpfs 中文章主体的内容写到 content_utf8_buf 中
-			int retv = fread(buf3, 1, sizeof(buf3), fp2);
-			if (retv<=0)
-				break;
-			fwrite(buf3, 1, retv, fp);
-		}
 
-		fclose(fp2);
+	size_t title_gbk_size = strlen(title) * 2;
+	title_gbk = (char *) malloc(title_gbk_size);
+	if (title_gbk == NULL) {
+		fclose(fp_final);
+		return -1;
+	}
+
+	memset(title_gbk, 0, title_gbk_size);
+	u2g(title, strlen(title), title_gbk, title_gbk_size);
+	ytht_strsncpy(header.title, title_gbk, sizeof(header.title));
+	free(title_gbk);
+
+	char timestr_buf[30];
+	ytht_ctime_r(now_t, timestr_buf);
+
+	content_utf8_buf_len = strlen(content) + 512;
+	content_utf8_buf = malloc(content_utf8_buf_len);
+	if (content_utf8_buf == NULL) {
+		fclose(fp_final);
+		return -1;
 	}
 
 	// TODO: QMD
-	fprintf(fp, "\n--\n");
-	// sig_append
+	snprintf(content_utf8_buf, content_utf8_buf_len,
+			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n%s\n--\n\033[1;%dm※ 来源:．兵马俑BBS %s [FROM: %.20s]\033[0m\n",
+			id, nickname, board, title, ytht_ctime(now_t),
+			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN,
+			content,
+			31 + rand() % 7, MY_BBS_DOMAIN " API", ip);
 
-	fprintf(fp, "\033[1;%dm※ 来源:．兵马俑BBS %s [FROM: %.20s]\033[0m\n",
-			31+rand()%7, MY_BBS_DOMAIN " API", ip);
+	content_gbk_buf = (char *) malloc(content_utf8_buf_len * 2);
+	if (content_gbk_buf == NULL) {
+		free(content_gbk_buf);
+		fclose(fp_final);
+		return -1;
+	}
 
-	fflush(fp);
-	fclose(fp);
-
-	content_gbk_buf = (char *)malloc(content_utf8_buf_len *2);
-	memset(content_gbk_buf, 0, content_utf8_buf_len *2);
-	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len*2);
-	fprintf(fp1, "%s", content_gbk_buf);
-	fclose(fp1);
+	memset(content_gbk_buf, 0, content_utf8_buf_len * 2);
+	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len * 2);
+	fprintf(fp_final, "%s", content_gbk_buf);
+	fclose(fp_final);
 	free(content_gbk_buf);
 	content_gbk_buf = NULL;
 	free(content_utf8_buf);
 	content_utf8_buf = NULL;
 
 	sprintf(buf3, "boards/%s/M.%ld.A", board, t);
-	header.sizebyte = ytht_num2byte(eff_size(buf3));
+	header.sizebyte = ytht_num2byte(eff_size(buf3)); // TODO MT 不安全的接口
 
 	if (thread == -1)
 		header.thread = header.filetime;
@@ -902,8 +903,6 @@ time_t do_article_post(const char *board, const char *title, const char *filenam
 
 	sprintf(buf3, "boards/%s/.DIR", board);
 	append_record(buf3, &header, sizeof(header));
-
-	//if(outgoing)
 
 	//updatelastpost(board);  //TODO:
 	return t;

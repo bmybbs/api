@@ -509,19 +509,15 @@ static int adduser_with_activation_code(struct userec *x, const char *code) {
 
 static void api_newcomer(struct userec *x, const char *fromhost, char *words)
 {
-	FILE *fp;
-	char filename[80];
-	sprintf(filename, "bbstmpfs/tmp/%s.tmp", x->userid);
-	fp = fopen(filename, "w");
-	fprintf(fp, "大家好, \n\n");
-	fprintf(fp, "我是 %s(%s), 来自 %s\n", x->userid, x->username, fromhost);
-	fprintf(fp, "今天初来此地报到, 请大家多多指教.\n\n");
-	fprintf(fp, "自我介绍:\n\n");
-	fprintf(fp, "%s", words);
-	fclose(fp);
-	do_article_post("newcomers", "API 新手上路", filename, x->userid,
+	(void) words; // 暂时不用
+	char local_buf[256];
+	snprintf(local_buf, sizeof(local_buf),
+			"大家好, \n\n"
+			"我是 %s(%s), 来自 %s\n"
+			"今天初来此地报到, 请大家多多指教.\n\n"
+			"自我介绍:\n\n", x->userid, x->username, fromhost);
+	do_article_post("newcomers", "API 新手上路", local_buf, x->userid,
 		x->username, fromhost, -1, 0, 0, x->userid, -1);
-	unlink(filename);
 }
 
 static int api_user_override_File_list(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode)

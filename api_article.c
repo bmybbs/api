@@ -1102,11 +1102,6 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_FBDGSTPIP);
 	}
 
-	char filename[80];
-	sprintf(filename, "bbstmpfs/tmp/%s_%s.tmp", ptr_info->userid, cookie.token); // line:141
-
-	f_write(filename, data);
-
 	bool is_anony = (json_object_object_get(req_json, "anony") != NULL);
 	bool is_norep = (json_object_object_get(req_json, "norep") != NULL);
 	bool using_math = (json_object_object_get(req_json, "math") != NULL);
@@ -1145,25 +1140,22 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	time_t r;
 	if (is_anony) {
-		r = do_article_post(bmem->header.filename, title, filename, "Anonymous",
+		r = do_article_post(bmem->header.filename, title, data, "Anonymous",
 				"我是匿名天使", "匿名天使的家", 0, mark,
 				0, ptr_info->userid, thread);
 	} else {
-		r = do_article_post(bmem->header.filename, title, filename, ptr_info->userid,
+		r = do_article_post(bmem->header.filename, title, data, ptr_info->userid,
 				ptr_info->username, fromhost, 0, mark,
 				0, ptr_info->userid, thread);
 	}
 
 	if (r <= 0) {
 		free(title_gbk);
-		unlink(filename);
 		return api_error(p, req, res, API_RT_ATCLINNERR);
 	}
 
 	// TODO: 更新未读标记
 	//brc_initial
-
-	unlink(filename);
 
 	char buf[256];
 	snprintf(buf, sizeof(buf), "%s post %s %s", ptr_info->userid, bmem->header.filename, title_gbk);
