@@ -819,17 +819,17 @@ int mail_count(char *id, int *unread)
 	return total;
 }
 
-int do_article_post(const char *board, const char *title, const char *filename, const char *id,
-		const char *nickname, const char *ip, int sig, int mark, int outgoing, const char *realauthor, int thread)
+time_t do_article_post(const char *board, const char *title, const char *filename, const char *id,
+		const char *nickname, const char *ip, int sig, int mark, int outgoing, const char *realauthor, time_t thread)
 {
 	FILE *fp, *fp1, *fp2;
 	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_gbk;
 	size_t content_utf8_buf_len;
 	struct fileheader header;
 	memset(&header, 0, sizeof(header));
-	int t;
+	time_t t;
 
-	if(strcasecmp(id, "Anonymous") != 0)
+	if (strcasecmp(id, "Anonymous") != 0)
 		fh_setowner(&header, id, 0);
 	else
 		fh_setowner(&header, realauthor, 1);
@@ -837,7 +837,7 @@ int do_article_post(const char *board, const char *title, const char *filename, 
 	sprintf(buf3, "boards/%s/", board);
 
 	time_t now_t = time(NULL);
-	t = trycreatefile(buf3, "M.%d.A", now_t, 100);
+	t = trycreatefile(buf3, "M.%ld.A", now_t, 100);
 	if(t<0)
 		return -1;
 
@@ -848,7 +848,7 @@ int do_article_post(const char *board, const char *title, const char *filename, 
 		header.accessed |= FH_INND;
 
 	fp1 = fopen(buf3, "w");
-	if(NULL == fp1)
+	if (NULL == fp1)
 		return -1;
 	title_gbk = (char *)malloc(strlen(title)*2);
 	memset(title_gbk, 0, strlen(title)*2);
@@ -861,10 +861,10 @@ int do_article_post(const char *board, const char *title, const char *filename, 
 			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
 	free(title_gbk);
 	fp2 = fopen(filename, "r");
-	if(fp2!=0) {
-		while(1) {  // 将 bbstmpfs 中文章主体的内容写到 content_utf8_buf 中
+	if (fp2!=0) {
+		while (1) {  // 将 bbstmpfs 中文章主体的内容写到 content_utf8_buf 中
 			int retv = fread(buf3, 1, sizeof(buf3), fp2);
-			if(retv<=0)
+			if (retv<=0)
 				break;
 			fwrite(buf3, 1, retv, fp);
 		}
@@ -892,10 +892,10 @@ int do_article_post(const char *board, const char *title, const char *filename, 
 	free(content_utf8_buf);
 	content_utf8_buf = NULL;
 
-	sprintf(buf3, "boards/%s/M.%d.A", board, t);
+	sprintf(buf3, "boards/%s/M.%ld.A", board, t);
 	header.sizebyte = ytht_num2byte(eff_size(buf3));
 
-	if(thread == -1)
+	if (thread == -1)
 		header.thread = header.filetime;
 	else
 		header.thread = thread;

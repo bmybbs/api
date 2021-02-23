@@ -166,9 +166,9 @@ const char *calc_perf_str_utf8(int perf);
  * @param thread 主题编号
  * @return 返回文件名中实际使用的时间戳
  */
-int do_article_post(const char *board, const char *title, const char *filename, const char *id,
+time_t do_article_post(const char *board, const char *title, const char *filename, const char *id,
 					const char *nickname, const char *ip, int sig, int mark,
-					int outgoing, const char *realauthor, int thread);
+					int outgoing, const char *realauthor, time_t thread);
 
 /**
  * @brief 实际处理发站内信的函数。
