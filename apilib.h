@@ -113,7 +113,7 @@ void free_attach_link_list(struct attach_link *attach_link_list);
  * @param buf 字符串
  * @return 成功返回 0，失败返回 -1。
  */
-int f_write(char *filename, char *buf);
+int f_write(const char *filename, const char *buf);
 
 /**
  * @brief 将字符串追加到指定的文件中。

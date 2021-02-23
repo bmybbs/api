@@ -772,7 +772,7 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 		fprintf(out_stream, "</span>\n");
 }
 
-int f_write(char *filename, char *buf)
+int f_write(const char *filename, const char *buf)
 {
 	FILE *fp;
 	fp = fopen(filename, "w");
