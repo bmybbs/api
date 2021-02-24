@@ -95,7 +95,7 @@ int getuser_s(struct userec *user, const char *id) {
 	if (uid + 1 > ythtbbs_cache_UserTable_get_number())
 		ythtbbs_cache_UserTable_resolve();
 
-	if (get_record(PASSFILE, user, sizeof(struct userec), uid) < 0) {
+	if (get_record(PASSFILE, user, sizeof(struct userec), uid + 1) < 0) {
 		return -2;
 	}
 
