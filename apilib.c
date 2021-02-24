@@ -14,6 +14,8 @@
 #include "ytht/fileop.h"
 #include "ytht/numbyte.h"
 #include "bmy/convcode.h"
+#include "ythtbbs/attach.h"
+#include "ythtbbs/binaryattach.h"
 #include "ythtbbs/cache.h"
 #include "ythtbbs/permissions.h"
 #include "ythtbbs/user.h"
@@ -842,15 +844,11 @@ time_t do_article_post(const char *board, const char *title, const char *content
 		return -1;
 
 	header.filetime = t;
-	header.accessed |= mark;
-
-	if (NULL == (fp_final = fopen(buf3, "w")))
-		return -1;
+	header.accessed = mark;
 
 	size_t title_gbk_size = strlen(title) * 2;
 	title_gbk = (char *) malloc(title_gbk_size);
 	if (title_gbk == NULL) {
-		fclose(fp_final);
 		return -1;
 	}
 
@@ -865,33 +863,42 @@ time_t do_article_post(const char *board, const char *title, const char *content
 	content_utf8_buf_len = strlen(content) + 512;
 	content_utf8_buf = malloc(content_utf8_buf_len);
 	if (content_utf8_buf == NULL) {
-		fclose(fp_final);
 		return -1;
 	}
 
 	// TODO: QMD
 	snprintf(content_utf8_buf, content_utf8_buf_len,
 			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n%s\n--\n\033[1;%dm※ 来源:．兵马俑BBS %s [FROM: %.20s]\033[0m\n",
-			id, nickname, board, title, ytht_ctime(now_t),
+			id, nickname, board, title, timestr_buf,
 			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN,
 			content,
 			31 + rand() % 7, MY_BBS_DOMAIN " API", ip);
 
 	content_gbk_buf = (char *) malloc(content_utf8_buf_len * 2);
 	if (content_gbk_buf == NULL) {
-		free(content_gbk_buf);
-		fclose(fp_final);
+		free(content_utf8_buf);
 		return -1;
 	}
 
 	memset(content_gbk_buf, 0, content_utf8_buf_len * 2);
 	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len * 2);
-	fprintf(fp_final, "%s", content_gbk_buf);
-	fclose(fp_final);
-	free(content_gbk_buf);
-	content_gbk_buf = NULL;
 	free(content_utf8_buf);
 	content_utf8_buf = NULL;
+
+	if (hasbinaryattach(realauthor)) {
+		if (insertattachments(buf3, content_gbk_buf, realauthor))
+			header.accessed |= FH_ATTACHED;
+	} else {
+		if (NULL == (fp_final = fopen(buf3, "w"))) {
+			free(content_gbk_buf);
+			return -1;
+		}
+		fprintf(fp_final, "%s", content_gbk_buf);
+		fclose(fp_final);
+	}
+
+	free(content_gbk_buf);
+	content_gbk_buf = NULL;
 
 	sprintf(buf3, "boards/%s/M.%ld.A", board, t);
 	header.sizebyte = ytht_num2byte(eff_size(buf3));
