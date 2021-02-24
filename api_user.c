@@ -145,45 +145,41 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 
 	const char * queryid = onion_request_get_query(req, "queryid"); //查询id
 	char buf[4096];
-	struct userec *ue;
+	struct userec ue;
 
 	if(!queryid || queryid[0]=='\0' || strcasecmp(queryid, ptr_info->userid) == 0) {
 		// 查询自己
-		ue = getuser(ptr_info->userid);
-		if(ue == 0)
+		if (getuser_s(&ue, ptr_info->userid) < 0)
 			return api_error(p, req, res, API_RT_NOSUCHUSER);
-
 		int unread_mail;
-		int total_mail = mail_count(ue->userid, &unread_mail);
+		int total_mail = mail_count(ue.userid, &unread_mail);
 		sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
 				"\"post_counts\":%d, \"total_mail\":%d, \"unread_mail\":%d, \"unread_notify\":%d,"
 				"\"job\":\"%s\", \"exp\":%d, \"perf\":%d,"
 				"\"exp_level\":\"%s\", \"perf_level\":\"%s\"}",
-				ue->userid, ue->numlogins, ue->numposts, total_mail, unread_mail,
-				count_notification_num(ue->userid), getuserlevelname(ue->userlevel),
-				countexp(ue), countperf(ue),
-				calc_exp_str_utf8(countexp(ue)), calc_perf_str_utf8(countperf(ue)));
+				ue.userid, ue.numlogins, ue.numposts, total_mail, unread_mail,
+				count_notification_num(ue.userid), getuserlevelname(ue.userlevel),
+				countexp(&ue), countperf(&ue),
+				calc_exp_str_utf8(countexp(&ue)), calc_perf_str_utf8(countperf(&ue)));
 	} else {
 		// 查询对方id
-		ue = getuser(queryid);
-		if(ue == 0)
+		if (getuser_s(&ue, queryid) < 0)
 			return api_error(p, req, res, API_RT_NOSUCHUSER);
 
 		sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
 				"\"post_counts\":%d, \"job\":\"%s\", \"exp_level\":\"%s\","
-				"\"perf_level\":\"%s\"}", ue->userid, ue->numlogins, ue->numposts,
-				getuserlevelname(ue->userlevel),
-				calc_exp_str_utf8(countexp(ue)), calc_perf_str_utf8(countperf(ue)));
+				"\"perf_level\":\"%s\"}", ue.userid, ue.numlogins, ue.numposts,
+				getuserlevelname(ue.userlevel),
+				calc_exp_str_utf8(countexp(&ue)), calc_perf_str_utf8(countperf(&ue)));
 	}
 
 	struct json_object *jp = json_tokener_parse(buf);
-	json_object_object_add(jp, "nickname", json_object_new_string(ue->username));
+	json_object_object_add(jp, "nickname", json_object_new_string(ue.username));
 
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(jp));
 
 	json_object_put(jp);
-	free(ue);
 
 	return OCS_PROCESSED;
 }
