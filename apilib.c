@@ -894,7 +894,7 @@ time_t do_article_post(const char *board, const char *title, const char *content
 	content_utf8_buf = NULL;
 
 	sprintf(buf3, "boards/%s/M.%ld.A", board, t);
-	header.sizebyte = ytht_num2byte(eff_size(buf3)); // TODO MT 不安全的接口
+	header.sizebyte = ytht_num2byte(eff_size(buf3));
 
 	if (thread == -1)
 		header.thread = header.filetime;
