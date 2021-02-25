@@ -862,6 +862,7 @@ time_t do_article_post(const char *board, const char *title, const char *content
 	free(title_gbk);
 
 	char timestr_buf[30];
+	char QMD_gbk[300];
 	ytht_ctime_r(now_t, timestr_buf);
 
 	content_utf8_buf_len = strlen(content) + 512;
@@ -872,11 +873,11 @@ time_t do_article_post(const char *board, const char *title, const char *content
 
 	// TODO: QMD
 	snprintf(content_utf8_buf, content_utf8_buf_len,
-			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n%s\n--\n\033[1;%dm※ 来源:．兵马俑BBS %s [FROM: %.20s]\033[0m\n",
+			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n%s\n",
 			id, nickname, board, title, timestr_buf,
 			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN,
-			content,
-			31 + rand() % 7, MY_BBS_DOMAIN " API", ip);
+			content);
+	snprintf(QMD_gbk, sizeof(QMD_gbk), "--\n\033[1;%dm\xA1\xF9 \xC0\xB4\xD4\xB4:\xA3\xAE" MY_BBS_NAME " " MY_BBS_DOMAIN " API [FROM: %.40s]\033[0m\n", 31 + rand() % 7, ip); // 来源
 
 	content_gbk_buf = (char *) malloc(content_utf8_buf_len * 2);
 	if (content_gbk_buf == NULL) {
@@ -892,12 +893,18 @@ time_t do_article_post(const char *board, const char *title, const char *content
 	if (hasbinaryattach(realauthor)) {
 		if (insertattachments(buf3, content_gbk_buf, realauthor))
 			header.accessed |= FH_ATTACHED;
+		if ((fp_final = fopen(buf3, "w")) != NULL) {
+			if (lseek(fileno(fp_final), 0, SEEK_END) >= 0) {
+				fprintf(fp_final, "%s", QMD_gbk);
+			}
+			fclose(fp_final);
+		}
 	} else {
 		if (NULL == (fp_final = fopen(buf3, "w"))) {
 			free(content_gbk_buf);
 			return -1;
 		}
-		fprintf(fp_final, "%s", content_gbk_buf);
+		fprintf(fp_final, "%s%s", content_gbk_buf, QMD_gbk);
 		fclose(fp_final);
 	}
 
