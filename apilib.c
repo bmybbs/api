@@ -444,6 +444,7 @@ char *parse_article_js_internal(struct mmapfile *pmf, struct attach_link **attac
 	size_t i, j, m, n, line, pos;
 	unsigned int attach_size = 0;
 	struct attach_link *attach = NULL;
+	bool is_first_line;
 
 	if (pmf->ptr == NULL || pmf->size == 0 || bname == NULL || fname == NULL)
 		return NULL;
@@ -459,10 +460,13 @@ char *parse_article_js_internal(struct mmapfile *pmf, struct attach_link **attac
 				line++;
 		}
 
+		is_first_line = true;
 		while (i < pmf->size) {
-			if (pmf->ptr[i] == '\n') {
+			if (is_first_line || pmf->ptr[i] == '\n') {
+				is_first_line = false;
 				// 换行符，先拷贝
-				content[j++] = pmf->ptr[i++];
+				if (pmf->ptr[i] == '\n')
+					content[j++] = pmf->ptr[i++];
 
 				// 判断新行是否为签名档，目前跳过
 				if (pmf->size - i > 3 && strncmp(pmf->ptr + i, "--\n", 3) == 0) {
