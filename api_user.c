@@ -604,6 +604,8 @@ static int api_user_override_File_add(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 	}
 
 	struct ythtbbs_override of;
+	memset(&of, 0, sizeof(struct ythtbbs_override));
+	query_ue.userid[sizeof(query_ue.userid) - 1] = 0;
 	ytht_strsncpy(of.id, query_ue.userid, IDLEN);
 	u2g(exp_utf, strlen(exp_utf), of.exp, sizeof(of.exp));
 
