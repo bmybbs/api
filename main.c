@@ -23,10 +23,6 @@ int main(int argc, char *argv[])
 
 	if(shm_init()<0)
 		return -1;
-	/*
-	if(ummap()<0)
-		return -1;
-	*/
 
 	signal(SIGINT, shutdown_server);
 	signal(SIGTERM, shutdown_server);
@@ -80,7 +76,9 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^mail/reply$", api_mail_reply);
 	onion_url_add(urls, "^attach/show$", api_attach_show);
 	onion_url_add(urls, "^attach/list$", api_attach_list);
+	onion_url_add(urls, "^attach/get$", api_attach_get);
 	onion_url_add(urls, "^attach/upload$", api_attach_upload);
+	onion_url_add(urls, "^attach/delete$", api_attach_delete);
 	onion_url_add(urls, "^notification/list$", api_notification_list);
 	onion_url_add(urls, "^notification/del$", api_notification_del);
 	onion_url_add(urls, "^subscription/list$", api_subscription_list);

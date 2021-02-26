@@ -14,6 +14,8 @@
 #include "ytht/fileop.h"
 #include "ytht/numbyte.h"
 #include "bmy/convcode.h"
+#include "ythtbbs/attach.h"
+#include "ythtbbs/binaryattach.h"
 #include "ythtbbs/cache.h"
 #include "ythtbbs/permissions.h"
 #include "ythtbbs/user.h"
@@ -22,9 +24,6 @@
 #include "ythtbbs/binaryattach.h"
 #include "ythtbbs/docutil.h"
 #include "ythtbbs/session.h"
-
-char *ummap_ptr = NULL;
-int ummap_size = 0;
 
 typedef struct selem *pelem;
 typedef struct selem {
@@ -70,38 +69,6 @@ int shm_init()
 	return 0;
 }
 
-/** 映射 .PASSWDS 文件到内存
- * 设置 ummap_ptr 地址为文件映射的地址，并且
- * 设置 ummap_size 为文件大小。
- * 该方法来自于 nju09/BBSLIB.c 。
- * @warning 尚未确定该方法是否线程安全。
- * @return <ul><li>0: 成功</li><li>-1: 失败</li></ul>
- */
-int ummap()
-{
-	int fd;
-	struct stat st;
-	if(ummap_ptr)
-		munmap(ummap_ptr, ummap_size);
-	ummap_ptr = NULL;
-	ummap_size = 0;
-	fd = open(".PASSWDS", O_RDONLY);
-	if(fd<0)
-		return -1;
-	if(fstat(fd, &st)<0 || !S_ISREG(st.st_mode) || st.st_size<=0) {
-		close(fd);
-		return -1;
-	}
-	ummap_ptr = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-
-	if(ummap_ptr == MAP_FAILED)
-		return -1;
-
-	ummap_size = st.st_size;
-	return 0;
-}
-
 /** 从共享内存中寻找用户
  * Hash userid and get index in PASSWDS file.
  * @warning remember to free userec address!
@@ -112,18 +79,29 @@ int ummap()
  */
 struct userec * getuser(const char *id)
 {
+	struct userec local_ue, *user = NULL;
+	if (getuser_s(&local_ue, id) < 0)
+		return NULL;
+	if ((user = malloc(sizeof(struct userec))) != NULL) {
+		memcpy(user, &local_ue, sizeof(struct userec));
+	}
+	return user;
+}
+
+int getuser_s(struct userec *user, const char *id) {
 	int uid;
 	uid = getusernum(id);
-	if(uid<0)
-		return NULL;
-	if((uid+1) * sizeof(struct userec) > ummap_size)
-		ummap(); // 重新 mmap PASSWDS 文件到内存
-	if(!ummap_ptr)
-		return 0;
+	if (uid < 0 || user == NULL)
+		return -1;
 
-	struct userec *user = malloc(sizeof(struct userec));
-	memcpy(user, ummap_ptr + sizeof(*user) * uid, sizeof(*user));
-	return user;
+	if (uid + 1 > ythtbbs_cache_UserTable_get_number())
+		ythtbbs_cache_UserTable_resolve();
+
+	if (get_record(PASSFILE, user, sizeof(struct userec), uid + 1) < 0) {
+		return -2;
+	}
+
+	return 0;
 }
 
 int getusernum(const char *id) {
@@ -217,30 +195,7 @@ int save_user_data(struct userec *x)
 	n = getusernum(x->userid);
 	if(n < 0 || n > 1000000)
 		return 0;
-	fd = open(".PASSWDS", O_WRONLY);
-	if(fd < 0)
-		return 0;
-	flock(fd, LOCK_EX);
-	if(lseek(fd, n*sizeof(struct userec), SEEK_SET) < 0) {
-		close(fd);
-		return 0;
-	}
-	write(fd, x, sizeof(struct userec));
-	flock(fd, LOCK_UN);
-	close(fd);
-	return 1;
-}
-
-int get_user_utmp_index(const char *sessid)
-{
-	return (sessid[0] - 'A') * 26 * 26
-			+(sessid[1] - 'A') * 26
-			+(sessid[2] - 'A');
-}
-
-int check_user_session(struct userec *x, const char *sessid, const char *appkey)
-{
-	return 0;
+	return substitute_record(PASSFILE, x, sizeof(struct userec), n + 1);
 }
 
 char *string_replace(char *ori, const char *old, const char *new)
@@ -489,6 +444,7 @@ char *parse_article_js_internal(struct mmapfile *pmf, struct attach_link **attac
 	size_t i, j, m, n, line, pos;
 	unsigned int attach_size = 0;
 	struct attach_link *attach = NULL;
+	bool is_first_line;
 
 	if (pmf->ptr == NULL || pmf->size == 0 || bname == NULL || fname == NULL)
 		return NULL;
@@ -504,10 +460,13 @@ char *parse_article_js_internal(struct mmapfile *pmf, struct attach_link **attac
 				line++;
 		}
 
+		is_first_line = true;
 		while (i < pmf->size) {
-			if (pmf->ptr[i] == '\n') {
+			if (is_first_line || pmf->ptr[i] == '\n') {
+				is_first_line = false;
 				// 换行符，先拷贝
-				content[j++] = pmf->ptr[i++];
+				if (pmf->ptr[i] == '\n')
+					content[j++] = pmf->ptr[i++];
 
 				// 判断新行是否为签名档，目前跳过
 				if (pmf->size - i > 3 && strncmp(pmf->ptr + i, "--\n", 3) == 0) {
@@ -819,7 +778,7 @@ void aha_convert(FILE *in_stream, FILE *out_stream)
 		fprintf(out_stream, "</span>\n");
 }
 
-int f_write(char *filename, char *buf)
+int f_write(const char *filename, const char *buf)
 {
 	FILE *fp;
 	fp = fopen(filename, "w");
@@ -866,91 +825,100 @@ int mail_count(char *id, int *unread)
 	return total;
 }
 
-int do_article_post(const char *board, const char *title, const char *filename, const char *id,
-		const char *nickname, const char *ip, int sig, int mark, int outgoing, const char *realauthor, int thread)
+time_t do_article_post(const char *board, const char *title, const char *content, const char *id,
+		const char *nickname, const char *ip, int sig, int mark, int outgoing, const char *realauthor, time_t thread)
 {
-	FILE *fp, *fp1, *fp2;
+	FILE *fp_final;
 	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_gbk;
 	size_t content_utf8_buf_len;
 	struct fileheader header;
 	memset(&header, 0, sizeof(header));
-	int t;
+	time_t t;
 
-	if(strcasecmp(id, "Anonymous") != 0)
+	if (strcasecmp(id, "Anonymous") != 0)
 		fh_setowner(&header, id, 0);
 	else
 		fh_setowner(&header, realauthor, 1);
 
-	sprintf(buf3, "boards/%s/", board);
+	snprintf(buf3, sizeof(buf3), "boards/%s/", board);
 
 	time_t now_t = time(NULL);
-	t = trycreatefile(buf3, "M.%d.A", now_t, 100);
-	if(t<0)
+	t = trycreatefile(buf3, "M.%ld.A", now_t, 100);
+	if (t < 0)
 		return -1;
 
 	header.filetime = t;
-	header.accessed |= mark;
+	header.accessed = mark;
 
-	if(outgoing)
-		header.accessed |= FH_INND;
-
-	fp1 = fopen(buf3, "w");
-	if(NULL == fp1)
+	size_t title_gbk_size = strlen(title) * 2;
+	title_gbk = (char *) malloc(title_gbk_size);
+	if (title_gbk == NULL) {
 		return -1;
-	title_gbk = (char *)malloc(strlen(title)*2);
-	memset(title_gbk, 0, strlen(title)*2);
-	u2g(title, strlen(title), title_gbk, strlen(title)*2);
-	ytht_strsncpy(header.title, title_gbk, sizeof(header.title));
-	fp = open_memstream(&content_utf8_buf, &content_utf8_buf_len);
-	fprintf(fp,
-			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n",
-			id, nickname, board, title, ytht_ctime(now_t),
-			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN);
-	free(title_gbk);
-	fp2 = fopen(filename, "r");
-	if(fp2!=0) {
-		while(1) {  // 将 bbstmpfs 中文章主体的内容写到 content_utf8_buf 中
-			int retv = fread(buf3, 1, sizeof(buf3), fp2);
-			if(retv<=0)
-				break;
-			fwrite(buf3, 1, retv, fp);
-		}
+	}
 
-		fclose(fp2);
+	memset(title_gbk, 0, title_gbk_size);
+	u2g(title, strlen(title), title_gbk, title_gbk_size);
+	ytht_strsncpy(header.title, title_gbk, sizeof(header.title));
+	free(title_gbk);
+
+	char timestr_buf[30];
+	char QMD_gbk[300];
+	ytht_ctime_r(now_t, timestr_buf);
+
+	content_utf8_buf_len = strlen(content) + 512;
+	content_utf8_buf = malloc(content_utf8_buf_len);
+	if (content_utf8_buf == NULL) {
+		return -1;
 	}
 
 	// TODO: QMD
-	fprintf(fp, "\n--\n");
-	// sig_append
+	snprintf(content_utf8_buf, content_utf8_buf_len,
+			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n%s",
+			id, nickname, board, title, timestr_buf,
+			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN,
+			content);
+	snprintf(QMD_gbk, sizeof(QMD_gbk), "\n--\n\033[1;%dm\xA1\xF9 \xC0\xB4\xD4\xB4:\xA3\xAE" MY_BBS_NAME " " MY_BBS_DOMAIN " API [FROM: %.40s]\033[0m\n", 31 + rand() % 7, ip); // 来源
 
-	fprintf(fp, "\033[1;%dm※ 来源:．兵马俑BBS %s [FROM: %.20s]\033[0m\n",
-			31+rand()%7, MY_BBS_DOMAIN " API", ip);
+	content_gbk_buf = (char *) malloc(content_utf8_buf_len * 2);
+	if (content_gbk_buf == NULL) {
+		free(content_utf8_buf);
+		return -1;
+	}
 
-	fflush(fp);
-	fclose(fp);
-
-	content_gbk_buf = (char *)malloc(content_utf8_buf_len *2);
-	memset(content_gbk_buf, 0, content_utf8_buf_len *2);
-	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len*2);
-	fprintf(fp1, "%s", content_gbk_buf);
-	fclose(fp1);
-	free(content_gbk_buf);
-	content_gbk_buf = NULL;
+	memset(content_gbk_buf, 0, content_utf8_buf_len * 2);
+	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len * 2);
 	free(content_utf8_buf);
 	content_utf8_buf = NULL;
 
-	sprintf(buf3, "boards/%s/M.%d.A", board, t);
+	if (hasbinaryattach(realauthor)) {
+		if (insertattachments(buf3, content_gbk_buf, realauthor))
+			header.accessed |= FH_ATTACHED;
+		if ((fp_final = fopen(buf3, "a")) != NULL) {
+			fprintf(fp_final, "%s", QMD_gbk);
+			fclose(fp_final);
+		}
+	} else {
+		if (NULL == (fp_final = fopen(buf3, "w"))) {
+			free(content_gbk_buf);
+			return -1;
+		}
+		fprintf(fp_final, "%s%s", content_gbk_buf, QMD_gbk);
+		fclose(fp_final);
+	}
+
+	free(content_gbk_buf);
+	content_gbk_buf = NULL;
+
+	sprintf(buf3, "boards/%s/M.%ld.A", board, t);
 	header.sizebyte = ytht_num2byte(eff_size(buf3));
 
-	if(thread == -1)
+	if (thread == -1)
 		header.thread = header.filetime;
 	else
 		header.thread = thread;
 
 	sprintf(buf3, "boards/%s/.DIR", board);
 	append_record(buf3, &header, sizeof(header));
-
-	//if(outgoing)
 
 	//updatelastpost(board);  //TODO:
 	return t;
@@ -1169,15 +1137,6 @@ int search_user_article_with_title_keywords(struct api_article *articles_array,
 	return 0;
 }
 
-int file_size_s(const char *filepath)
-{
-	struct stat buf;
-	if(stat(filepath, &buf) == -1)
-		memset(&buf, 0, sizeof(buf));
-
-	return buf.st_size;
-}
-
 bool api_check_method(onion_request *req, onion_request_flags flags) {
 	return flags == (onion_request_get_flags(req) & OR_METHODS);
 }
@@ -1190,7 +1149,7 @@ int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, stru
 		return API_RT_NOTLOGGEDIN;
 	}
 
-	strncpy(cookie_buf, cookie_str, buf_len);
+	ytht_strsncpy(cookie_buf, cookie_str, buf_len);
 	bmy_cookie_parse(cookie_buf, cookie);
 	if (cookie->userid == NULL || cookie->sessid == NULL || strcasecmp(cookie->userid, "guest") == 0) {
 		return API_RT_NOTLOGGEDIN;

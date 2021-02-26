@@ -7,28 +7,15 @@
 
 int api_notification_list(ONION_FUNC_PROTO_STR)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * appkey = onion_request_get_query(req, "appkey");
-	const char * sessid = onion_request_get_query(req, "sessid");
+	DEFINE_COMMON_SESSION_VARS;
 
-	if (userid == NULL || sessid == NULL || appkey == NULL) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	struct userec *ue = getuser(userid);
-	if (ue == 0) {
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	}
-
-	int r = check_user_session(ue, sessid, appkey);
-	if (r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
 	struct json_object *obj = json_tokener_parse("{\"errcode\": 0, \"notifications\": []}");
 	struct json_object *noti_array = json_object_object_get(obj, "notifications");
-	NotifyItemList allNotifyItems = parse_notification(ue->userid);
+	NotifyItemList allNotifyItems = parse_notification(ptr_info->userid);
 	struct json_object * item = NULL;
 	struct NotifyItem * currItem;
 	struct boardmem *b;
@@ -50,20 +37,17 @@ int api_notification_list(ONION_FUNC_PROTO_STR)
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(obj));
 	json_object_put(obj);
-	free(ue);
 
 	return OCS_PROCESSED;
 }
 
 int api_notification_del(ONION_FUNC_PROTO_STR)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * appkey = onion_request_get_query(req, "appkey");
-	const char * sessid = onion_request_get_query(req, "sessid");
+	DEFINE_COMMON_SESSION_VARS;
 
-	if (userid == NULL || sessid == NULL || appkey == NULL) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
 	const char * type = onion_request_get_query(req, "type");
 	const char * board = onion_request_get_query(req, "board");
@@ -73,23 +57,12 @@ int api_notification_del(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
 
-	struct userec *ue = getuser(userid);
-	if (ue == 0) {
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-	}
-
-	int r = check_user_session(ue, sessid, appkey);
-	if (r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-
 	if ((type != NULL) && (strcasecmp(type, "delall") == 0)) {
-		del_all_notification(ue->userid);
+		del_all_notification(ptr_info->userid);
 	} else {
-		del_post_notification(ue->userid, board, atoi(aid_str));
+		del_post_notification(ptr_info->userid, board, atoi(aid_str));
 	}
 
-	free(ue);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
+

@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 
@@ -29,55 +30,55 @@ int api_attach_show(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 }
 
-int api_attach_list(ONION_FUNC_PROTO_STR)
-{
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
+int api_attach_list(ONION_FUNC_PROTO_STR) {
+	DEFINE_COMMON_SESSION_VARS;
+	if (!api_check_method(req, OR_GET))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
 
-	if(!userid || !sessid || !appkey)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
 
 	char userattachpath[256];
-	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ue->userid);
+	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
 	mkdir(userattachpath, 0760);
-	free(ue);
 
 	DIR *pdir;
 	struct dirent *pdent;
 	char fname[1024];
 
 	pdir = opendir(userattachpath);
-	if(!pdir)
+	if (!pdir)
 		return api_error(p, req, res, API_RT_NOSUCHFILE);
 
 	struct json_object * obj = json_tokener_parse("{\"errcode\":0, \"attach_array\":[]}");
 	struct json_object * aa = json_object_object_get(obj, "attach_array");
 
-	while((pdent = readdir(pdir))) {
-		if(!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
+	while ((pdent = readdir(pdir))) {
+		if (!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
 			continue;
 
-		if(strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
+		if (strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
 			break;
 		}
 
-		sprintf(fname, "%s/%s", userattachpath, pdent->d_name);
+		snprintf(fname, sizeof(fname), "%s/%s", userattachpath, pdent->d_name);
 
 		struct json_object * attach_obj = json_object_new_object();
-		json_object_object_add(attach_obj, "file_name", json_object_new_string(pdent->d_name));
-		json_object_object_add(attach_obj, "size", json_object_new_int(file_size_s(fname)));
-		json_object_array_add(aa, attach_obj);
+		if (attach_obj) {
+			struct json_object *tmp_obj;
+			if ((tmp_obj = json_object_new_string(pdent->d_name)) != NULL) {
+				json_object_object_add(attach_obj, "file_name", tmp_obj);
+				if ((tmp_obj = json_object_new_int(ytht_file_size_s(fname))) != NULL) {
+					json_object_object_add(attach_obj, "size", tmp_obj);
+					json_object_array_add(aa, attach_obj);
+				} else {
+					json_object_put(attach_obj);
+				}
+			} else {
+				json_object_put(attach_obj);
+			}
+		}
 	}
 
 	closedir(pdir);
@@ -88,49 +89,84 @@ int api_attach_list(ONION_FUNC_PROTO_STR)
 	return OCS_PROCESSED;
 }
 
-int api_attach_upload(ONION_FUNC_PROTO_STR)
-{
-	char filename_buf[512];
-	if(!(onion_request_get_flags(req) & OR_POST))
-		return api_error(p, req, res, API_RT_FUNCNOTIMPL);
+int api_attach_get(ONION_FUNC_PROTO_STR) {
+	char userattachpath[256], finalname[1024];
+	struct mmapfile mf = {
+		.ptr = NULL,
+		.size = 0
+	};
+	DEFINE_COMMON_SESSION_VARS;
 
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
+	if (!api_check_method(req, OR_GET))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	const char *name = onion_request_get_query(req, "file");
+	if (!name || !strcmp(name, ".") || !strcmp(name, ".."))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
+	const char *c = name;
+	while (*c) {
+		if (*c == '/')
+			return api_error(p, req, res, API_RT_WRONGPARAM);
+		c++;
 	}
 
+	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
+	if (strlen(userattachpath) + (c - name) + 2 /* '/' + '\0' */ > sizeof(finalname))
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	snprintf(finalname, sizeof(finalname), "%s/%s", userattachpath, name);
+	if (mmapfile(finalname, &mf) < 0) {
+		return api_error(p, req, res, API_RT_NOSUCHFILE);
+	}
+
+	snprintf(finalname, sizeof(finalname), "filename=\"%s\"", name);
+	onion_response_set_header(res, "Content-Type", get_mime_type(name));
+	onion_response_set_header(res, "Content-Disposition", finalname);
+	onion_response_write_headers(res);
+	onion_response_write(res, mf.ptr, mf.size);
+	mmapfile(NULL, &mf);
+
+	return 0;
+}
+
+int api_attach_upload(ONION_FUNC_PROTO_STR) {
 	char userattachpath[256], finalname[1024];
-	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ue->userid);
-	mkdir(userattachpath, 0760);
-	free(ue);
+	DEFINE_COMMON_SESSION_VARS;
 
-	const char * name=onion_request_get_post(req,"file");
-	const char * filename=onion_request_get_file(req,"file");
-	const char * length_str = onion_request_get_header(req, "Content-Length");
+	if (!api_check_method(req, OR_POST))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
 
-	if(!name || !filename || !length_str)
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL) {
+		return api_error(p, req, res, rc);
+	}
+
+	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
+	mkdir(userattachpath, 0770);
+
+	const char *name = onion_request_get_post(req, "file");
+	const char *filename = onion_request_get_file(req, "file");
+	const char *length_str = onion_request_get_header(req, "Content-Length");
+
+	if (!name || !filename || !length_str)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	if(strlen(userattachpath) + strlen(name) > 1022)	// 1024 - '\0' - '/'
+	if (strlen(userattachpath) + strlen(name) + 2 /* '/' + '\0' */ > sizeof(finalname))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	snprintf(filename_buf, sizeof(filename_buf), "%s/%s", userattachpath, name);
-	const char * ext_name = name + strlen(name);
+	snprintf(finalname, sizeof(finalname), "%s/%s", userattachpath, name);
+	const char *ext_name = name + strlen(name);
 	int upload_size = atoi(length_str);
 	if (upload_size <= 0 || upload_size > 5000000)
 		return api_error(p, req, res, API_RT_ATTTOOBIG);
 	if (!strcasecmp(ext_name - 4, ".gif") || !strcasecmp(ext_name - 4, ".jpg") ||
 		!strcasecmp(ext_name - 4, ".bmp") || !strcasecmp(ext_name - 4, ".png") ||
-		!strcasecmp(ext_name - 4, ".jpeg")) {
+		!strcasecmp(ext_name - 5, ".jpeg")) {
 		if (upload_size > MAXPICSIZE) {
 			return api_error(p, req, res, API_RT_ATTTOOBIG);
 		}
@@ -142,25 +178,25 @@ int api_attach_upload(ONION_FUNC_PROTO_STR)
 	char fname[1024];
 
 	pdir = opendir(userattachpath);
-	if(!pdir)
+	if (!pdir)
 		return api_error(p, req, res, API_RT_NOSUCHFILE);
 
-	while((pdent = readdir(pdir))) {
-		if(!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
+	while ((pdent = readdir(pdir))) {
+		if (!strcmp(pdent->d_name, "..") || !strcmp(pdent->d_name, "."))
 			continue;
 
-		if(strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
+		if (strlen(pdent->d_name) + strlen(userattachpath) >= sizeof(fname) - 2) {
 			closedir(pdir);
 			return api_error(p, req, res, API_RT_ATTINNERR);
 		}
 
-		sprintf(fname, "%s/%s", userattachpath, pdent->d_name);
-		current_size += file_size_s(fname);
+		snprintf(fname, sizeof(fname), "%s/%s", userattachpath, pdent->d_name);
+		current_size += ytht_file_size_s(fname);
 	}
 
 	closedir(pdir);
 
-	if(current_size > MAXATTACHSIZE || current_size + upload_size > MAXATTACHSIZE)
+	if (current_size > MAXATTACHSIZE || current_size + upload_size > MAXATTACHSIZE)
 		return api_error(p, req, res, API_RT_ATTNOSPACE);
 
 	onion_shortcut_rename(filename, finalname);
@@ -168,35 +204,58 @@ int api_attach_upload(ONION_FUNC_PROTO_STR)
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 
+int api_attach_delete(ONION_FUNC_PROTO_STR) {
+	char userattachpath[256], finalname[1024];
+	DEFINE_COMMON_SESSION_VARS;
+
+	if (!api_check_method(req, OR_DELETE))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	const char *name = onion_request_get_query(req, "file");
+	if (!name || !strcmp(name, ".") || !strcmp(name, ".."))
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	const char *c = name;
+	while (*c) {
+		if (*c == '/')
+			return api_error(p, req, res, API_RT_WRONGPARAM);
+		c++;
+	}
+
+	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
+	if (strlen(userattachpath) + (c - name) + 2 /* '/' + '\0' */ > sizeof(finalname))
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+
+	snprintf(finalname, sizeof(finalname), "%s/%s", userattachpath, name);
+	rc = unlink(finalname);
+
+	return api_error(p, req, res, (rc == 0) ? API_RT_SUCCESSFUL : API_RT_ATTINNERR);
+}
+
 static int api_attach_show_mail(ONION_FUNC_PROTO_STR)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
 	const char * str_mid = onion_request_get_query(req, "mid");
 	const char * str_pos = onion_request_get_query(req, "pos");
 	const char * attname = onion_request_get_query(req, "attname");
+	DEFINE_COMMON_SESSION_VARS;
 
-	if(!userid || !sessid || !appkey || !str_mid || !str_pos || !attname)
+	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	if (!str_mid || !str_pos || !attname)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	struct userec *ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
-
-	char mailfilename[STRLEN];
-	sprintf(mailfilename, MY_BBS_HOME "/mail/%c/%s/M.%s.A", mytoupper(ue->userid[0]), ue->userid, str_mid);
-
+	char mailfilename[STRLEN], filename[24];
+	snprintf(filename, sizeof(filename), "M.%s.A", str_mid);
+	setmailfile_s(mailfilename, sizeof(mailfilename), ptr_info->userid, filename);
 
 	output_binary_attach(res, mailfilename, attname, atoi(str_pos));
 
-	free(ue);
 	return OCS_PROCESSED;
 }
 
@@ -204,18 +263,18 @@ static void output_binary_attach(onion_response *res, const char *filename, cons
 {
 	struct mmapfile mf = {.ptr = NULL};
 
-	if(mmapfile(filename, &mf) < 0) {
+	if (mmapfile(filename, &mf) < 0) {
 		api_error(NULL, NULL, res, API_RT_MAILATTERR);
 		return ;
 	}
 
-	if(attachpos >= mf.size-4 || attachpos < 1) {
+	if (attachpos < 1 || ((unsigned int) attachpos /* safe */) >= mf.size-4) {
 		mmapfile(NULL, &mf);
 		api_error(NULL, NULL, res, API_RT_MAILATTERR);
 		return ;
 	}
 
-	if(mf.ptr[attachpos-1] != 0) {
+	if (mf.ptr[attachpos-1] != 0) {
 		mmapfile(NULL, &mf);
 		api_error(NULL, NULL, res, API_RT_MAILATTERR);
 		return ;
@@ -230,7 +289,7 @@ static void output_binary_attach(onion_response *res, const char *filename, cons
 	unsigned int size = ntohl(*(unsigned int *)(mf.ptr + attachpos));
 	char * body = (char *)malloc(size);
 
-	if(body==NULL) {
+	if (body == NULL) {
 		mmapfile(NULL, &mf);
 		api_error(NULL, NULL, res, API_RT_NOTENGMEM);
 		return ;

@@ -62,30 +62,11 @@ void api_template_free(api_template_t tpl);
 
 int shm_init();
 
-extern char *ummap_ptr;
-extern int ummap_size;
-int ummap();
-
 int getusernum(const char *id);
 struct userec * getuser(const char *id);
+int getuser_s(struct userec *user, const char *id);
 char * getuserlevelname(unsigned userlevel);
 int save_user_data(struct userec *x);
-
-/**
- * @brief 从 sessid 中获取 utmp 的索引值
- * @param sessid 前三位为索引的sessionid
- * @return utmp 的索引值，注意是从0开始。
- */
-int get_user_utmp_index(const char *sessid);
-
-/**
- * @brief 检查用户 session 是否有效
- * @param x
- * @param sessid
- * @param appkey
- * @return api_error_code
- */
-int check_user_session(struct userec *x, const char *sessid, const char *appkey);
 
 /**
  * @brief 字符串替换函数
@@ -132,7 +113,7 @@ void free_attach_link_list(struct attach_link *attach_link_list);
  * @param buf 字符串
  * @return 成功返回 0，失败返回 -1。
  */
-int f_write(char *filename, char *buf);
+int f_write(const char *filename, const char *buf);
 
 /**
  * @brief 将字符串追加到指定的文件中。
@@ -174,7 +155,7 @@ const char *calc_perf_str_utf8(int perf);
  * 该函数来自 nju09。
  * @param board 版面名称
  * @param title 文章标题, utf8 编码
- * @param filename 位于 bbstmpfs 中的文章内容
+ * @param content 内容 utf8 编码
  * @param id 用于显示的作者 id
  * @param nickname 作者昵称
  * @param ip 来自 ip
@@ -185,9 +166,9 @@ const char *calc_perf_str_utf8(int perf);
  * @param thread 主题编号
  * @return 返回文件名中实际使用的时间戳
  */
-int do_article_post(const char *board, const char *title, const char *filename, const char *id,
+time_t do_article_post(const char *board, const char *title, const char *content, const char *id,
 					const char *nickname, const char *ip, int sig, int mark,
-					int outgoing, const char *realauthor, int thread);
+					int outgoing, const char *realauthor, time_t thread);
 
 /**
  * @brief 实际处理发站内信的函数。
@@ -247,14 +228,6 @@ int search_user_article_with_title_keywords(struct api_article *articles_array,
 		int max_searchnum, struct user_info *ui_currentuser, char *query_userid,
 		char *title_keyword1, char *title_keyword2, char *title_keyword3,
 		int searchtime);
-
-/**
- * @brief 获取文件的大小
- * 参考 ythtlib.h/file_size 宏，本方法线程安全。
- * @param filepath 文件路径
- * @return 文件大小
- */
-int file_size_s(const char *filepath);
 
 bool api_check_method(onion_request *req, onion_request_flags flags);
 #define DEFINE_COMMON_SESSION_VARS \

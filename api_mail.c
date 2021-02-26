@@ -6,6 +6,7 @@
 #include "ythtbbs/article.h"
 #include "ythtbbs/misc.h"
 #include "ythtbbs/permissions.h"
+#include "ythtbbs/session.h"
 #include "bmy/convcode.h"
 
 #include "api.h"
@@ -37,25 +38,24 @@ static char * parse_mail(char * userid, int filetime, int mode, struct attach_li
 
 int api_mail_list(ONION_FUNC_PROTO_STR)
 {
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+	struct userec ue;
+
+	if (!api_check_method(req, OR_GET))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	if (getuser_s(&ue, ptr_info->userid) < 0) {
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
+	}
+
 	const char * str_startnum = onion_request_get_query(req, "startnum");
 	const char * str_count    = onion_request_get_query(req, "count");
-	const char * userid   = onion_request_get_query(req, "userid");
-	const char * appkey   = onion_request_get_query(req, "appkey");
-	const char * sessid   = onion_request_get_query(req, "sessid");
 	const char * box_type  = onion_request_get_query(req, "box_type");
-
-	if(!userid || !appkey || !sessid)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	struct userec *ue = getuser(userid);
-	if(!ue)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
-	int r = check_user_session(ue, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, r);
-	}
 
 	int startnum = (str_startnum) ? atoi(str_startnum) : 999999;
 	int count = (str_count) ? atoi(str_count) : 20;
@@ -63,27 +63,25 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 	char mail_dir[80];
 
 	int box_type_i = (box_type != NULL && box_type[0] == '1') ? API_MAIL_SENT_BOX : API_MAIL_RECIEVE_BOX;
-	if(box_type_i == API_MAIL_RECIEVE_BOX)
-		setmailfile_s(mail_dir, sizeof(mail_dir), ue->userid, ".DIR");
+	if (box_type_i == API_MAIL_RECIEVE_BOX)
+		setmailfile_s(mail_dir, sizeof(mail_dir), ptr_info->userid, ".DIR");
 	else
-		setsentmailfile(mail_dir, ue->userid, ".DIR");
+		setsentmailfile(mail_dir, ptr_info->userid, ".DIR");
 
-	int total = file_size_s(mail_dir) / sizeof(struct fileheader);
+	int total = ytht_file_size_s(mail_dir) / sizeof(struct fileheader);
 
-	if(!total) {
-		free(ue);
+	if (!total) {
 		return api_error(p, req, res, API_RT_MAILEMPTY);
 	}
 
 	FILE *fp = fopen(mail_dir, "r");
-	if(fp==0) {
-		free(ue);
+	if (fp == NULL) {
 		return api_error(p, req, res, API_RT_MAILDIRERR);
 	}
 
-	if(startnum == 0 || startnum > total-count+1)
+	if (startnum == 0 || startnum > total-count+1)
 		startnum = total - count + 1;
-	if(startnum <= 0)
+	if (startnum <= 0)
 		startnum = 1;
 
 	struct fileheader x;
@@ -91,7 +89,7 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 	struct api_article mail_list[count];
 	memset(mail_list, 0, sizeof(struct api_article) * count);
 	fseek(fp, (startnum - 1) * sizeof(struct fileheader), SEEK_SET);
-	for(i=0; i<count; ++i) {
+	for (i = 0; i < count; ++i) {
 		if(fread(&x, sizeof(x), 1, fp) <= 0)
 			break;
 
@@ -105,12 +103,11 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 	fclose(fp);
 
-	char *s = bmy_mail_array_to_json_string(mail_list, count, 0, ue);
+	char *s = bmy_mail_array_to_json_string(mail_list, count, 0, &ue);
 
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
-	free(ue);
 	return OCS_PROCESSED;
 }
 
@@ -159,15 +156,15 @@ static int get_user_mail_size(char * userid)
 
 	sethomefile_s(tmpmail, sizeof(tmpmail), userid, "msgindex");
 	if(file_time(tmpmail))
-		currsize += file_size_s(tmpmail);
+		currsize += ytht_file_size_s(tmpmail);
 
 	sethomefile_s(tmpmail, sizeof(tmpmail), userid, "msgindex2");
 	if(file_time(tmpmail))
-		currsize += file_size_s(tmpmail);
+		currsize += ytht_file_size_s(tmpmail);
 
 	sethomefile_s(tmpmail, sizeof(tmpmail), userid, "msgcontent");
 	if(file_time(tmpmail))
-		currsize += file_size_s(tmpmail);
+		currsize += ytht_file_size_s(tmpmail);
 
 	sprintf(currmaildir, "mail/%c/%s/%s", mytoupper(userid[0]), userid, DOT_DIR);
 	t = file_time(currmaildir);
@@ -180,7 +177,7 @@ static int get_user_mail_size(char * userid)
 
 	while(fread(&tmpfh, 1, sizeof(tmpfh), fp) == sizeof(tmpfh)) {
 		setmailfile_s(tmpmail, sizeof(tmpmail), userid, fh2fname(&tmpfh));
-		currsize += file_size_s(tmpmail);
+		currsize += ytht_file_size_s(tmpmail);
 	}
 
 	fclose(fp);
@@ -202,51 +199,47 @@ static int check_user_maxmail(struct userec *currentuser)
 
 static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * appkey = onion_request_get_query(req, "appkey");
-	const char * str_num = onion_request_get_query(req, "num");
-	const char * box_type  = onion_request_get_query(req, "box_type");
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
 
-	if(!userid || !sessid || !appkey || !str_num)
+	if (!api_check_method(req, OR_GET))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+
+	const char *str_num = onion_request_get_query(req, "num");
+	const char *box_type  = onion_request_get_query(req, "box_type");
+
+	if (!str_num)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	struct userec * ue = getuser(userid);
-	if(ue == 0)
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-
-	if(check_user_session(ue, sessid, appkey) != API_RT_SUCCESSFUL) {
-		free(ue);
-		return api_error(p, req, res, API_RT_WRONGSESS);
-	}
 
 	char mail_dir[80];
 	struct fileheader fh;
 
 	int box_type_i = (box_type != NULL && box_type[0] == '1') ? API_MAIL_SENT_BOX : API_MAIL_RECIEVE_BOX;
 	if(box_type_i == API_MAIL_RECIEVE_BOX)
-		setmailfile_s(mail_dir, sizeof(mail_dir), ue->userid, ".DIR");
+		setmailfile_s(mail_dir, sizeof(mail_dir), ptr_info->userid, ".DIR");
 	else
-		setsentmailfile(mail_dir, ue->userid, ".DIR");
+		setsentmailfile(mail_dir, ptr_info->userid, ".DIR");
 
 	FILE *fp = fopen(mail_dir, "r");
-	if(fp==0) {
-		free(ue);
+	if (fp == 0) {
 		return api_error(p, req, res, API_RT_MAILINNERR);
 	}
 
-	int total = file_size_s(mail_dir) / sizeof(struct fileheader);
+	int total = ytht_file_size_s(mail_dir) / sizeof(struct fileheader);
 	int num = atoi(str_num);
 
-	if(num<=0)
+	if (num <= 0)
 		num = 1;
-	if(num>total)
+	if (num > total)
 		num = total;
 
 	fseek(fp, (num-1)*sizeof(struct fileheader), SEEK_SET);
-	if(fread(&fh, sizeof(fh), 1, fp) <= 0) {
+	if (fread(&fh, sizeof(fh), 1, fp) <= 0) {
 		fclose(fp);
-		free(ue);
 		return api_error(p, req, res, API_RT_MAILINNERR);
 	}
 
@@ -257,19 +250,17 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	g2u(fh.title, strlen(fh.title), title_utf, 240);
 
 	struct attach_link *attach_link_list = NULL;
-	char * mail_content_utf8 = parse_mail(ue->userid, fh.filetime, mode, &attach_link_list);
+	char * mail_content_utf8 = parse_mail(ptr_info->userid, fh.filetime, mode, &attach_link_list);
 
-	if(!mail_content_utf8) {
+	if (!mail_content_utf8) {
 		// 文件不存在
-		free(ue);
 		free_attach_link_list(attach_link_list);
 		return api_error(p, req, res, API_RT_MAILEMPTY);
 	}
 
-	char * mail_json_str = (char *)malloc(strlen(mail_content_utf8) + 512);
+	char *mail_json_str = (char *) malloc(strlen(mail_content_utf8) + 512);
 
-	if(!mail_json_str) {
-		free(ue);
+	if (!mail_json_str) {
 		free(mail_content_utf8);
 		free_attach_link_list(attach_link_list);
 		return api_error(p, req, res, API_RT_NOTENGMEM);
@@ -278,8 +269,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	memset(mail_json_str, 0, strlen(mail_content_utf8)+512);
 	sprintf(mail_json_str, "{\"errcode\": 0, \"attach\":[]}");
 	struct json_object * jp = json_tokener_parse(mail_json_str);
-	if(!jp) {
-		free(ue);
+	if (!jp) {
 		free(mail_content_utf8);
 		free_attach_link_list(attach_link_list);
 		free(mail_json_str);
@@ -302,7 +292,6 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	char * api_output = strdup(json_object_to_json_string(jp));
 
-	free(ue);
 	free(mail_content_utf8);
 	free_attach_link_list(attach_link_list);
 	free(mail_json_str);
@@ -350,71 +339,65 @@ static char * bmy_mail_array_to_json_string(struct api_article *ba_list, int cou
 
 static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode)
 {
-	const char * userid = onion_request_get_query(req, "userid");
-	const char * appkey = onion_request_get_query(req, "appkey");
-	const char * sessid = onion_request_get_query(req, "sessid");
-	const char * token = onion_request_get_query(req, "token");
 	const char * to_userid = onion_request_get_query(req, "to_userid");
 	const char * title = onion_request_get_query(req, "title");
 	const char * backup = onion_request_get_query(req, "backup");
 
-	if(!userid || !appkey || !sessid || !title || !to_userid || !token)
+	DEFINE_COMMON_SESSION_VARS;
+	int rc;
+
+	if (!api_check_method(req, OR_POST))
+		return api_error(p, req, res, API_RT_WRONGMETHOD);
+
+	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
+	if (rc != API_RT_SUCCESSFUL)
+		return api_error(p, req, res, rc);
+	if (!title || !to_userid)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
-	struct userec *ue = getuser(userid);
-	if(!ue)
-		return api_error(p, req, res, API_RT_NOSUCHUSER);
-
 	struct userec currentuser;
-	memcpy(&currentuser, ue, sizeof(currentuser));
-	free(ue);
-
-	int r = check_user_session(&currentuser, sessid, appkey);
-	if(r != API_RT_SUCCESSFUL) {
-		return api_error(p, req, res, r);
+	if (getuser_s(&currentuser, ptr_info->userid) < 0) {
+		return api_error(p, req, res, API_RT_NOSUCHUSER);
 	}
 
-	if(HAS_PERM(PERM_DENYMAIL, currentuser)) {
+	if (HAS_PERM(PERM_DENYMAIL, currentuser)) {
 		return api_error(p, req, res, API_RT_MAILNOPPERM);
 	}
 
-	int uent_index = get_user_utmp_index(sessid);
-	struct user_info *ui = ythtbbs_cache_utmp_get_by_idx(uent_index);
-	if(strcmp(ui->token, token) != 0) {
+	// TODO 重构、重新生成
+	if (strcmp(ptr_info->token, cookie.token) != 0) {
 		return api_error(p, req, res, API_RT_WRONGTOKEN);
 	}
 
 	// 更新 token 和来源 IP
-	ytht_get_random_str_r(ui->token, TOKENLENGTH+1);
+	ythtbbs_session_generate_id(ptr_info->token, TOKENLENGTH+1);
 	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
-	memset(ui->from, 0, 20);
-	strncpy(ui->from, fromhost, 20);
+	ytht_strsncpy(ptr_info->from, fromhost, sizeof(ptr_info->from));
 
-	if(check_user_maxmail(&currentuser)) {
+	if (check_user_maxmail(&currentuser)) {
 		return api_error(p, req, res, API_RT_MAILFULL);
 	}
 
-	struct userec *to_user = getuser(to_userid);
-	if(!to_user) {
+	struct userec to_user;
+	if (getuser_s(&to_user, to_userid) < 0) {
 		return api_error(p, req, res, API_RT_NOSUCHUSER);
 	}
 
-	if(ythtbbs_override_included(to_user->userid, YTHTBBS_OVERRIDE_REJECTS, currentuser.userid)) {
-		free(to_user);
+	if (ythtbbs_override_included(to_user.userid, YTHTBBS_OVERRIDE_REJECTS, currentuser.userid)) {
 		return api_error(p, req, res, API_RT_INUSERBLIST);
 	}
 
 	const char * data = onion_request_get_post(req, "content");
 
 	char filename[80];
-	sprintf(filename, "bbstmpfs/tmp/%s_%s.tmp", currentuser.userid, ui->token);
+	sprintf(filename, "bbstmpfs/tmp/%s_%s.tmp", currentuser.userid, ptr_info->token);
 
-	char * data2 = strdup(data);
-	while(strstr(data2, "[ESC]") != NULL)
+	char *data2 = strdup(data);
+	while (strstr(data2, "[ESC]") != NULL)
 		data2 = string_replace(data2, "[ESC]", "\033");
 
-	char * data_gbk = (char *)malloc(strlen(data2)*2);
-	u2g(data2, strlen(data2), data_gbk, strlen(data2)*2);
+	char *data_gbk = (char *) malloc(strlen(data2) * 2);
+	u2g(data2, strlen(data2), data_gbk, strlen(data2) * 2);
 
 	f_write(filename, data_gbk);
 	free(data2);
@@ -425,29 +408,28 @@ static int api_mail_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	free(data_gbk);
 
-	char * title_tmp = (char *)malloc(strlen(title)*2);
+	char * title_tmp = (char *) malloc(strlen(title)*2);
 	u2g(title, strlen(title), title_tmp, strlen(title)*2);
 	char title_gbk[80], title_tmp2[80];
 	strncpy(title_gbk, title_tmp[0]==0 ? "No Subject" : title_tmp, 80);
-	snprintf(title_tmp2, 80, "{%s} %s", to_user->userid, title);
+	snprintf(title_tmp2, 80, "{%s} %s", to_user.userid, title);
 	free(title_tmp);
 
-	r = do_mail_post(to_user->userid, title, filename, currentuser.userid,
+	rc = do_mail_post(to_user.userid, title, filename, currentuser.userid,
 			currentuser.username, fromhost, 0, mark);
-	if(backup && strcasecmp(backup, "true")==0) {
+	if (backup && strcasecmp(backup, "true") == 0) {
 		do_mail_post_to_sent_box(currentuser.userid, title_tmp2, filename, currentuser.userid,
 			currentuser.username, fromhost, 0, mark);
 	}
 
 	unlink(filename);
-	free(to_user);
 
-	if(r<0) {
+	if (rc < 0) {
 		return api_error(p, req, res, API_RT_MAILINNERR);
 	}
 
 	api_set_json_header(res);
-	onion_response_printf(res, "{ \"errcode\":0, \"token\":\"%s\" }", ui->token);
+	onion_response_printf(res, "{ \"errcode\":0, \"token\":\"%s\" }", ptr_info->token);
 
 	return OCS_PROCESSED;
 }
