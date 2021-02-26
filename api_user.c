@@ -153,6 +153,7 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 			return api_error(p, req, res, API_RT_NOSUCHUSER);
 		int unread_mail;
 		int total_mail = mail_count(ue.userid, &unread_mail);
+		ue.userid[sizeof(ue.userid) - 1] = 0;
 		sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
 				"\"post_counts\":%d, \"total_mail\":%d, \"unread_mail\":%d, \"unread_notify\":%d,"
 				"\"job\":\"%s\", \"exp\":%d, \"perf\":%d,"
@@ -166,6 +167,7 @@ int api_user_query(ONION_FUNC_PROTO_STR)
 		if (getuser_s(&ue, queryid) < 0)
 			return api_error(p, req, res, API_RT_NOSUCHUSER);
 
+		ue.userid[sizeof(ue.userid) - 1] = 0;
 		sprintf(buf, "{\"errcode\":0, \"userid\":\"%s\", \"login_counts\":%d,"
 				"\"post_counts\":%d, \"job\":\"%s\", \"exp_level\":\"%s\","
 				"\"perf_level\":\"%s\"}", ue.userid, ue.numlogins, ue.numposts,
