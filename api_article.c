@@ -1102,9 +1102,19 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_FBDGSTPIP);
 	}
 
-	bool is_anony = (json_object_object_get(req_json, "anony") != NULL);
-	bool is_norep = (json_object_object_get(req_json, "norep") != NULL);
-	bool using_math = (json_object_object_get(req_json, "math") != NULL);
+	bool is_anony = false, is_norep = false, using_math = false;
+
+	if ((obj_tmp = json_object_object_get(req_json, "anony")) != NULL) {
+		is_anony = json_object_get_boolean(obj_tmp);
+	}
+
+	if ((obj_tmp = json_object_object_get(req_json, "norep")) != NULL) {
+		is_norep = json_object_get_boolean(obj_tmp);
+	}
+
+	if ((obj_tmp = json_object_object_get(req_json, "math")) != NULL) {
+		using_math = json_object_get_boolean(obj_tmp);
+	}
 
 	if (is_norep)
 		mark |= FH_NOREPLY;
