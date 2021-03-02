@@ -191,8 +191,7 @@ const char *calc_perf_str_utf8(int perf) {
  */
 int save_user_data(struct userec *x)
 {
-	int n, fd;
-	n = getusernum(x->userid);
+	int n = getusernum(x->userid);
 	if(n < 0 || n > 1000000)
 		return 0;
 	return substitute_record(PASSFILE, x, sizeof(struct userec), n + 1);
