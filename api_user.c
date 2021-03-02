@@ -94,10 +94,6 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	const char *passwd = json_object_get_string(req_json_passwd);
 	const char *fromhost = onion_request_get_header(req, "X-Real-IP");
 
-	time_t now_t = time(NULL);
-	time_t dtime;
-	struct tm dt;
-	int t;
 	int utmp_index;
 
 	if(userid == NULL || passwd == NULL) {
@@ -463,6 +459,7 @@ int api_user_rejects_del(ONION_FUNC_PROTO_STR)
 }
 
 static int autocomplete_callback(const struct ythtbbs_cache_User *user, int curr_idx, va_list ap) {
+	(void) curr_idx;
 	char *search_str = va_arg(ap, char *);
 	struct json_object *json_array_user = va_arg(ap, struct json_object *); // TODO
 
