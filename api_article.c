@@ -1306,7 +1306,6 @@ static void parse_thread_info(struct api_article *ba)
 	char dir[80];
 	int i = 0, j = 0, num_records = 0, is_in_commenter_list = 0;
 	struct fileheader * curr_article = NULL;
-	char * curr_userid = NULL;
 	struct mmapfile mf = { .ptr = NULL };
 	if(NULL == ba || ba->board[0] == '\0')
 		return ;
@@ -1484,6 +1483,7 @@ static struct fileheader * findbarticle(struct mmapfile *mf, time_t filetime, in
 static const int COUNT_PER_PAGE = 40;
 
 static int count_board_in_section(struct boardmem *board, int curr_idx, va_list ap) {
+	(void) curr_idx;
 	int rc = va_arg(ap, int);
 	struct user_info *ptr_info = va_arg(ap, struct user_info *);
 	int *count = va_arg(ap, int *);
