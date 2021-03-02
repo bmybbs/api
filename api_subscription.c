@@ -19,7 +19,6 @@ extern bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char
 int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
 	int rc;
-	char output[1024];
 
 	if (!api_check_method(req, OR_GET))
 		return api_error(p, req, res, API_RT_WRONGMETHOD);
