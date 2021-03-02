@@ -9,12 +9,15 @@ static onion *o = NULL;
 
 static void shutdown_server(int _)
 {
+	(void) _;
 	if (o)
 		onion_listen_stop(o);
 }
 
 int main(int argc, char *argv[])
 {
+	(void) argc;
+	(void) argv;
 	seteuid(BBSUID);
 	setuid(BBSUID);
 	setgid(BBSGID);
