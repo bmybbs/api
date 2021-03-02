@@ -441,7 +441,6 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 char *parse_article_js_internal(struct mmapfile *pmf, struct attach_link **attach_link_list, const char *bname, const char *fname) {
 	char *content = NULL, *token;
 	size_t i, j, m, n, line, pos;
-	unsigned int attach_size = 0;
 	struct attach_link *attach = NULL;
 	bool is_first_line;
 
