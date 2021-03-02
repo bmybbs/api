@@ -1043,6 +1043,7 @@ int do_mail_post_to_sent_box(const char *userid, const char *title, const char *
 }
 
 static int search_user_article_with_title_keywords_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	(void) curr_idx;
 	struct user_info *ui = va_arg(ap, struct user_info *);
 	struct api_article *articles_array = va_arg(ap, struct api_article *);
 	int *article_sum = va_arg(ap, int *);
