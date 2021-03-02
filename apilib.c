@@ -191,8 +191,7 @@ const char *calc_perf_str_utf8(int perf) {
  */
 int save_user_data(struct userec *x)
 {
-	int n, fd;
-	n = getusernum(x->userid);
+	int n = getusernum(x->userid);
 	if(n < 0 || n > 1000000)
 		return 0;
 	return substitute_record(PASSFILE, x, sizeof(struct userec), n + 1);
@@ -442,7 +441,6 @@ char *parse_article(const char *bname, const char *fname, int mode, struct attac
 char *parse_article_js_internal(struct mmapfile *pmf, struct attach_link **attach_link_list, const char *bname, const char *fname) {
 	char *content = NULL, *token;
 	size_t i, j, m, n, line, pos;
-	unsigned int attach_size = 0;
 	struct attach_link *attach = NULL;
 	bool is_first_line;
 
@@ -1045,6 +1043,7 @@ int do_mail_post_to_sent_box(const char *userid, const char *title, const char *
 }
 
 static int search_user_article_with_title_keywords_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	(void) curr_idx;
 	struct user_info *ui = va_arg(ap, struct user_info *);
 	struct api_article *articles_array = va_arg(ap, struct api_article *);
 	int *article_sum = va_arg(ap, int *);

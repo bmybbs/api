@@ -29,21 +29,6 @@ enum activation_code_query_result {
 	ACQR_DBERROR	= -2	// 数据库错误
 };
 
-/** 查询激活码是否可用
- * @param code 激活码
- * @return 查看 activation_code_query_result
- */
-static int activation_code_query(const char *code);
-
-/** 使用激活码注册用户
- *
- * @param x
- * @param code
- */
-static int adduser_with_activation_code(struct userec *x, const char *code);
-
-static void api_newcomer(struct userec *x, const char *fromhost, char *words);
-
 /** 好友、黑名单的显示
  *
  * @param ONION_FUNC_PROTO_STR
@@ -94,10 +79,6 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	const char *passwd = json_object_get_string(req_json_passwd);
 	const char *fromhost = onion_request_get_header(req, "X-Real-IP");
 
-	time_t now_t = time(NULL);
-	time_t dtime;
-	struct tm dt;
-	int t;
 	int utmp_index;
 
 	if(userid == NULL || passwd == NULL) {
@@ -211,74 +192,6 @@ int api_user_check_session(ONION_FUNC_PROTO_STR)
 	if(rc != API_RT_SUCCESSFUL) {
 		return api_error(p, req, res, rc);
 	}
-
-	api_set_json_header(res);
-	onion_response_write0(res, "{\"errcode\":0}");
-
-	return OCS_PROCESSED;
-}
-
-int api_user_register(ONION_FUNC_PROTO_STR)
-{
-	const char *userid = onion_request_get_query(req, "userid");
-	const char *passwd = onion_request_get_query(req, "passwd");
-	const char *active = onion_request_get_query(req, "activation");	// 激活码，仅供测试使用
-	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
-
-	if(userid == NULL || passwd == NULL || active == NULL) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	if(id_with_num(userid) || strlen(userid)<2 || strlen(passwd)<4 || strlen(active)!=9) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	if(ytht_badstr(passwd) || ytht_badstr(userid)) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	if(is_bad_id(userid)) {
-		return api_error(p, req, res, API_RT_FBDUSERNAME);
-	}
-
-	struct userec *ue = getuser(userid);
-	if(ue) {
-		free(ue);
-		return api_error(p, req, res, API_RT_USEREXSITED);
-	}
-
-	if(activation_code_query(active) != ACQR_NORMAL) {
-		return api_error(p, req, res, API_RT_WRONGACTIVE);
-	}
-
-	struct userec x;
-	memset(&x, 0, sizeof(x));
-	ytht_strsncpy(x.userid, userid, 13);
-
-	char salt[3];
-	ytht_get_salt(salt);
-	ytht_strsncpy(x.passwd, ytht_crypt_crypt1(passwd, salt), 14);
-
-	x.userlevel = PERM_DEFAULT;
-
-	time_t now_t;
-	time(&now_t);
-	x.firstlogin = now_t;
-	x.lastlogin = now_t - 3600;
-	x.userdefine = -1;
-	x.flags[0] = BRDSORT_FLAG2 | PAGER_FLAG; // see src/bbs/register.c
-
-	adduser_with_activation_code(&x, active);
-
-	char filename[80];
-	sethomepath_s(filename, sizeof(filename), userid);
-	mkdir(filename, 0755);
-
-	api_newcomer(&x, fromhost, "");
-
-	char buf[256];
-	sprintf(buf, "%s newaccount %d %s api", x.userid, getusernum(x.userid), fromhost);
-	newtrace(buf);
 
 	api_set_json_header(res);
 	onion_response_write0(res, "{\"errcode\":0}");
@@ -463,6 +376,7 @@ int api_user_rejects_del(ONION_FUNC_PROTO_STR)
 }
 
 static int autocomplete_callback(const struct ythtbbs_cache_User *user, int curr_idx, va_list ap) {
+	(void) curr_idx;
 	char *search_str = va_arg(ap, char *);
 	struct json_object *json_array_user = va_arg(ap, struct json_object *); // TODO
 
@@ -493,29 +407,6 @@ int api_user_autocomplete(ONION_FUNC_PROTO_STR)
 	json_object_put(obj);
 
 	return OCS_PROCESSED;
-}
-
-__attribute__((deprecated)) static int activation_code_query(const char *code)
-{
-	return ACQR_NORMAL;
-}
-
-// TODO deprecated
-static int adduser_with_activation_code(struct userec *x, const char *code) {
-	return ACQR_NORMAL;
-}
-
-static void api_newcomer(struct userec *x, const char *fromhost, char *words)
-{
-	(void) words; // 暂时不用
-	char local_buf[256];
-	snprintf(local_buf, sizeof(local_buf),
-			"大家好, \n\n"
-			"我是 %s(%s), 来自 %s\n"
-			"今天初来此地报到, 请大家多多指教.\n\n"
-			"自我介绍:\n\n", x->userid, x->username, fromhost);
-	do_article_post("newcomers", "API 新手上路", local_buf, x->userid,
-		x->username, fromhost, -1, 0, 0, x->userid, -1);
 }
 
 static int api_user_override_File_list(ONION_FUNC_PROTO_STR, enum ythtbbs_override_type mode)

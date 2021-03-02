@@ -327,6 +327,7 @@ int api_board_fav_list(ONION_FUNC_PROTO_STR)
 }
 
 static int api_board_autocomplete_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	(void) curr_idx;
 	const char *search_str = va_arg(ap, const char *);
 	int rc = va_arg(ap, int);
 	struct user_info *ui = va_arg(ap, struct user_info *);
@@ -379,6 +380,7 @@ int api_board_autocomplete(ONION_FUNC_PROTO_STR)
 }
 
 static int api_board_fav_list_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	(void) curr_idx;
 	struct user_info *ui = va_arg(ap, struct user_info *);
 	struct boardmem **board_array = va_arg(ap, struct boardmem **);
 	int *count = va_arg(ap, int *);
@@ -427,6 +429,7 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 }
 
 static int api_board_list_sec_callback(struct boardmem *board, int curr_idx, va_list ap) {
+	(void) curr_idx;
 	int rc = va_arg(ap, int);
 	struct user_info *ui = va_arg(ap, struct user_info *);
 	struct boardmem **board_array = va_arg(ap, struct boardmem **);

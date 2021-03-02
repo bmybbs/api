@@ -296,6 +296,8 @@ static void output_binary_attach(onion_response *res, const char *filename, cons
 	}
 
 	onion_response_set_header(res, "Content-Type", get_mime_type(filename));
+	onion_response_set_header(res, "Content-Disposition", attachname);
+	onion_response_write_headers(res);
 	onion_response_write(res, mf.ptr+attachpos+4, size);
 
 	mmapfile(NULL, &mf);

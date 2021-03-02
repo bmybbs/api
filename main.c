@@ -9,12 +9,15 @@ static onion *o = NULL;
 
 static void shutdown_server(int _)
 {
+	(void) _;
 	if (o)
 		onion_listen_stop(o);
 }
 
 int main(int argc, char *argv[])
 {
+	(void) argc;
+	(void) argv;
 	seteuid(BBSUID);
 	setuid(BBSUID);
 	setgid(BBSGID);
@@ -41,7 +44,6 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^user/login$", api_user_login);
 	onion_url_add(urls, "^user/logout$", api_user_logout);
 	onion_url_add(urls, "^user/checksession$", api_user_check_session);
-	onion_url_add(urls, "^user/register$", api_user_register);
 	onion_url_add(urls, "^user/articlequery$", api_user_articlequery);
 	onion_url_add(urls, "^user/friends/list$", api_user_friends_list);
 	onion_url_add(urls, "^user/friends/add$", api_user_friends_add);

@@ -226,7 +226,7 @@ START_TEST(parse_article_js_internal_content_check_attach_linked_list) {
 
 	struct mmapfile mf = { .ptr = s, .size = strlen(s) };
 	struct attach_link *root = NULL;
-	unsigned int pos1, pos2, pos3;
+	//unsigned int pos1, pos2, pos3;
 	char *delimiter;
 	unsigned int size_n = htonl(16);
 
@@ -234,19 +234,19 @@ START_TEST(parse_article_js_internal_content_check_attach_linked_list) {
 	delimiter[0] = 0;
 	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
 	memcpy(delimiter + 5, bin, 16);
-	pos1 = delimiter + 1 - s;
+	//pos1 = delimiter + 1 - s;
 
 	delimiter = strchr(delimiter + 21, 0xFF);
 	delimiter[0] = 0;
 	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
 	memcpy(delimiter + 5, bin, 16);
-	pos2 = delimiter + 1 - s;
+	//pos2 = delimiter + 1 - s;
 
 	delimiter = strchr(delimiter + 21, 0xFF);
 	delimiter[0] = 0;
 	memcpy(delimiter + 1, &size_n, sizeof(unsigned int));
 	memcpy(delimiter + 5, bin, 16);
-	pos3 = delimiter + 1 - s;
+	//pos3 = delimiter + 1 - s;
 
 	char *result = parse_article_js_internal(&mf, &root, "b", "f");
 
