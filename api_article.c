@@ -679,6 +679,8 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 	DEFINE_COMMON_SESSION_VARS;
 	int rc;
 	struct userec ue;
+	size_t size;
+
 	const char *board = onion_request_get_query(req, "board");
 	//判断必要参数
 	if (!board)
@@ -717,7 +719,9 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 
 	int i;
 	for (i = 0; i < count; ++i) {
-		fread(&x, sizeof(x), 1, fp);
+		size = fread(&x, sizeof(x), 1, fp);
+		if (size != 1)
+			break;
 
 		board_list[i].filetime = x.filetime;
 		board_list[i].mark = x.accessed;
