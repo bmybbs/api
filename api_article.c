@@ -386,7 +386,7 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	fseek(fp, (startnum - 1) * sizeof(struct commend), SEEK_SET);
 	int count=0, length = 0, i;
 	for(i=0; i<number; i++) {
-		if(fread(&x, sizeof(struct commend), 1, fp)<=0)
+		if (fread(&x, sizeof(struct commend), 1, fp) != 1)
 			break;
 
 		// 显示添加字符串终止符
