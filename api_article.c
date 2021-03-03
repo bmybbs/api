@@ -519,10 +519,11 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 			lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
 			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime) {
 				x2.sizebyte = data[i].sizebyte;
-				lseek(fd, -1 * sizeof (x2), SEEK_CUR);
-				if(write(fd, &x2, sizeof (x2)) == -1) {
-					snprintf(logbuf, sizeof(logbuf), "write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.", dir, (startnum-1+i), filename, errno, strerror(errno));
-					newtrace(logbuf);
+				if (lseek(fd, -1 * sizeof (x2), SEEK_CUR) != (off_t) -1) {
+					if (write(fd, &x2, sizeof (x2)) == -1) {
+						snprintf(logbuf, sizeof(logbuf), "write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.", dir, (startnum-1+i), filename, errno, strerror(errno));
+						newtrace(logbuf);
+					}
 				}
 			}
 			flock(fd, LOCK_UN);
