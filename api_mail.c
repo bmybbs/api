@@ -237,8 +237,7 @@ static int api_mail_get_content(ONION_FUNC_PROTO_STR, int mode)
 	if (num > total)
 		num = total;
 
-	fseek(fp, (num-1)*sizeof(struct fileheader), SEEK_SET);
-	if (fread(&fh, sizeof(fh), 1, fp) != 1) {
+	if (fseek(fp, (num - 1) * sizeof(struct fileheader), SEEK_SET) < 0 || fread(&fh, sizeof(fh), 1, fp) != 1) {
 		fclose(fp);
 		return api_error(p, req, res, API_RT_MAILINNERR);
 	}
