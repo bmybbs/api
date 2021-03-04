@@ -17,6 +17,7 @@ enum api_error_code {
 	API_RT_NOTENGMEM	= 12,		///< 没有足够的内存
 	API_RT_MAILINNERR	= 13,		///< 发信遇到内部错误
 	API_RT_FILEERROR    = 14,       ///< 文件操作相关的错误
+	API_RT_CNTMKDIR     = 15,       ///< 不能创建文件夹
 	API_RT_WRONGPARAM	= 1000,		///< 接口参数错误
 	API_RT_WRONGSESS	= 1001,		///< 错误的session
 	API_RT_NOTLOGGEDIN	= 1002,		///< 没有登录
