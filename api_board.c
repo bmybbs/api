@@ -126,9 +126,7 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 		today_num = 0;
 	} else {
 		struct fileheader *data = (struct fileheader*) mf.ptr;
-		for (i = mf.size / sizeof(struct fileheader) - 1; data[i].filetime > day_begin; i--) {
-			if (i <= 0)
-				break;
+		for (i = mf.size / sizeof(struct fileheader) - 1; i >= 0 && data[i].filetime > day_begin; i--) {
 			today_num++;
 		}
 
