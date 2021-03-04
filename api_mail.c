@@ -86,8 +86,12 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 
 	struct fileheader x;
 	int i;
-	struct api_article mail_list[count];
-	memset(mail_list, 0, sizeof(struct api_article) * count);
+	struct api_article *mail_list = calloc(count, sizeof(struct api_article));
+	if (mail_list == NULL) {
+		fclose(fp);
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
 	fseek(fp, (startnum - 1) * sizeof(struct fileheader), SEEK_SET);
 	for (i = 0; i < count; ++i) {
 		if (fread(&x, sizeof(x), 1, fp) != 1)
@@ -108,6 +112,7 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
+	free(mail_list);
 	return OCS_PROCESSED;
 }
 
