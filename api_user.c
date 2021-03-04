@@ -489,7 +489,10 @@ static int api_user_override_File_add(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 
 	size_t size;
 
-	lockfd = ythtbbs_override_lock(ptr_info->userid, mode);
+	if ((lockfd = ythtbbs_override_lock(ptr_info->userid, mode)) < 0) {
+		return api_error(p, req, res, API_RT_USERLOCKFAIL);
+	}
+
 	size = ythtbbs_override_count(ptr_info->userid, mode);
 	if (size >= (mode == YTHTBBS_OVERRIDE_FRIENDS ? MAXFRIENDS : MAXREJECTS) - 1) {
 		ythtbbs_override_unlock(lockfd);
