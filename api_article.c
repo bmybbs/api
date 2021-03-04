@@ -372,20 +372,27 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 	}
 
 	fp = fopen(dir, "r");
-	if(!fp || fsize == 0) {
+	if (!fp || fsize == 0) {
 		free(commend_list);
-		if (fp) fclose(fp);
+		if (fp)
+			fclose(fp);
 		return api_error(p, req, res, API_RT_NOCMMNDFILE);
 	}
 
-	if(startnum == 0)
-		startnum = total- number + 1;
-	if(startnum <= 0)
+	if (startnum == 0)
+		startnum = total - number + 1;
+	if (startnum <= 0)
 		startnum = 1;
 
-	fseek(fp, (startnum - 1) * sizeof(struct commend), SEEK_SET);
-	int count=0, length = 0, i;
-	for(i=0; i<number; i++) {
+	if (fseek(fp, (startnum - 1) * sizeof(struct commend), SEEK_SET) == -1) {
+		free(commend_list);
+		if (fp)
+			fclose(fp);
+		return api_error(p, req, res, API_RT_FILEERROR);
+	}
+
+	int count = 0, length = 0;
+	for (int i = 0; i < number; i++) {
 		if (fread(&x, sizeof(struct commend), 1, fp) != 1)
 			break;
 
