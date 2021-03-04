@@ -41,7 +41,9 @@ int api_attach_list(ONION_FUNC_PROTO_STR) {
 
 	char userattachpath[256];
 	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
-	mkdir(userattachpath, 0760);
+	if (mkdir(userattachpath, 0770) < 0) {
+		return api_error(p, req, res, API_RT_CNTMKDIR);
+	}
 
 	DIR *pdir;
 	struct dirent *pdent;
@@ -147,7 +149,9 @@ int api_attach_upload(ONION_FUNC_PROTO_STR) {
 	}
 
 	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
-	mkdir(userattachpath, 0770);
+	if (mkdir(userattachpath, 0770) < 0) {
+		return api_error(p, req, res, API_RT_CNTMKDIR);
+	}
 
 	const char *name = onion_request_get_post(req, "file");
 	const char *filename = onion_request_get_file(req, "file");

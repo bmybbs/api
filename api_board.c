@@ -112,6 +112,7 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	//g2u(bmem->header.type, 5, type, 16);
 
 	int today_num=0, thread_num=0, i;
+	struct mmapfile mf = { .ptr = NULL, .size = 0 };
 	size_t j;
 	struct tm tm;
 	memset(&tm, 0, sizeof(tm));
@@ -121,30 +122,21 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	char filename[256];
 
 	sprintf(filename, "boards/%s/.DIR", bmem->header.filename);
-	int fsize = ytht_file_size_s(filename);
-	int fd = open(filename, O_RDONLY);
-	if(fd==0 || fsize==0)
+	if (mmapfile(filename, &mf) < 0) {
 		today_num = 0;
-	else {
-		struct fileheader *data = (struct fileheader*)mmap(NULL, fsize, PROT_READ, MAP_SHARED, fd, 0);
-		close(fd);
-		if(data == MAP_FAILED)
-			today_num = 0;
-		else {
-			for(i=fsize/sizeof(struct fileheader)-1; data[i].filetime>day_begin; i--) {
-				if(i<=0)
-					break;
-
-				today_num++;
-			}
-
-			for(j=0; j<fsize/sizeof(struct fileheader); ++j) {
-				if(data[j].filetime == data[j].thread)
-					++thread_num;
-			}
-
-			munmap(data, fsize);
+	} else {
+		struct fileheader *data = (struct fileheader*) mf.ptr;
+		for (i = mf.size / sizeof(struct fileheader) - 1; data[i].filetime > day_begin; i--) {
+			if (i <= 0)
+				break;
+			today_num++;
 		}
+
+		for (j = 0; j < mf.size / sizeof(struct fileheader); ++j) {
+			if (data[j].filetime == data[j].thread)
+				++thread_num;
+		}
+		mmapfile(NULL, &mf);
 	}
 
 	if (rc == API_RT_SUCCESSFUL) {

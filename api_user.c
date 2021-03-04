@@ -489,7 +489,10 @@ static int api_user_override_File_add(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 
 	size_t size;
 
-	lockfd = ythtbbs_override_lock(ptr_info->userid, mode);
+	if ((lockfd = ythtbbs_override_lock(ptr_info->userid, mode)) < 0) {
+		return api_error(p, req, res, API_RT_USERLOCKFAIL);
+	}
+
 	size = ythtbbs_override_count(ptr_info->userid, mode);
 	if (size >= (mode == YTHTBBS_OVERRIDE_FRIENDS ? MAXFRIENDS : MAXREJECTS) - 1) {
 		ythtbbs_override_unlock(lockfd);
@@ -544,10 +547,16 @@ static int api_user_override_File_del(ONION_FUNC_PROTO_STR, enum ythtbbs_overrid
 	if ((array = (struct ythtbbs_override *) malloc(sizeof(struct ythtbbs_override) * size)) == NULL) {
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
-	lockfd = ythtbbs_override_lock(ptr_info->userid, mode);
+
+	if ((lockfd = ythtbbs_override_lock(ptr_info->userid, mode)) < 0) {
+		free(array);
+		return api_error(p, req, res, API_RT_USERLOCKFAIL);
+	}
+
 	rc = ythtbbs_override_get_records(ptr_info->userid, array, size, mode);
 	if (rc < 0) {
 		free(array);
+		ythtbbs_override_unlock(lockfd);
 		return api_error(p, req, res, API_RT_NOSUCHFILE);
 	}
 	size = (unsigned int) rc; /* safe */
