@@ -92,7 +92,12 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
 
-	fseek(fp, (startnum - 1) * sizeof(struct fileheader), SEEK_SET);
+	if (fseek(fp, (startnum - 1) * sizeof(struct fileheader), SEEK_SET) < 0) {
+		fclose(fp);
+		free(mail_list);
+		return api_error(p, req, res, API_RT_FILEERROR);
+	}
+
 	for (i = 0; i < count; ++i) {
 		if (fread(&x, sizeof(x), 1, fp) != 1)
 			break;
