@@ -213,7 +213,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 {
 	int listmax;
 	char ttfile[40];
-	if(mode == 0) { // 十大热门
+	if (mode == 0) { // 十大热门
 		listmax = 10;
 		sprintf(ttfile, "wwwtmp/ctopten");
 	} else { // 分区热门
@@ -229,14 +229,14 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	struct fileheader fh;
 
 	htmlDocPtr doc = htmlParseFile(ttfile, "GBK");
-	if(doc == NULL) {
+	if (doc == NULL) {
 		free(top_list);
 		return api_error(p, req, res, API_RT_NOTOP10FILE);
 	}
 
 	char xpath_links[40], xpath_nums[16];
 
-	if(mode == 0) { //十大
+	if (mode == 0) { //十大
 		sprintf(xpath_links, "//div[@class='td-overflow']/a");
 		sprintf(xpath_nums, "//tr/td[4]");
 	} else { //分区
@@ -245,7 +245,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	}
 
 	xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
-	if(ctx==NULL) {
+	if (ctx == NULL) {
 		xmlFreeDoc(doc);
 		free(top_list);
 		return api_error(p, req, res, API_RT_XMLFMTERROR);
@@ -255,32 +255,22 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	xmlXPathObjectPtr r_nums = xmlXPathEvalExpression((const xmlChar*)xpath_nums, ctx);
 
 	if(r_links->nodesetval == 0 || r_nums->nodesetval == 0) {
-		xmlXPathFreeObject(r_links);
-		xmlXPathFreeObject(r_nums);
-		xmlXPathFreeContext(ctx);
-		xmlFreeDoc(doc);
-		free(top_list);
-		return api_error(p, req, res, API_RT_XMLFMTERROR);
+		goto ERROR;
 	}
 
 	int total = r_links->nodesetval->nodeNr;
-	if( total == 0 || total>listmax ||
+	if (total == 0 || total>listmax ||
 		(mode == 0 && r_nums->nodesetval->nodeNr - total != 1) ||
 		(mode == 1 && r_nums->nodesetval->nodeNr != total)) {
-		xmlXPathFreeObject(r_links);
-		xmlXPathFreeObject(r_nums);
-		xmlXPathFreeContext(ctx);
-		xmlFreeDoc(doc);
-		free(top_list);
-		return api_error(p, req, res, API_RT_XMLFMTERROR);
+		goto ERROR;
 	}
 
 	int i;
 	xmlNodePtr cur_link, cur_num;
 	char *link, *num, *t1, *t2, buf[256], tmp[16];
-	for(i=0; i<total; ++i) {
+	for (i = 0; i < total; ++i) {
 		cur_link = r_links->nodesetval->nodeTab[i];
-		if(mode==0)
+		if (mode==0)
 			cur_num = r_nums->nodesetval->nodeTab[i+1];
 		else
 			cur_num = r_nums->nodesetval->nodeTab[i];
@@ -289,7 +279,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		num = (char *)xmlNodeGetContent(cur_num);
 
 		top_list[i].type = (strstr(link, "tfind?board") != NULL);
-		if(mode == 0) {
+		if (mode == 0) {
 			top_list[i].th_num = atoi(num);
 		} else {
 			// 分区模式下num格式为 (7)
@@ -298,41 +288,43 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		}
 		ytht_strsncpy(top_list[i].title, (const char*)xmlNodeGetContent(cur_link), 80);
 
-		memset(buf, 0, 256);
-		memcpy(buf, link, 256);
+		ytht_strsncpy(buf, link, sizeof(buf));
 
-		t1 = strtok(buf, "&");
-		t2 = strchr(t1, '=');
+		if ((t1 = strtok(buf, "&")) == NULL)
+			goto ERROR;
+		if ((t2 = strchr(t1, '=')) == NULL)
+			goto ERROR;
 		t2++;
 		sprintf(top_list[i].board, "%s", t2);
 
-		t1 = strtok(NULL, "&");
-		t2 = strchr(t1, '=');
+		if ((t1 = strtok(NULL, "&")) == NULL)
+			goto ERROR;
+		if ((t2 = strchr(t1, '=')) == NULL)
+			goto ERROR;
 
-		if(top_list[i].type) {
+		if (top_list[i].type) {
 			t2++;
 			sprintf(tmp, "%s", t2);
 			top_list[i].thread = atoi(tmp);
 		} else {
-			t2=t2+3;
+			t2 = t2 + 3;
 			snprintf(tmp, 11, "%s", t2);
 			top_list[i].filetime = atoi(tmp);
 		}
 		//根据 board、thread 或 filetime 得到 fileheader 补全所有信息
-		if(top_list[i].type) {
+		if (top_list[i].type) {
 			get_fileheader_by_filetime_thread(1, top_list[i].board, top_list[i].thread, &fh);
-			if(fh.filetime != 0) {
+			if (fh.filetime != 0) {
 				top_list[i].filetime = fh.filetime;
 				strcpy(top_list[i].author, fh2owner(&fh));
 			}
 		} else {
 			get_fileheader_by_filetime_thread(0, top_list[i].board, top_list[i].filetime, &fh);
-			if(fh.thread != 0) {
+			if (fh.thread != 0) {
 				top_list[i].thread = fh.thread;
 				strcpy(top_list[i].author, fh2owner(&fh));
 			}
 		}
-
 	}
 
 	char *s = api_article_array_to_json_string(top_list, total, 1);
@@ -349,6 +341,15 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	free(s);
 
 	return OCS_PROCESSED;
+
+ERROR:
+	xmlXPathFreeObject(r_links);
+	xmlXPathFreeObject(r_nums);
+	xmlXPathFreeContext(ctx);
+	xmlFreeDoc(doc);
+	free(top_list);
+
+	return api_error(p, req, res, API_RT_XMLFMTERROR);
 }
 
 static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum, int number)
