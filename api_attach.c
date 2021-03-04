@@ -41,7 +41,7 @@ int api_attach_list(ONION_FUNC_PROTO_STR) {
 
 	char userattachpath[256];
 	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
-	if (mkdir(userattachpath, 0760) < 0) {
+	if (mkdir(userattachpath, 0770) < 0) {
 		return api_error(p, req, res, API_RT_CNTMKDIR);
 	}
 
@@ -149,7 +149,7 @@ int api_attach_upload(ONION_FUNC_PROTO_STR) {
 	}
 
 	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
-	if (mkdir(userattachpath, 0771) < 0) {
+	if (mkdir(userattachpath, 0770) < 0) {
 		return api_error(p, req, res, API_RT_CNTMKDIR);
 	}
 
