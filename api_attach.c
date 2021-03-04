@@ -41,7 +41,9 @@ int api_attach_list(ONION_FUNC_PROTO_STR) {
 
 	char userattachpath[256];
 	snprintf(userattachpath, sizeof(userattachpath), PATHUSERATTACH "/%s", ptr_info->userid);
-	mkdir(userattachpath, 0760);
+	if (mkdir(userattachpath, 0760) < 0) {
+		return api_error(p, req, res, API_RT_CNTMKDIR);
+	}
 
 	DIR *pdir;
 	struct dirent *pdent;
