@@ -90,7 +90,7 @@ int api_mail_list(ONION_FUNC_PROTO_STR)
 	memset(mail_list, 0, sizeof(struct api_article) * count);
 	fseek(fp, (startnum - 1) * sizeof(struct fileheader), SEEK_SET);
 	for (i = 0; i < count; ++i) {
-		if(fread(&x, sizeof(x), 1, fp) <= 0)
+		if (fread(&x, sizeof(x), 1, fp) != 1)
 			break;
 
 		mail_list[i].sequence_num = i + startnum;
