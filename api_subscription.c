@@ -40,7 +40,7 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	memset(&g_brd, 0, sizeof(struct goodboard));
 	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
-	int *bid_arr = malloc(g_brd.num);
+	int *bid_arr = calloc(g_brd.num, sizeof(int));
 	if (bid_arr == NULL) {
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
