@@ -196,7 +196,7 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 		xmlFreeDoc(doc);
 	}
 
-	snprintf(filename, sizeof(filename), MY_BBS_HOME "/vote/%s/notes", bmem->header.filename);
+	snprintf(filename, sizeof(filename), "boards/%s/introduction", bmem->header.filename);
 	if (mmapfile(filename, &mf) == 0) {
 		struct json_object *json_note = json_object_new_string(mf.ptr);
 		if (json_note) {
