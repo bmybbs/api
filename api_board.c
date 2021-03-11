@@ -195,6 +195,15 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 		xmlFreeDoc(doc);
 	}
 
+	snprintf(filename, sizeof(filename), MY_BBS_HOME "/vote/%s/notes", bmem->header.filename);
+	if (mmapfile(filename, &mf) == 0) {
+		struct json_object *json_note = json_object_new_string(mf.ptr);
+		if (json_note) {
+			json_object_object_add(jp, "notes", json_note);
+		}
+		mmapfile(NULL, &mf);
+	}
+
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(jp));
 	json_object_put(jp);
