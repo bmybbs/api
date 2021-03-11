@@ -204,6 +204,10 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 int api_board_fav_add(ONION_FUNC_PROTO_STR)
 {
 	DEFINE_COMMON_SESSION_VARS;
+
+	if (!api_check_method(req, OR_POST))
+		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
+
 	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
@@ -246,6 +250,10 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 int api_board_fav_del(ONION_FUNC_PROTO_STR)
 {
 	DEFINE_COMMON_SESSION_VARS;
+
+	if (!api_check_method(req, OR_POST))
+		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
+
 	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
