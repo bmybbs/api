@@ -106,9 +106,10 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	}
 
 	char buf[512];
-	char zh_name[80];//, type[16], keyword[128];
+	char zh_name[80], keyword[sizeof(bmem->header.keyword) * 2];//, type[16];
 	g2u(bmem->header.title, 24, zh_name, 80);
-	//g2u(bmem->header.keyword, 64, keyword, 128);
+	bmem->header.keyword[sizeof(bmem->header.keyword) - 1] = 0;
+	g2u(bmem->header.keyword, sizeof(bmem->header.keyword), keyword, sizeof(keyword));
 	//g2u(bmem->header.type, 5, type, 16);
 
 	int today_num=0, thread_num=0, i;
@@ -202,6 +203,11 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 			json_object_object_add(jp, "notes", json_note);
 		}
 		mmapfile(NULL, &mf);
+	}
+
+	struct json_object *json_keyword = json_object_new_string(keyword);
+	if (json_keyword) {
+		json_object_object_add(jp, "keyword", json_keyword);
 	}
 
 	api_set_json_header(res);
