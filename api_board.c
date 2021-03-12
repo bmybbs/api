@@ -260,6 +260,7 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 	}
 
 	// 所有校验通过，写入用户文件
+	ythtbbs_mybrd_append(&g_brd, b->header.filename);
 	ythtbbs_mybrd_save_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	api_set_json_header(res);
@@ -296,6 +297,7 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 	}
 
 	// 所有校验通过，写入用户文件
+	ythtbbs_mybrd_remove(&g_brd, board);
 	ythtbbs_mybrd_save_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	api_set_json_header(res);
