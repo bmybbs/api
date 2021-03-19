@@ -1050,7 +1050,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_NOBRDPPERM);
 	}
 
-	int thread = -1;
+	time_t thread = -1;
 	int mark = 0;
 	char noti_userid[14] = { '\0' };
 	if (mode == API_POST_TYPE_REPLY) { // 已通过参数校验
