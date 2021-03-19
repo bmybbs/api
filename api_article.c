@@ -1139,7 +1139,9 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	else
 		is_anony = 0;
 
-	int is_1984 = (bmem->header.flag & IS1984_FLAG) ? 1 : 0;
+	if (bmem->header.flag & IS1984_FLAG) {
+		mark |= FH_1984;
+	}
 
 	size_t title_len = strlen(title);
 	char * title_gbk = (char *) malloc(title_len * 2);
