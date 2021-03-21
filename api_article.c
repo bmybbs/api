@@ -1202,7 +1202,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	memset(ptr_info->from, 0, sizeof(ptr_info->from));
 	ytht_strsncpy(ptr_info->from, fromhost, sizeof(ptr_info->from));
 	api_set_json_header(res);
-	onion_response_printf(res, "{ \"errcode\":0, \"aid\":%ld }", r);
+	onion_response_printf(res, "{ \"errcode\":0, \"aid\":%ld, \"tid\":%ld }", r, thread);
 
 	return OCS_PROCESSED;
 }
