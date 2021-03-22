@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
 	onion_url_add(urls, "^article/getHTMLContent$", api_article_getHTMLContent);
 	onion_url_add(urls, "^article/getRAWContent$", api_article_getRAWContent);
 	onion_url_add(urls, "^article/getContent$", api_article_getContent);
-	onion_url_add(urls, "^article/preview$", api_article_preview);
 	onion_url_add(urls, "^article/post$", api_article_post);
 	onion_url_add(urls, "^article/reply$", api_article_reply);
 	onion_url_add(urls, "^board/list$", api_board_list);
