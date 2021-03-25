@@ -32,11 +32,10 @@
  * 相关的异常应该在从 BMY 数据转为 api_article 的过程中判断、处理。
  * @param ba_list struct api_article 数组
  * @param count 数组长度
- * @param mode 0:不输出文章所在版面信息, 1:输出每个文章所在的版面信息。
- * @return json 字符串
- * @warning 记得调用完成 free
+ * @return json_object 指针
+ * @warning 记得调用完成 json_object_put
  */
-static char* api_article_array_to_json_string(struct api_article *ba_list, int count, int mode);
+static struct json_object *api_article_json_array(struct api_article *ba_list, int count);
 static char* api_article_with_num_array_to_json_string(struct api_article *ba_list, int count, int mode);
 
 /**
@@ -327,7 +326,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		}
 	}
 
-	char *s = api_article_array_to_json_string(top_list, total, 1);
+	struct json_object *result = api_article_json_array(top_list, total);
 
 	xmlXPathFreeObject(r_links);
 	xmlXPathFreeObject(r_nums);
@@ -335,10 +334,14 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	xmlFreeDoc(doc);
 	free(top_list);
 
-	api_set_json_header(res);
-	onion_response_write0(res, s);
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
 
-	free(s);
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
+
+	json_object_put(result);
 
 	return OCS_PROCESSED;
 
@@ -418,11 +421,17 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		++count;
 	}
 	fclose(fp);
-	char *s = api_article_array_to_json_string(commend_list, count, 1);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+
+	struct json_object *result = api_article_json_array(commend_list, count);
 	free(commend_list);
+
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
+	json_object_put(result);
 	return OCS_PROCESSED;
 }
 
@@ -675,11 +684,17 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	for(i = 0; i < num; ++i){
 		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 	}
-	char *s = api_article_array_to_json_string(board_list, num, 1);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+
+	struct json_object *result = api_article_json_array(board_list, num);
 	free(board_list);
+
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
+	json_object_put(result);
 	return OCS_PROCESSED;
 }
 
@@ -746,11 +761,16 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 
 	fclose(fp);
 
-	char *s = api_article_array_to_json_string(board_list, count, 1);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+	struct json_object *result = api_article_json_array(board_list, count);
 	free(board_list);
+
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
+	json_object_put(result);
 
 	return OCS_PROCESSED;
 }
@@ -1135,43 +1155,42 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	return OCS_PROCESSED;
 }
 
-static char* api_article_array_to_json_string(struct api_article *ba_list, int count, int mode)
+static struct json_object *api_article_json_array(struct api_article *ba_list, int count)
 {
 	char buf[512];
 	int i;
-	struct boardmem *b;
-	struct api_article *p;
-	struct json_object *jp;
+	const struct boardmem *b;
+	const struct api_article *p;
+	struct json_object *jp, *jp2;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
+
+	if (obj == NULL) {
+		return NULL;
+	}
+
 	struct json_object *json_array = json_object_object_get(obj, "articlelist");
 
-	for(i=0; i<count; ++i) {
+	for (i = 0; i < count; ++i) {
 		p = &(ba_list[i]);
-		memset(buf, 0, 512);
-		if(mode==0) {
-			sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
-				"\"th_num\":%d, \"mark\":%d }",
-				p->type, p->filetime, p->thread, p->th_num, p->mark);
-		} else {
-			b = ythtbbs_cache_Board_get_board_by_name(p->board);
-			sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
-				"\"th_num\":%d, \"mark\":%d, \"secstr\":\"%s\" }",
-				p->type, p->filetime, p->thread, p->th_num, p->mark, b->header.sec1);
-		}
+		b = ythtbbs_cache_Board_get_board_by_name(p->board);
+		snprintf(buf, sizeof(buf), "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
+			"\"th_num\":%d, \"mark\":%d, \"secstr\":\"%s\" }",
+			p->type, p->filetime, p->thread, p->th_num, p->mark, b->header.sec1);
 		jp = json_tokener_parse(buf);
-		if(jp) {
-			json_object_object_add(jp, "board", json_object_new_string(p->board));
-			json_object_object_add(jp, "title", json_object_new_string(p->title));
-			json_object_object_add(jp, "author", json_object_new_string(p->author));
+		if (jp) {
+			if ((jp2 = json_object_new_string(p->board)) != NULL)
+				json_object_object_add(jp, "board", jp2);
+			if ((jp2 = json_object_new_string(p->title)) != NULL)
+				json_object_object_add(jp, "title", jp2);
+			if ((jp2 = json_object_new_string(p->author)) != NULL)
+				json_object_object_add(jp, "author", jp2);
 			json_object_array_add(json_array, jp);
 		}
 	}
 
-	char *r = strdup(json_object_to_json_string(obj));
-	json_object_put(obj);
-
-	return r;
+	return obj;
 }
+
 static char* api_article_with_num_array_to_json_string(struct api_article *ba_list, int count, int mode)
 {
 	char buf[512];
