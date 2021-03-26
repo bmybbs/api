@@ -573,6 +573,11 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
 
+	struct json_object *jp;
+	if ((jp = json_object_new_int(total_article)) != NULL) {
+		json_object_object_add(result, "total", jp);
+	}
+
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(result));
 	return OCS_PROCESSED;
