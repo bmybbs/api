@@ -36,7 +36,7 @@
  * @warning 记得调用完成 json_object_put
  */
 static struct json_object *api_article_json_array(struct api_article *ba_list, int count);
-static char* api_article_with_num_array_to_json_string(struct api_article *ba_list, int count, int mode);
+static struct json_object *api_article_with_num_array_to_json(struct api_article *ba_list, int count, int mode);
 
 /**
  * @brief 将十大、分区热门话题转为 JSON 数据输出
@@ -565,11 +565,16 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	for(i = 0; i < num; ++i){
 		parse_thread_info(&board_list[i]);
 	}
-	char *s = api_article_with_num_array_to_json_string(board_list, num, mode);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+
+	struct json_object *result = api_article_with_num_array_to_json(board_list, num, mode);
 	free(board_list);
+
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
 	return OCS_PROCESSED;
 }
 
@@ -1191,31 +1196,37 @@ static struct json_object *api_article_json_array(struct api_article *ba_list, i
 	return obj;
 }
 
-static char* api_article_with_num_array_to_json_string(struct api_article *ba_list, int count, int mode)
+static struct json_object *api_article_with_num_array_to_json(struct api_article *ba_list, int count, int mode)
 {
 	char buf[512];
 	int i, j;
 	struct api_article *p;
-	struct json_object *jp;
+	struct json_object *jp, *jp2;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
+	if (obj == NULL) {
+		return NULL;
+	}
+
 	struct json_object *json_array = json_object_object_get(obj, "articlelist");
 
-	for(i=0; i<count; ++i) {
+	for (i = 0; i < count; ++i) {
 		p = &(ba_list[i]);
-		memset(buf, 0, 512);
-		sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
+		snprintf(buf, sizeof(buf), "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
 				"\"th_num\":%d, \"mark\":%d ,\"num\":%d, \"th_size\":%d, \"th_commenter\":[] }",
 				p->type, p->filetime, p->thread, p->th_num, p->mark, p->sequence_num, p->th_size);
 		jp = json_tokener_parse(buf);
-		if(jp) {
-			json_object_object_add(jp, "board", json_object_new_string(p->board));
-			json_object_object_add(jp, "title", json_object_new_string(p->title));
-			json_object_object_add(jp, "author", json_object_new_string(p->author));
+		if (jp) {
+			if ((jp2 = json_object_new_string(p->board)) != NULL)
+				json_object_object_add(jp, "board", jp2);
+			if ((jp2 = json_object_new_string(p->title)) != NULL)
+				json_object_object_add(jp, "title", jp2);
+			if ((jp2 = json_object_new_string(p->author)) != NULL)
+				json_object_object_add(jp, "author", jp2);
 
-			if(mode == 1) {
+			if (mode == 1) {
 				// 主题模式下输出评论者
 				struct json_object *json_array_commenter = json_object_object_get(jp, "th_commenter");
-				for(j = 0; j < p->th_commenter_count; ++j) {
+				for (j = 0; j < p->th_commenter_count; ++j) {
 					if(p->th_commenter[j][0] == 0)
 						break;
 					json_object_array_add(json_array_commenter, json_object_new_string(p->th_commenter[j]));
@@ -1226,10 +1237,7 @@ static char* api_article_with_num_array_to_json_string(struct api_article *ba_li
 		}
 	}
 
-	char *r = strdup(json_object_to_json_string(obj));
-	json_object_put(obj);
-
-	return r;
+	return obj;
 }
 
 static int get_thread_by_filetime(char *board, int filetime)
