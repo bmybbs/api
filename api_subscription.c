@@ -29,12 +29,17 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 
 	time_t now_t = time(NULL);
 
-	const char *start_str = onion_request_get_query(req, "start");
-	time_t start_time;
-	if (start_str == NULL || start_str[0] == '\0')
-		start_time = now_t;
+	const char *page_str = onion_request_get_query(req, "page");
+	int page;
+	size_t offset;
+	if (page_str == NULL || page_str[0] == '\0')
+		page = 1;
 	else
-		start_time = atol(start_str); // TODO
+		page = atol(page_str);
+
+	if (page < 1)
+		page = 1;
+	offset = COUNT_PER_PAGE * (page - 1);
 
 	struct goodboard g_brd;
 	memset(&g_brd, 0, sizeof(struct goodboard));
@@ -48,7 +53,7 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 		bid_arr[i] = ythtbbs_cache_Board_get_idx_by_name(g_brd.ID[i]);
 	}
 
-	struct bmy_articles *articles = bmy_article_list_selected_boards(bid_arr, g_brd.num, COUNT_PER_PAGE, start_time);
+	struct bmy_articles *articles = bmy_article_list_selected_boards_by_offset(bid_arr, g_brd.num, COUNT_PER_PAGE, offset);
 	free(bid_arr);
 
 	if (articles == NULL || articles->count == 0) {
