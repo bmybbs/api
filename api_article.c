@@ -1516,13 +1516,14 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
 	int rc;
 	size_t count, i, board_count;
-	time_t start;
+	int page;
+	unsigned int offset;
 	int *boardnum_array;
 	char c;
 	const struct sectree *sec;
 	int hasintro = 0;
-	const char *secstr    = onion_request_get_query(req, "secstr");
-	const char *start_str = onion_request_get_query(req, "start");
+	const char *secstr   = onion_request_get_query(req, "secstr");
+	const char *page_str = onion_request_get_query(req, "page");
 
 	if (secstr == NULL || secstr[0] == '\0')
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -1532,10 +1533,15 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
-	if (start_str != NULL)
-		start = atol(start_str);
+	if (page_str != NULL)
+		page = atoi(page_str);
 	else
-		start = time(NULL);
+		page = 1;
+
+	if (page < 1)
+		page = 1;
+
+	offset = (page - 1) * COUNT_PER_PAGE;
 
 	struct bmy_articles *articles;
 
@@ -1551,7 +1557,7 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	boardnum_array = calloc(board_count, sizeof(int));
 	board_count = 0;
 	ythtbbs_cache_Board_foreach_v(put_boardnum_in_section, rc, ptr_info, &board_count, hasintro, secstr, boardnum_array);
-	articles = bmy_article_list_selected_boards(boardnum_array, board_count, COUNT_PER_PAGE, start);
+	articles = bmy_article_list_selected_boards_by_offset(boardnum_array, board_count, COUNT_PER_PAGE, offset);
 	free(boardnum_array);
 
 	if (articles == NULL || articles->count == 0) {
