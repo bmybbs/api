@@ -1522,6 +1522,7 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	char c;
 	const struct sectree *sec;
 	int hasintro = 0;
+	unsigned long total = 0;
 	const char *secstr   = onion_request_get_query(req, "secstr");
 	const char *page_str = onion_request_get_query(req, "page");
 
@@ -1558,6 +1559,7 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	board_count = 0;
 	ythtbbs_cache_Board_foreach_v(put_boardnum_in_section, rc, ptr_info, &board_count, hasintro, secstr, boardnum_array);
 	articles = bmy_article_list_selected_boards_by_offset(boardnum_array, board_count, COUNT_PER_PAGE, offset);
+	total = bmy_article_total_selected_boards(boardnum_array, board_count);
 	free(boardnum_array);
 
 	if (articles == NULL || articles->count == 0) {
@@ -1577,6 +1579,7 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	}
 
 	struct json_object *obj = json_object_new_object();
+	struct json_object *jp_total = json_object_new_int64(total);
 	struct json_object *article_array = json_object_new_array_ext(count);
 	struct json_object *article_obj;
 
@@ -1590,6 +1593,9 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	}
 
 	json_object_object_add(obj, "articles", article_array);
+	if (jp_total) {
+		json_object_object_add(obj, "total", jp_total);
+	}
 
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE));
