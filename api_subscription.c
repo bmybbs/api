@@ -27,8 +27,6 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
 
-	time_t now_t = time(NULL);
-
 	const char *page_str = onion_request_get_query(req, "page");
 	int page;
 	size_t offset;
