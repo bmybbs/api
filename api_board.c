@@ -106,9 +106,10 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 	}
 
 	char buf[512];
-	char zh_name[80];//, type[16], keyword[128];
+	char zh_name[80], keyword[sizeof(bmem->header.keyword) * 2];//, type[16];
 	g2u(bmem->header.title, 24, zh_name, 80);
-	//g2u(bmem->header.keyword, 64, keyword, 128);
+	bmem->header.keyword[sizeof(bmem->header.keyword) - 1] = 0;
+	g2u(bmem->header.keyword, sizeof(bmem->header.keyword), keyword, sizeof(keyword));
 	//g2u(bmem->header.type, 5, type, 16);
 
 	int today_num=0, thread_num=0, i;
@@ -195,6 +196,26 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 		xmlFreeDoc(doc);
 	}
 
+	snprintf(filename, sizeof(filename), "boards/%s/introduction", bmem->header.filename);
+	if (mmapfile(filename, &mf) == 0) {
+		size_t note_len = strlen(mf.ptr);
+		char *note_utf = malloc(note_len * 2);
+		if (note_utf) {
+			memset(note_utf, 0, note_len * 2);
+			g2u(mf.ptr, note_len, note_utf, note_len * 2);
+			struct json_object *json_note = json_object_new_string(note_utf);
+			if (json_note) {
+				json_object_object_add(jp, "notes", json_note);
+			}
+		}
+		mmapfile(NULL, &mf);
+	}
+
+	struct json_object *json_keyword = json_object_new_string(keyword);
+	if (json_keyword) {
+		json_object_object_add(jp, "keyword", json_keyword);
+	}
+
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string(jp));
 	json_object_put(jp);
@@ -204,6 +225,10 @@ int api_board_info(ONION_FUNC_PROTO_STR)
 int api_board_fav_add(ONION_FUNC_PROTO_STR)
 {
 	DEFINE_COMMON_SESSION_VARS;
+
+	if (!api_check_method(req, OR_POST))
+		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
+
 	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
@@ -235,6 +260,7 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 	}
 
 	// 所有校验通过，写入用户文件
+	ythtbbs_mybrd_append(&g_brd, b->header.filename);
 	ythtbbs_mybrd_save_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	api_set_json_header(res);
@@ -246,6 +272,10 @@ int api_board_fav_add(ONION_FUNC_PROTO_STR)
 int api_board_fav_del(ONION_FUNC_PROTO_STR)
 {
 	DEFINE_COMMON_SESSION_VARS;
+
+	if (!api_check_method(req, OR_POST))
+		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
+
 	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
@@ -267,6 +297,7 @@ int api_board_fav_del(ONION_FUNC_PROTO_STR)
 	}
 
 	// 所有校验通过，写入用户文件
+	ythtbbs_mybrd_remove(&g_brd, board);
 	ythtbbs_mybrd_save_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
 	api_set_json_header(res);

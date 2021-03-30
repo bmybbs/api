@@ -32,12 +32,11 @@
  * 相关的异常应该在从 BMY 数据转为 api_article 的过程中判断、处理。
  * @param ba_list struct api_article 数组
  * @param count 数组长度
- * @param mode 0:不输出文章所在版面信息, 1:输出每个文章所在的版面信息。
- * @return json 字符串
- * @warning 记得调用完成 free
+ * @return json_object 指针
+ * @warning 记得调用完成 json_object_put
  */
-static char* api_article_array_to_json_string(struct api_article *ba_list, int count, int mode);
-static char* api_article_with_num_array_to_json_string(struct api_article *ba_list, int count, int mode);
+static struct json_object *api_article_json_array(struct api_article *ba_list, int count);
+static struct json_object *api_article_with_num_array_to_json(struct api_article *ba_list, int count, int mode);
 
 /**
  * @brief 将十大、分区热门话题转为 JSON 数据输出
@@ -327,7 +326,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		}
 	}
 
-	char *s = api_article_array_to_json_string(top_list, total, 1);
+	struct json_object *result = api_article_json_array(top_list, total);
 
 	xmlXPathFreeObject(r_links);
 	xmlXPathFreeObject(r_nums);
@@ -335,10 +334,14 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 	xmlFreeDoc(doc);
 	free(top_list);
 
-	api_set_json_header(res);
-	onion_response_write0(res, s);
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
 
-	free(s);
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
+
+	json_object_put(result);
 
 	return OCS_PROCESSED;
 
@@ -418,11 +421,17 @@ static int api_article_list_commend(ONION_FUNC_PROTO_STR, int mode, int startnum
 		++count;
 	}
 	fclose(fp);
-	char *s = api_article_array_to_json_string(commend_list, count, 1);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+
+	struct json_object *result = api_article_json_array(commend_list, count);
 	free(commend_list);
+
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
+	json_object_put(result);
 	return OCS_PROCESSED;
 }
 
@@ -556,11 +565,21 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	for(i = 0; i < num; ++i){
 		parse_thread_info(&board_list[i]);
 	}
-	char *s = api_article_with_num_array_to_json_string(board_list, num, mode);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+
+	struct json_object *result = api_article_with_num_array_to_json(board_list, num, mode);
 	free(board_list);
+
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	struct json_object *jp;
+	if ((jp = json_object_new_int(total_article)) != NULL) {
+		json_object_object_add(result, "total", jp);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
 	return OCS_PROCESSED;
 }
 
@@ -675,11 +694,17 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	for(i = 0; i < num; ++i){
 		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
 	}
-	char *s = api_article_array_to_json_string(board_list, num, 1);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+
+	struct json_object *result = api_article_json_array(board_list, num);
 	free(board_list);
+
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
+	json_object_put(result);
 	return OCS_PROCESSED;
 }
 
@@ -746,11 +771,16 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 
 	fclose(fp);
 
-	char *s = api_article_array_to_json_string(board_list, count, 1);
-	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+	struct json_object *result = api_article_json_array(board_list, count);
 	free(board_list);
+
+	if (result == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
+	api_set_json_header(res);
+	onion_response_write0(res, json_object_to_json_string(result));
+	json_object_put(result);
 
 	return OCS_PROCESSED;
 }
@@ -874,77 +904,6 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 	return OCS_PROCESSED;
 }
 
-int api_article_preview(ONION_FUNC_PROTO_STR) {
-	DEFINE_COMMON_SESSION_VARS;
-
-	if (!api_check_method(req, OR_POST))
-		return api_error(p, req, res, API_RT_WRONGMETHOD);
-
-	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
-	if (rc != API_RT_SUCCESSFUL) {
-		return api_error(p, req, res, rc);
-	}
-
-	const char *json_str = onion_block_data(onion_request_get_data(req));
-	struct json_object *json_request = json_tokener_parse(json_str);
-	if (json_request == NULL) {
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	struct json_object *content_obj = json_object_object_get(json_request, "content");
-	if (content_obj == NULL || json_object_get_type(content_obj) != json_type_string) {
-		json_object_put(json_request);
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	const char *content = json_object_get_string(content_obj);
-	if (content == NULL) {
-		json_object_put(json_request);
-		return api_error(p, req, res, API_RT_WRONGPARAM);
-	}
-
-	char *data2 = strdup(content);
-	if (data2 == NULL) {
-		json_object_put(json_request);
-		return api_error(p, req, res, API_RT_NOTENGMEM);
-	}
-
-	while(strstr(data2, "[ESC]") != NULL) {
-		data2 = string_replace(data2, "[ESC]", "\033");
-	}
-
-	FILE *in_stream = fmemopen(data2, strlen(content), "r");
-	char *output;
-	size_t len;
-	FILE *out_stream = open_memstream(&output, &len);
-
-	aha_convert(in_stream, out_stream);
-
-	fflush(out_stream);
-	fclose(out_stream);
-	fclose(in_stream);
-	json_object_put(json_request);
-
-	struct json_object *json_response = json_object_new_object();
-	if (json_response == NULL) {
-		free(output);
-		free(data2);
-		return api_error(p, req, res, API_RT_NOTENGMEM);
-	}
-
-	json_object_object_add(json_response, "errcode", json_object_new_int(0));
-	json_object_object_add(json_response, "content", json_object_new_string(output));
-
-	api_set_json_header(res);
-	onion_response_write0(res, json_object_to_json_string_ext(json_response, JSON_C_TO_STRING_NOSLASHESCAPE));
-
-	json_object_put(json_response);
-	free(output);
-	free(data2);
-
-	return OCS_PROCESSED;
-}
-
 int api_article_post(ONION_FUNC_PROTO_STR)
 {
 	return api_article_do_post(p, req, res, API_POST_TYPE_POST);
@@ -1050,7 +1009,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_NOBRDPPERM);
 	}
 
-	int thread = -1;
+	time_t thread = -1;
 	int mark = 0;
 	char noti_userid[14] = { '\0' };
 	if (mode == API_POST_TYPE_REPLY) { // 已通过参数校验
@@ -1139,7 +1098,9 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	else
 		is_anony = 0;
 
-	int is_1984 = (bmem->header.flag & IS1984_FLAG) ? 1 : 0;
+	if (bmem->header.flag & IS1984_FLAG) {
+		mark |= FH_1984;
+	}
 
 	size_t title_len = strlen(title);
 	char * title_gbk = (char *) malloc(title_len * 2);
@@ -1196,77 +1157,81 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	}
 
 	free(title_gbk);
-	ytht_get_random_str_r(ptr_info->token, TOKENLENGTH+1);
 	memset(ptr_info->from, 0, sizeof(ptr_info->from));
 	ytht_strsncpy(ptr_info->from, fromhost, sizeof(ptr_info->from));
 	api_set_json_header(res);
-	onion_response_printf(res, "{ \"errcode\":0, \"aid\":%ld }", r);
+	onion_response_printf(res, "{ \"errcode\":0, \"aid\":%ld, \"tid\":%ld }", r, thread);
 
 	return OCS_PROCESSED;
 }
 
-static char* api_article_array_to_json_string(struct api_article *ba_list, int count, int mode)
+static struct json_object *api_article_json_array(struct api_article *ba_list, int count)
 {
 	char buf[512];
 	int i;
-	struct boardmem *b;
-	struct api_article *p;
-	struct json_object *jp;
+	const struct boardmem *b;
+	const struct api_article *p;
+	struct json_object *jp, *jp2;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
+
+	if (obj == NULL) {
+		return NULL;
+	}
+
 	struct json_object *json_array = json_object_object_get(obj, "articlelist");
 
-	for(i=0; i<count; ++i) {
+	for (i = 0; i < count; ++i) {
 		p = &(ba_list[i]);
-		memset(buf, 0, 512);
-		if(mode==0) {
-			sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
-				"\"th_num\":%d, \"mark\":%d }",
-				p->type, p->filetime, p->thread, p->th_num, p->mark);
-		} else {
-			b = ythtbbs_cache_Board_get_board_by_name(p->board);
-			sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
-				"\"th_num\":%d, \"mark\":%d, \"secstr\":\"%s\" }",
-				p->type, p->filetime, p->thread, p->th_num, p->mark, b->header.sec1);
-		}
+		b = ythtbbs_cache_Board_get_board_by_name(p->board);
+		snprintf(buf, sizeof(buf), "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
+			"\"th_num\":%d, \"mark\":%d, \"secstr\":\"%s\" }",
+			p->type, p->filetime, p->thread, p->th_num, p->mark, b->header.sec1);
 		jp = json_tokener_parse(buf);
-		if(jp) {
-			json_object_object_add(jp, "board", json_object_new_string(p->board));
-			json_object_object_add(jp, "title", json_object_new_string(p->title));
-			json_object_object_add(jp, "author", json_object_new_string(p->author));
+		if (jp) {
+			if ((jp2 = json_object_new_string(p->board)) != NULL)
+				json_object_object_add(jp, "board", jp2);
+			if ((jp2 = json_object_new_string(p->title)) != NULL)
+				json_object_object_add(jp, "title", jp2);
+			if ((jp2 = json_object_new_string(p->author)) != NULL)
+				json_object_object_add(jp, "author", jp2);
 			json_object_array_add(json_array, jp);
 		}
 	}
 
-	char *r = strdup(json_object_to_json_string(obj));
-	json_object_put(obj);
-
-	return r;
+	return obj;
 }
-static char* api_article_with_num_array_to_json_string(struct api_article *ba_list, int count, int mode)
+
+static struct json_object *api_article_with_num_array_to_json(struct api_article *ba_list, int count, int mode)
 {
 	char buf[512];
 	int i, j;
 	struct api_article *p;
-	struct json_object *jp;
+	struct json_object *jp, *jp2;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
+	if (obj == NULL) {
+		return NULL;
+	}
+
 	struct json_object *json_array = json_object_object_get(obj, "articlelist");
 
-	for(i=0; i<count; ++i) {
+	for (i = 0; i < count; ++i) {
 		p = &(ba_list[i]);
-		memset(buf, 0, 512);
-		sprintf(buf, "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
+		snprintf(buf, sizeof(buf), "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
 				"\"th_num\":%d, \"mark\":%d ,\"num\":%d, \"th_size\":%d, \"th_commenter\":[] }",
 				p->type, p->filetime, p->thread, p->th_num, p->mark, p->sequence_num, p->th_size);
 		jp = json_tokener_parse(buf);
-		if(jp) {
-			json_object_object_add(jp, "board", json_object_new_string(p->board));
-			json_object_object_add(jp, "title", json_object_new_string(p->title));
-			json_object_object_add(jp, "author", json_object_new_string(p->author));
+		if (jp) {
+			if ((jp2 = json_object_new_string(p->board)) != NULL)
+				json_object_object_add(jp, "board", jp2);
+			if ((jp2 = json_object_new_string(p->title)) != NULL)
+				json_object_object_add(jp, "title", jp2);
+			if ((jp2 = json_object_new_string(p->author)) != NULL)
+				json_object_object_add(jp, "author", jp2);
 
-			if(mode == 1) {
+			if (mode == 1) {
 				// 主题模式下输出评论者
 				struct json_object *json_array_commenter = json_object_object_get(jp, "th_commenter");
-				for(j = 0; j < p->th_commenter_count; ++j) {
+				for (j = 0; j < p->th_commenter_count; ++j) {
 					if(p->th_commenter[j][0] == 0)
 						break;
 					json_object_array_add(json_array_commenter, json_object_new_string(p->th_commenter[j]));
@@ -1277,10 +1242,7 @@ static char* api_article_with_num_array_to_json_string(struct api_article *ba_li
 		}
 	}
 
-	char *r = strdup(json_object_to_json_string(obj));
-	json_object_put(obj);
-
-	return r;
+	return obj;
 }
 
 static int get_thread_by_filetime(char *board, int filetime)
@@ -1554,13 +1516,15 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
 	int rc;
 	size_t count, i, board_count;
-	time_t start;
+	int page;
+	unsigned int offset;
 	int *boardnum_array;
 	char c;
 	const struct sectree *sec;
 	int hasintro = 0;
-	const char *secstr    = onion_request_get_query(req, "secstr");
-	const char *start_str = onion_request_get_query(req, "start");
+	unsigned long total = 0;
+	const char *secstr   = onion_request_get_query(req, "secstr");
+	const char *page_str = onion_request_get_query(req, "page");
 
 	if (secstr == NULL || secstr[0] == '\0')
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -1570,10 +1534,15 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
-	if (start_str != NULL)
-		start = atol(start_str);
+	if (page_str != NULL)
+		page = atoi(page_str);
 	else
-		start = time(NULL);
+		page = 1;
+
+	if (page < 1)
+		page = 1;
+
+	offset = (page - 1) * COUNT_PER_PAGE;
 
 	struct bmy_articles *articles;
 
@@ -1589,7 +1558,8 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	boardnum_array = calloc(board_count, sizeof(int));
 	board_count = 0;
 	ythtbbs_cache_Board_foreach_v(put_boardnum_in_section, rc, ptr_info, &board_count, hasintro, secstr, boardnum_array);
-	articles = bmy_article_list_selected_boards(boardnum_array, board_count, COUNT_PER_PAGE, start);
+	articles = bmy_article_list_selected_boards_by_offset(boardnum_array, board_count, COUNT_PER_PAGE, offset);
+	total = bmy_article_total_selected_boards(boardnum_array, board_count);
 	free(boardnum_array);
 
 	if (articles == NULL || articles->count == 0) {
@@ -1609,6 +1579,7 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	}
 
 	struct json_object *obj = json_object_new_object();
+	struct json_object *jp_total = json_object_new_int64(total);
 	struct json_object *article_array = json_object_new_array_ext(count);
 	struct json_object *article_obj;
 
@@ -1622,6 +1593,9 @@ static int api_article_list_section(ONION_FUNC_PROTO_STR) {
 	}
 
 	json_object_object_add(obj, "articles", article_array);
+	if (jp_total) {
+		json_object_object_add(obj, "total", jp_total);
+	}
 
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE));

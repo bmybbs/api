@@ -19,6 +19,7 @@ extern bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char
 int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	DEFINE_COMMON_SESSION_VARS;
 	int rc;
+	unsigned long total = 0;
 
 	if (!api_check_method(req, OR_GET))
 		return api_error(p, req, res, API_RT_WRONGMETHOD);
@@ -27,20 +28,23 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
 
-	time_t now_t = time(NULL);
-
-	const char *start_str = onion_request_get_query(req, "start");
-	time_t start_time;
-	if (start_str == NULL || start_str[0] == '\0')
-		start_time = now_t;
+	const char *page_str = onion_request_get_query(req, "page");
+	int page;
+	size_t offset;
+	if (page_str == NULL || page_str[0] == '\0')
+		page = 1;
 	else
-		start_time = atol(start_str); // TODO
+		page = atol(page_str);
+
+	if (page < 1)
+		page = 1;
+	offset = COUNT_PER_PAGE * (page - 1);
 
 	struct goodboard g_brd;
 	memset(&g_brd, 0, sizeof(struct goodboard));
 	ythtbbs_mybrd_load_ext(ptr_info, &g_brd, api_mybrd_has_read_perm);
 
-	int *bid_arr = malloc(g_brd.num);
+	int *bid_arr = calloc(g_brd.num, sizeof(int));
 	if (bid_arr == NULL) {
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
@@ -48,7 +52,8 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 		bid_arr[i] = ythtbbs_cache_Board_get_idx_by_name(g_brd.ID[i]);
 	}
 
-	struct bmy_articles *articles = bmy_article_list_selected_boards(bid_arr, g_brd.num, COUNT_PER_PAGE, start_time);
+	struct bmy_articles *articles = bmy_article_list_selected_boards_by_offset(bid_arr, g_brd.num, COUNT_PER_PAGE, offset);
+	total = bmy_article_total_selected_boards(bid_arr, g_brd.num);
 	free(bid_arr);
 
 	if (articles == NULL || articles->count == 0) {
@@ -60,6 +65,7 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 	struct json_object *obj = json_object_new_object();
 	struct json_object *article_array = json_object_new_array_ext(articles->count);
 	struct json_object *article_obj;
+	struct json_object *total_obj;
 
 	size_t i;
 	struct fileheader_utf *ptr_header;
@@ -71,6 +77,9 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 
 	json_object_object_add(obj, "articles", article_array);
 	json_object_object_add(obj, "errcode", json_object_new_int(API_RT_SUCCESSFUL));
+	if ((total_obj = json_object_new_int64(total)) != NULL) {
+		json_object_object_add(obj, "total", total_obj);
+	}
 
 	api_set_json_header(res);
 	onion_response_write0(res, json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE));
