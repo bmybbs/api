@@ -107,7 +107,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	char buf[60];
 	bmy_cookie_gen(buf, sizeof(buf), &cookie);
 	api_set_json_header(res);
-	onion_response_add_cookie(res, SMAGIC, buf, MAX_SESS_TIME - 10, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY);
+	onion_response_add_cookie(res, SMAGIC, buf, MAX_SESS_TIME - 10, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY | OC_SAMESITE_STRICT);
 
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
@@ -181,7 +181,7 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 
 	ythtbbs_user_logout(ptr_info->userid, utmp_idx); // TODO return value
 
-	onion_response_add_cookie(res, SMAGIC, "", 0, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY);
+	onion_response_add_cookie(res, SMAGIC, "", 0, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY | OC_SAMESITE_STRICT);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 
