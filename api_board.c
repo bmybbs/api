@@ -535,6 +535,11 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 		break;
 	}
 
+	struct goodboard g_brd;
+	memset(&g_brd, 0, sizeof(struct goodboard));
+	if (ui != NULL)
+		ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
+
 	for(i=0; i<count; ++i) {
 		bp = board_array[i];
 		memset(buf, 0, 512);
@@ -548,12 +553,13 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 		g2u(bp->header.type, 5, type, 16);
 		sprintf(buf, "{\"name\":\"%s\", \"zh_name\":\"%s\", \"type\":\"%s\", \"bm\":[],"
 				"\"unread\":%d, \"voting\":%d, \"article_num\":%d, \"score\":%d,"
-				"\"inboard_num\":%d, \"secstr\":\"%s\", \"keyword\":\"%s\" }",
+				"\"inboard_num\":%d, \"secstr\":\"%s\", \"keyword\":\"%s\", \"is_fav\":%d }",
 				bp->header.filename, zh_name, type,
 				(ui == NULL ? 1 : !board_read(bp->header.filename, bp->lastpost, fromhost, ui)),
 				(bp->header.flag & VOTE_FLAG),
 				bp->total, bp->score,
-				bp->inboard, bp->header.sec1, keyword);
+				bp->inboard, bp->header.sec1, keyword,
+				(ui == NULL ? 0 : ythtbbs_mybrd_exists(&g_brd, bp->header.filename)));
 		jp = json_tokener_parse(buf);
 		if(jp) {
 			struct json_object *bm_json_array = json_object_object_get(jp, "bm");
