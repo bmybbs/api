@@ -26,6 +26,7 @@
 
 #include "api.h"
 #include "apilib.h"
+#include "apiconfig.h"
 /**
  * @brief 将 struct api_article 数组序列化为 json 字符串。
  * 这个方法不考虑异常，因此方法里确定了 errcode 为 0，也就是 API_RT_SUCCESSFUL，
@@ -470,7 +471,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	if(str_count != NULL)
 		count = atoi(str_count);
 	if(0 >= count)
-		count = 20;
+		count = COUNT_PER_PAGE;
 	if(str_btype[0] == 't')
 		mode = 1;
 	else
@@ -1454,8 +1455,6 @@ static struct fileheader * findbarticle(struct mmapfile *mf, time_t filetime, in
 
 	return NULL;
 }
-
-static const int COUNT_PER_PAGE = 40;
 
 static int count_board_in_section(struct boardmem *board, int curr_idx, va_list ap) {
 	(void) curr_idx;
