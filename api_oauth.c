@@ -228,7 +228,7 @@ int api_oauth_login(ONION_FUNC_PROTO_STR) {
 
 	cookie.userid = ui.userid;
 	cookie.sessid = ui.sessionid;
-	cookie.token  = "";
+	cookie.token  = ui.token;
 	bmy_cookie_gen(cookie_buf, sizeof(cookie_buf), &cookie);
 
 	api_set_json_header(res);
