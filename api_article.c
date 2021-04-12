@@ -933,7 +933,12 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	int rid = 0;
 
 	const char *fromhost = onion_request_get_header(req, "X-Real-IP");
-	const char *body = onion_block_data(onion_request_get_data(req));
+	const onion_block *block = onion_request_get_data(req);
+	if (block == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	const char *body = onion_block_data(block);
 	if (body == NULL || body[0] == '\0') {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
