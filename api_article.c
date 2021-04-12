@@ -1066,7 +1066,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	cookie_token = cookie.token;
 	ytht_strsncpy(session_token, ptr_info->token, sizeof(session_token));
 	ythtbbs_session_generate_id(ptr_info->token, sizeof(ptr_info->token));
-	userunlock(ptr_info->userid, LOCK_UN);
+	userunlock(ptr_info->userid, ulock);
 
 	cookie.token = ptr_info->token;
 	bmy_cookie_gen(cookie_buf2, sizeof(cookie_buf2), &cookie);
