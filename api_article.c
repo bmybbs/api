@@ -26,6 +26,7 @@
 
 #include "api.h"
 #include "apilib.h"
+#include "apiconfig.h"
 /**
  * @brief 将 struct api_article 数组序列化为 json 字符串。
  * 这个方法不考虑异常，因此方法里确定了 errcode 为 0，也就是 API_RT_SUCCESSFUL，
@@ -470,7 +471,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	if(str_count != NULL)
 		count = atoi(str_count);
 	if(0 >= count)
-		count = 20;
+		count = COUNT_PER_PAGE;
 	if(str_btype[0] == 't')
 		mode = 1;
 	else
@@ -932,7 +933,12 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	int rid = 0;
 
 	const char *fromhost = onion_request_get_header(req, "X-Real-IP");
-	const char *body = onion_block_data(onion_request_get_data(req));
+	const onion_block *block = onion_request_get_data(req);
+	if (block == NULL) {
+		return api_error(p, req, res, API_RT_WRONGPARAM);
+	}
+
+	const char *body = onion_block_data(block);
 	if (body == NULL || body[0] == '\0') {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	}
@@ -1060,7 +1066,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	cookie_token = cookie.token;
 	ytht_strsncpy(session_token, ptr_info->token, sizeof(session_token));
 	ythtbbs_session_generate_id(ptr_info->token, sizeof(ptr_info->token));
-	userunlock(ptr_info->userid, LOCK_UN);
+	userunlock(ptr_info->userid, ulock);
 
 	cookie.token = ptr_info->token;
 	bmy_cookie_gen(cookie_buf2, sizeof(cookie_buf2), &cookie);
@@ -1454,8 +1460,6 @@ static struct fileheader * findbarticle(struct mmapfile *mf, time_t filetime, in
 
 	return NULL;
 }
-
-static const int COUNT_PER_PAGE = 40;
 
 static int count_board_in_section(struct boardmem *board, int curr_idx, va_list ap) {
 	(void) curr_idx;

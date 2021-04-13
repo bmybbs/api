@@ -10,9 +10,9 @@
 #include "ythtbbs/cache.h"
 #include "api.h"
 #include "apilib.h"
+#include "apiconfig.h"
 #include "error_code.h"
 
-static const int COUNT_PER_PAGE = 40;
 // api_board
 extern bool api_mybrd_has_read_perm(const struct user_info *ptr_info, const char *boardname);
 
