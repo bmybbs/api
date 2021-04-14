@@ -14,6 +14,7 @@
 #include "ytht/fileop.h"
 #include "ytht/numbyte.h"
 #include "bmy/convcode.h"
+#include "bmy/board.h"
 #include "ythtbbs/attach.h"
 #include "ythtbbs/binaryattach.h"
 #include "ythtbbs/cache.h"
@@ -919,6 +920,15 @@ time_t do_article_post(const char *board, const char *title, const char *content
 	append_record(buf3, &header, sizeof(header));
 
 	//updatelastpost(board);  //TODO:
+
+	if (!bmy_board_is_system_board(board)) {
+		if (thread == -1) {
+			bmy_article_add_thread(ythtbbs_cache_Board_get_idx_by_name(board) + 1, header.thread, header.title, header.owner, header.accessed);
+		} else {
+			bmy_article_add_comment(ythtbbs_cache_Board_get_idx_by_name(board) + 1, thread);
+		}
+	}
+
 	return t;
 }
 
