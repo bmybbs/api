@@ -1180,6 +1180,8 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	snprintf(buf, sizeof(buf), "%s post %s %s", ptr_info->userid, bmem->header.filename, title_gbk);
 	newtrace(buf);
 
+	ythtbbs_cache_Board_updatelastpost_x(bmem);
+
 	if (bmem->header.clubnum == 0 && !board_is_junkboard(bmem->header.filename)) {
 		local_ue.numposts++;
 		save_user_data(&local_ue);
