@@ -51,6 +51,7 @@ enum api_error_code {
 	API_RT_ATCLDELETED	= 120001,	///< 文章已被删除
 	API_RT_ATCLNOTITLE	= 120002,	///< 文章缺少标题
 	API_RT_ATCLFBDREPLY	= 120003,	///< 文章禁止回复
+	API_RT_ATCL1984     = 120004,   ///< ....
 	API_RT_MAILDIRERR	= 130000,	///< 用户邮箱索引错误
 	API_RT_MAILEMPTY	= 130001,	///< 用户没有邮件
 	API_RT_MAILATTERR	= 130002,	///< 邮件附件错误

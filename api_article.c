@@ -1072,11 +1072,13 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	bmy_cookie_gen(cookie_buf2, sizeof(cookie_buf2), &cookie);
 	onion_response_add_cookie(res, SMAGIC, cookie_buf2, MAX_SESS_TIME - 10, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY);
 	if (strcmp(session_token, cookie_token) != 0) {
+		json_object_put(req_json);
 		return api_error(p, req, res, API_RT_WRONGTOKEN);
 	}
 	// TOKEN 相关结束
 
 	if (!strcasecmp(ptr_info->userid, "guest") && seek_in_file(MY_BBS_HOME "/etc/guestbanip", fromhost)) {
+		json_object_put(req_json);
 		return api_error(p, req, res, API_RT_FBDGSTPIP);
 	}
 
@@ -1094,6 +1096,8 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		using_math = json_object_get_boolean(obj_tmp);
 	}
 
+	json_object_put(req_json);
+
 	if (is_norep)
 		mark |= FH_NOREPLY;
 	if (using_math)
@@ -1110,6 +1114,10 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	size_t title_len = strlen(title);
 	char * title_gbk = (char *) malloc(title_len * 2);
+	if (title_gbk == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
+
 	memset(title_gbk, 0, title_len * 2);
 	u2g(title, title_len, title_gbk, title_len * 2);
 	size_t i;
@@ -1127,6 +1135,27 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	//if(insertattachments(filename, data_gbk, ue->userid))
 		//mark = mark | FH_ATTACHED;
+
+	if (!ythtbbs_board_is_hidden_x(bmem)) {
+		enum ytht_smth_filter_option option = ythtbbs_board_is_political_x(bmem) ? YTHT_SMTH_FILTER_OPTION_NORMAL : YTHT_SMTH_FILTER_OPTION_SIMPLE;
+		enum ytht_smth_filter_result dangerous = api_stringfilter(title_gbk, option);
+		if (dangerous == YTHT_SMTH_FILTER_RESULT_SAFE) {
+			size_t data_len = strlen(data);
+			char *data_gbk = malloc(data_len * 2);
+			if (data_gbk == NULL) {
+				free(title_gbk);
+				return api_error(p, req, res, API_RT_NOTENGMEM);
+			}
+			u2g(data, data_len, data_gbk, data_len * 2);
+			dangerous = api_stringfilter(data_gbk, option);
+			free(data_gbk);
+		}
+
+		if (dangerous != YTHT_SMTH_FILTER_RESULT_SAFE) {
+			free(title_gbk);
+			return api_error(p, req, res, API_RT_ATCL1984);
+		}
+	}
 
 	time_t r;
 	if (is_anony) {
@@ -1150,6 +1179,8 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	char buf[256];
 	snprintf(buf, sizeof(buf), "%s post %s %s", ptr_info->userid, bmem->header.filename, title_gbk);
 	newtrace(buf);
+
+	ythtbbs_cache_Board_updatelastpost_x(bmem);
 
 	if (bmem->header.clubnum == 0 && !board_is_junkboard(bmem->header.filename)) {
 		local_ue.numposts++;

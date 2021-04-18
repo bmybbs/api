@@ -11,6 +11,7 @@
 #include "ythtbbs/cache.h"
 #include "ythtbbs/user.h"
 #include "ythtbbs/override.h"
+#include "ytht/smth_filter.h"
 
 #define MAX_COMMENTER_COUNT 10
 
@@ -249,4 +250,12 @@ bool api_check_method(onion_request *req, onion_request_flags flags);
 int api_check_session(onion_request *req, char *cookie_buf, size_t buf_len, struct bmy_cookie *cookie, int *utmp_idx, struct user_info **pptr_info);
 
 struct json_object *apilib_convert_fileheader_utf_to_jsonobj(struct fileheader_utf *ptr_header);
+
+/**
+ * @brief 过滤词汇
+ * @param buf_gbk 待检查的文本，gbk 编码
+ * @param mode    过滤选项
+ * @return 过滤结果
+ */
+enum ytht_smth_filter_result api_stringfilter(const char *buf_gbk, enum ytht_smth_filter_option mode);
 #endif

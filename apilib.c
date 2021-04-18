@@ -1193,3 +1193,45 @@ struct json_object *apilib_convert_fileheader_utf_to_jsonobj(struct fileheader_u
 	return article_obj;
 }
 
+enum ytht_smth_filter_result api_stringfilter(const char *buf_gbk, enum ytht_smth_filter_option mode) {
+	struct mmapfile mf = { .ptr = NULL };
+	const char *BF;
+	enum ytht_smth_filter_result result;
+
+	switch (mode) {
+	case YTHT_SMTH_FILTER_OPTION_NORMAL:
+		BF = BADWORDS;
+		break;
+	case YTHT_SMTH_FILTER_OPTION_SIMPLE:
+		BF = SBADWORDS;
+		break;
+	case YTHT_SMTH_FILTER_OPTION_PLTCAL:
+		BF = PBADWORDS;
+		break;
+	default:
+		result = YTHT_SMTH_FILTER_RESULT_1984;
+	}
+
+	if (mmapfile(BF, &mf) < 0) {
+		if (mode != YTHT_SMTH_FILTER_OPTION_NORMAL) {
+			result = YTHT_SMTH_FILTER_RESULT_SAFE;
+		} else {
+			BF = PBADWORDS;
+
+			if (mmapfile(BF, &mf) < 0) {
+				result = YTHT_SMTH_FILTER_RESULT_SAFE;
+			} else {
+				result = ytht_smth_filter_string(buf_gbk, &mf) ? YTHT_SMTH_FILTER_RESULT_WARN : YTHT_SMTH_FILTER_RESULT_SAFE;
+			}
+		}
+	} else {
+		result = ytht_smth_filter_string(buf_gbk, &mf) ? YTHT_SMTH_FILTER_RESULT_1984 : YTHT_SMTH_FILTER_RESULT_SAFE;
+	}
+
+	if (mf.ptr) {
+		mmapfile(NULL, &mf);
+	}
+
+	return result;
+}
+
