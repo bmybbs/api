@@ -37,7 +37,7 @@
  * @warning 记得调用完成 json_object_put
  */
 static struct json_object *api_article_json_array(struct api_article *ba_list, int count);
-static struct json_object *api_article_with_num_array_to_json(struct api_article *ba_list, int count, int mode);
+static struct json_object *api_article_with_num_array_to_json(struct api_article *ba_list, int count, int mode, struct user_info *ptr_info);
 
 /**
  * @brief 将十大、分区热门话题转为 JSON 数据输出
@@ -580,7 +580,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	}
 	mmapfile(NULL, &mf);
 
-	struct json_object *result = api_article_with_num_array_to_json(board_list, num, mode);
+	struct json_object *result = api_article_with_num_array_to_json(board_list, num, mode, ptr_info);
 	free(board_list);
 
 	if (result == NULL) {
@@ -1251,10 +1251,12 @@ static struct json_object *api_article_json_array(struct api_article *ba_list, i
 	return obj;
 }
 
-static struct json_object *api_article_with_num_array_to_json(struct api_article *ba_list, int count, int mode)
+static struct json_object *api_article_with_num_array_to_json(struct api_article *ba_list, int count, int mode, struct user_info *ptr_info)
 {
-	char buf[512];
-	int i, j;
+	char buf[512], brc_file[80];
+	int i, j, ulock;
+	const char *last_board = NULL;
+	struct onebrc onebrc;
 	struct api_article *p;
 	struct json_object *jp, *jp2;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"articlelist\":[]}");
@@ -1264,11 +1266,26 @@ static struct json_object *api_article_with_num_array_to_json(struct api_article
 
 	struct json_object *json_array = json_object_object_get(obj, "articlelist");
 
+	if (ptr_info) {
+		ulock = userlock(ptr_info->userid, LOCK_SH);
+		sethomefile_s(brc_file, sizeof(brc_file), ptr_info->userid, "brc");
+		brc_init(&ptr_info->allbrc, ptr_info->userid, brc_file);
+		memset(&onebrc, 0, sizeof(struct onebrc));
+	}
+
 	for (i = 0; i < count; ++i) {
 		p = &(ba_list[i]);
-		snprintf(buf, sizeof(buf), "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
+
+		if (ptr_info && (last_board == NULL || strcmp(last_board, p->board) != 0)) {
+			last_board = p->board;
+			brc_getboard(&ptr_info->allbrc, &onebrc, last_board);
+		}
+
+		snprintf(buf, sizeof(buf), "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, \"unread\": %d, "
 				"\"th_num\":%d, \"mark\":%d ,\"num\":%d, \"th_size\":%d, \"th_commenter\":[] }",
-				p->type, p->filetime, p->thread, p->th_num, p->mark, p->sequence_num, p->th_size);
+				p->type, p->filetime, p->thread,
+				(ptr_info == NULL ? 1 : brc_unreadt(&onebrc, p->latest)),
+				p->th_num, p->mark, p->sequence_num, p->th_size);
 		jp = json_tokener_parse(buf);
 		if (jp) {
 			if ((jp2 = json_object_new_string(p->board)) != NULL)
@@ -1290,6 +1307,10 @@ static struct json_object *api_article_with_num_array_to_json(struct api_article
 
 			json_object_array_add(json_array, jp);
 		}
+	}
+
+	if (ptr_info) {
+		userunlock(ptr_info->userid, ulock);
 	}
 
 	return obj;
