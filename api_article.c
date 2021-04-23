@@ -452,7 +452,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	struct boardmem *b = ythtbbs_cache_Board_get_board_by_name(board);
-	if(b == NULL) {
+	if (b == NULL) {
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	}
 	if (rc == API_RT_SUCCESSFUL) {
@@ -466,13 +466,13 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	}
 
 	int mode = 0, startnum = 0, count = 0;
-	if(str_startnum != NULL)
+	if (str_startnum != NULL)
 		startnum = atoi(str_startnum);
-	if(str_count != NULL)
+	if (str_count != NULL)
 		count = atoi(str_count);
-	if(0 >= count)
+	if (0 >= count)
 		count = COUNT_PER_PAGE;
-	if(str_btype[0] == 't')
+	if (str_btype[0] == 't')
 		mode = 1;
 	else
 		mode = 0;
@@ -496,32 +496,35 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 
 	data = (struct fileheader *) mf.ptr;
 	total = mf.size / sizeof(struct fileheader);
-	if(0 == mode) {				// 一般模式
+	if (0 == mode) {
+		// 一般模式
 		total_article = total;
-	} else if(1 == mode) {		// 主题模式
+	} else if (1 == mode) {
+		// 主题模式
 		total_article = 0;
-		for(i = 0; i < total; ++i)
-			if(data[i].thread == data[i].filetime)
+		for (i = 0; i < total; ++i)
+			if (data[i].thread == data[i].filetime)
 				++total_article;
 	}
 
-	if(str_page != NULL)		// 如果使用分页参数，则首先依据分页计算
+	// 如果使用分页参数，则首先依据分页计算
+	if (str_page != NULL)
 		startnum = total_article - count * (atoi(str_page)) + 1;
 
-	if(startnum == 0)
+	if (startnum == 0)
 		startnum = total_article - count + 1;
-	if(startnum <= 0)
+	if (startnum <= 0)
 		startnum = 1;
 	int sum = 0, num = 0;
 	struct api_article EMPTY_ARTICLE;
-	for(i = 0; i < total; ++i) {
+	for (i = 0; i < total; ++i) {
 		// TODO: 高亮标题处理
-		if(0 == mode)
+		if (0 == mode)
 			++sum;
-		else if(1 == mode && data[i].thread == data[i].filetime)
+		else if (1 == mode && data[i].thread == data[i].filetime)
 			++sum;
 
-		if(sum < startnum || (1 == mode && data[i].thread != data[i].filetime)) {
+		if (sum < startnum || (1 == mode && data[i].thread != data[i].filetime)) {
 			continue;
 		}
 
@@ -558,12 +561,12 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		ytht_strsncpy(board_list[num].author, data[i].owner, sizeof(EMPTY_ARTICLE.author));
 		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
 		++num;
-		if(num >= count) {
+		if (num >= count) {
 			break;
 		}
 	}
 	mmapfile(NULL, &mf);
-	for(i = 0; i < num; ++i){
+	for (i = 0; i < num; ++i){
 		parse_thread_info(&board_list[i]);
 	}
 
