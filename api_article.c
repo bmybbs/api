@@ -99,6 +99,12 @@ static int get_thread_by_filetime(char *board, int filetime);
 
 /**
  * @brief 通过同主题ID查找同主题文章的帖子数、总大小，以及参与评论的用户 ID
+ * 更新的字段包括：
+ * * th_num
+ * * th_size
+ * * latest
+ * * th_commenter_count
+ * * th_commenter
  * @param ba struct api_article，API 中缓存帖子信息的结构体
  * @param pmf 映射的 .DIR mmapfile
  */
@@ -555,6 +561,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		board_list[num].mark = data[i].accessed;
 		board_list[num].filetime = data[i].filetime;
 		board_list[num].thread = data[i].thread;
+		board_list[num].latest = (data[i].edittime ? data[i].edittime : data[i].filetime);
 		board_list[num].type = mode;
 		board_list[num].sequence_num = i;
 
@@ -566,7 +573,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 			break;
 		}
 	}
-	for (i = 0; i < num; ++i){
+	for (i = 0; i < num; ++i) {
 		parse_thread_info(&board_list[i], &mf);
 	}
 	mmapfile(NULL, &mf);
@@ -1320,6 +1327,7 @@ static void parse_thread_info(struct api_article *ba, const struct mmapfile *pmf
 {
 	// TODO
 	int i = 0, j = 0, num_records = 0, is_in_commenter_list = 0;
+	time_t curr_time;
 	struct fileheader *curr_article = NULL;
 	if (NULL == ba || ba->board[0] == '\0')
 		return ;
@@ -1339,6 +1347,10 @@ static void parse_thread_info(struct api_article *ba, const struct mmapfile *pmf
 		else {
 			++ba->th_num;
 			ba->th_size += ytht_num2byte(curr_article->sizebyte);
+			curr_time = curr_article->edittime ? curr_article->edittime : curr_article->filetime;
+			if (curr_time > ba->latest) {
+				ba->latest = curr_time;
+			}
 			char * curr_userid = curr_article->owner;
 			// 判断是否在参与评论的人之中
 			if (ba->th_commenter_count < MAX_COMMENTER_COUNT) {
@@ -1347,7 +1359,7 @@ static void parse_thread_info(struct api_article *ba, const struct mmapfile *pmf
 				if (strcasecmp(curr_userid, ba->author) == 0) {
 					continue;	// 主题作者自己不参与统计
 				} else {
-					for (j=0; j<ba->th_commenter_count; ++j) {
+					for (j = 0; j < ba->th_commenter_count; ++j) {
 						if (strcasecmp(curr_userid, ba->th_commenter[j]) == 0) {
 							// 已统计过
 							is_in_commenter_list = 1;
