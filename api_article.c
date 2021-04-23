@@ -573,8 +573,10 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 			break;
 		}
 	}
-	for (i = 0; i < num; ++i) {
-		parse_thread_info(&board_list[i], &mf);
+	if (mode == 1) {
+		for (i = 0; i < num; ++i) {
+			parse_thread_info(&board_list[i], &mf);
+		}
 	}
 	mmapfile(NULL, &mf);
 
