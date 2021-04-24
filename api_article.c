@@ -705,9 +705,6 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	}
 
 	mmapfile(NULL, &mf);
-	for(i = 0; i < num; ++i){
-		board_list[i].th_num = get_number_of_articles_in_thread(board_list[i].board, board_list[i].thread);
-	}
 
 	struct json_object *result = api_article_json_array(board_list, num);
 	free(board_list);
