@@ -9,7 +9,6 @@
 #include "ythtbbs/mybrd.h"
 #include "api.h"
 #include "apilib.h"
-#include "api_brc.h"
 
 /**
  * @brief 将 boardmem 数组输出为 json 字符串
@@ -21,7 +20,7 @@
  * @param ui 当前会话的 user_info 指针，用于判断版面是否存在未读信息
  * @return 字符指针
  */
-static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, const char *fromhost, struct user_info *ui);
+static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, struct user_info *ui);
 
 /**
  * @brief 返回用户的收藏版面列表
@@ -37,15 +36,6 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR);
  * @return
  */
 static int api_board_list_sec(ONION_FUNC_PROTO_STR);
-
-/**
- * @brief 检查版面是否已读
- * @param board 版面名称
- * @param lastpost 版面最后一篇帖子的filetime
- * @param ui 用户会话
- * @return 若lastpost已读，返回1，否则返回0.
- */
-static int board_read(char *board, int lastpost, const char *fromhost, struct user_info *ui);
 
 /**
  * @brief 比较两个版面的名称，用于 qsort 排序。
@@ -429,7 +419,6 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 		return api_error(p, req, res, rc);
 
 	const char * sortmode_s = onion_request_get_query(req, "sortmode");
-	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 
 	int sortmode = (sortmode_s) ? atoi(sortmode_s) : 2;
 
@@ -442,7 +431,7 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 
 	ythtbbs_cache_Board_foreach_v(api_board_fav_list_callback, ptr_info, board_array, &count, &g_brd);
 
-	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ptr_info);
+	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, ptr_info);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
@@ -490,7 +479,6 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 
 	const char * secstr = onion_request_get_query(req, "secstr");
 	const char * sortmode_s = onion_request_get_query(req, "sortmode");
-	const char * fromhost = onion_request_get_header(req, "X-Real-IP");
 	const char *sec_array = "0123456789GNHAC";
 
 	if(secstr == NULL || strlen(secstr)>=2 || strstr(sec_array, secstr) == NULL)
@@ -506,17 +494,20 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 
 	ythtbbs_cache_Board_foreach_v(api_board_list_sec_callback, rc, ptr_info, board_array, &count, hasintro, secstr);
 
-	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, fromhost, ptr_info);
+	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, ptr_info);
 	api_set_json_header(res);
 	onion_response_write0(res, s);
 	free(s);
 	return OCS_PROCESSED;
 }
 
-static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, const char *fromhost, struct user_info *ui)
+static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, struct user_info *ui)
 {
 	char buf[512];
 	int i, j;
+	char brc_file[STRLEN * 2]; // 用于生成 brc 文件路径
+	struct onebrc onebrc;      // 用于解压 onebrc
+	int ulock = 0;             // 用于避免同时读写 allbrc
 	struct boardmem *bp;
 	struct json_object *jp;
 	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"boardlist\":[]}");
@@ -537,12 +528,20 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 
 	struct goodboard g_brd;
 	memset(&g_brd, 0, sizeof(struct goodboard));
-	if (ui != NULL)
+	if (ui != NULL) {
+		ulock = userlock(ui->userid, LOCK_SH);
 		ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
+		sethomefile_s(brc_file, sizeof(brc_file), ui->userid, "brc");
+		brc_init(&ui->allbrc, ui->userid, brc_file);
+		memset(&onebrc, 0, sizeof(struct onebrc));
+	}
 
-	for(i=0; i<count; ++i) {
+	for (i = 0; i < count; ++i) {
 		bp = board_array[i];
-		memset(buf, 0, 512);
+		memset(buf, 0, sizeof(buf));
+		if (ui) {
+			brc_getboard(&ui->allbrc, &onebrc, bp->header.filename);
+		}
 
 		// @warning: by IronBlood
 		// 此处将 boardmem 中的部分字符字段转为 utf-8 编码，若 boardmem 发生变更
@@ -555,7 +554,7 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 				"\"unread\":%d, \"voting\":%d, \"article_num\":%d, \"score\":%d,"
 				"\"inboard_num\":%d, \"secstr\":\"%s\", \"keyword\":\"%s\", \"is_fav\":%d }",
 				bp->header.filename, zh_name, type,
-				(ui == NULL ? 1 : !board_read(bp->header.filename, bp->lastpost, fromhost, ui)),
+				(ui == NULL ? 1 : brc_unreadt(&onebrc, bp->lastpost)),
 				(bp->header.flag & VOTE_FLAG),
 				bp->total, bp->score,
 				bp->inboard, bp->header.sec1, keyword,
@@ -566,8 +565,7 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 			for(j=0; j<4; j++) {
 				if(bp->header.bm[j][0]==0)
 					break;
-				json_object_array_add(bm_json_array,
-						json_object_new_string(bp->header.bm[j]));
+				json_object_array_add(bm_json_array, json_object_new_string(bp->header.bm[j]));
 			}
 			json_object_array_add(json_array, jp);
 		}
@@ -576,21 +574,11 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 	char *r = strdup(json_object_to_json_string(obj));
 	json_object_put(obj);
 
+	if (ui != NULL) {
+		userunlock(ui->userid, ulock);
+	}
+
 	return r;
-}
-
-static int board_read(char *board, int lastpost, const char *fromhost, struct user_info *ui)
-{
-	struct allbrc allbrc;
-	char allbrcuser[STRLEN];
-	struct onebrc *pbrc, brc;
-
-	memset(&allbrc, 0, sizeof(allbrc));
-	memset(allbrcuser, 0, sizeof(allbrcuser));
-	memset(&brc, 0, sizeof(brc));
-
-	brc_initial(NULL, board, &allbrc, allbrcuser, sizeof(allbrcuser), fromhost, ui, &pbrc, &brc);
-	return !brc_unreadt(pbrc, lastpost);
 }
 
 static int cmpboard(struct boardmem **b1, struct boardmem **b2)

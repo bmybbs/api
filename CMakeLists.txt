@@ -7,7 +7,6 @@ add_executable(bmyapi
 	api_user.c
 	api_article.c
 	api_board.c
-	api_brc.c
 	api_meta.c
 	api_attach.c
 	api_mail.c
