@@ -633,7 +633,8 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 
 	int fd = 0;
 	struct fileheader *data = NULL, x2;
-	char dir[80], filename[80];
+	char dir[80], filename[80], brc_file[80];
+	struct onebrc onebrc;
 	int i = 0, total = 0, total_article = 0;
 	sprintf(dir, "boards/%s/.DIR", board);
 	struct mmapfile mf = { .ptr = NULL };
@@ -662,6 +663,19 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		startnum = total_article - count + 1;
 	if(startnum <= 0)
 		startnum = 1;
+
+	int ulock;
+	if (ptr_info) {
+		if ((ulock = userlock(ptr_info->userid, LOCK_EX)) < 0) {
+			mmapfile(NULL, &mf);
+			return api_error(p, req, res, API_RT_USERLOCKFAIL);
+		}
+
+		sethomefile_s(brc_file, sizeof(brc_file), ptr_info->userid, "brc");
+		brc_init(&ptr_info->allbrc, ptr_info->userid, brc_file);
+		brc_getboard(&ptr_info->allbrc, &onebrc, board);
+		userunlock(ptr_info->userid, ulock);
+	}
 
 	int sum = 0, num = 0;
 	struct api_article EMPTY_ARTICLE;
@@ -695,6 +709,8 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		board_list[num].filetime = data[i].filetime;
 		board_list[num].thread = data[i].thread;
 		board_list[num].type = 0;
+		board_list[num].latest = data[i].edittime ? data[i].edittime : data[i].filetime;
+		board_list[num].unread = (ptr_info == NULL) ? true : brc_unreadt(&onebrc, board_list[num].latest);
 
 		ytht_strsncpy(board_list[num].board, board, sizeof(EMPTY_ARTICLE.board));
 		ytht_strsncpy(board_list[num].author, data[i].owner, sizeof(EMPTY_ARTICLE.author));
@@ -1230,9 +1246,9 @@ static struct json_object *api_article_json_array(struct api_article *ba_list, i
 	for (i = 0; i < count; ++i) {
 		p = &(ba_list[i]);
 		b = ythtbbs_cache_Board_get_board_by_name(p->board);
-		snprintf(buf, sizeof(buf), "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, "
+		snprintf(buf, sizeof(buf), "{ \"type\":%d, \"aid\":%ld, \"tid\":%ld, \"unread\":%d, "
 			"\"th_num\":%d, \"mark\":%d, \"secstr\":\"%s\" }",
-			p->type, p->filetime, p->thread, p->th_num, p->mark, b->header.sec1);
+			p->type, p->filetime, p->thread, p->unread, p->th_num, p->mark, b->header.sec1);
 		jp = json_tokener_parse(buf);
 		if (jp) {
 			if ((jp2 = json_object_new_string(p->board)) != NULL)

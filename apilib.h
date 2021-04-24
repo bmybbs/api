@@ -40,6 +40,7 @@ struct api_article {
 	time_t filetime;		///< fileheader.filetime，可以理解为文章id
 	time_t thread;			///< 主题id
 	time_t latest;          ///< 最新一篇讨论的时间
+	bool unread;            ///< 是否未读
 	int th_num;				///< 参与主题讨论的人数
 	unsigned int mark; 		///< 文章标记，fileheader.accessed
 	int sequence_num;		///< 文章在版面的序号
