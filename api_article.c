@@ -1246,9 +1246,6 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_ATCLINNERR);
 	}
 
-	// TODO: 更新未读标记
-	//brc_initial
-
 	char buf[256];
 	snprintf(buf, sizeof(buf), "%s post %s %s", ptr_info->userid, bmem->header.filename, title_gbk);
 	newtrace(buf);

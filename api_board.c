@@ -9,7 +9,6 @@
 #include "ythtbbs/mybrd.h"
 #include "api.h"
 #include "apilib.h"
-#include "api_brc.h"
 
 /**
  * @brief 将 boardmem 数组输出为 json 字符串
