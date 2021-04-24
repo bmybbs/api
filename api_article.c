@@ -601,21 +601,20 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 {
 	DEFINE_COMMON_SESSION_VARS;
 	int rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
-	const char * board        = onion_request_get_query(req, "board");
-	const char * str_thread   = onion_request_get_query(req, "thread");
-	const char * str_startnum = onion_request_get_query(req, "startnum");
-	const char * str_count    = onion_request_get_query(req, "count");
-	char logbuf[512];
+	const char *board        = onion_request_get_query(req, "board");
+	const char *str_thread   = onion_request_get_query(req, "thread");
+	const char *str_startnum = onion_request_get_query(req, "startnum");
+	const char *str_count    = onion_request_get_query(req, "count");
 	//判断必要参数
-	if(!(board && str_thread))
+	if (!(board && str_thread))
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 	int thread = atoi(str_thread);
-	if(thread == 0)
+	if (thread == 0)
 		return api_error(p, req, res, API_RT_WRONGPARAM);
 
 	//判断版面访问权
 	struct boardmem *b = ythtbbs_cache_Board_get_board_by_name(board);
-	if(b == NULL)
+	if (b == NULL)
 		return api_error(p, req, res, API_RT_NOSUCHBRD);
 	if (rc == API_RT_SUCCESSFUL) {
 		if (!check_user_read_perm_x(ptr_info, b))
@@ -625,114 +624,122 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 			return api_error(p, req, res, API_RT_NOSUCHBRD);
 	}
 
-	int startnum = 0, count = 0;
-	if(str_startnum != NULL)
+	int startnum = 0,
+		count = 0,
+		fd = 0,
+		ulock,
+		i = 0,
+		total = 0,
+		total_article = 0,
+		sum = 0,
+		num = 0;
+	char dir[80],
+		filename[80],
+		brc_file[80],
+		logbuf[512];
+	bool brc_inited = false;
+
+	struct fileheader *data = NULL, x2;
+	struct onebrc onebrc;
+	struct api_article *board_list;
+	struct api_article EMPTY_ARTICLE;
+
+	enum api_error_code errcode = API_RT_SUCCESSFUL;
+
+	if (str_startnum != NULL)
 		startnum = atoi(str_startnum);
-	if(str_count != NULL)
+	if (str_count != NULL)
 		count = atoi(str_count);
 
-	int fd = 0;
-	struct fileheader *data = NULL, x2;
-	char dir[80], filename[80], brc_file[80];
-	struct onebrc onebrc;
-	int i = 0, total = 0, total_article = 0;
 	sprintf(dir, "boards/%s/.DIR", board);
 	struct mmapfile mf = { .ptr = NULL };
-	if (mmapfile(dir, &mf) == -1 || mf.size == 0) {
-		return api_error(p, req, res, API_RT_EMPTYBRD);
-	}
-
-	data = (struct fileheader *) mf.ptr;
-	total = mf.size / sizeof(struct fileheader);
-	total_article = 0;
-	for(i = 0; i < total; ++i) {
-		if(data[i].thread == thread)
-			++total_article;
-	}
-
-	if(count == 0)
-		count = total_article;
-
-	struct api_article *board_list = calloc(count, sizeof(struct api_article));
-	if (board_list == NULL) {
-		mmapfile(NULL, &mf);
-		return api_error(p, req, res, API_RT_NOTENGMEM);
-	}
-
-	if(startnum == 0)
-		startnum = total_article - count + 1;
-	if(startnum <= 0)
-		startnum = 1;
-
-	int ulock;
-	if (ptr_info) {
-		if ((ulock = userlock(ptr_info->userid, LOCK_EX)) < 0) {
-			mmapfile(NULL, &mf);
-			return api_error(p, req, res, API_RT_USERLOCKFAIL);
+	if (mmapfile(dir, &mf) >= 0) {
+		data = (struct fileheader *) mf.ptr;
+		total = mf.size / sizeof(struct fileheader);
+		total_article = 0;
+		for (i = 0; i < total; ++i) {
+			if (data[i].thread == thread)
+				++total_article;
 		}
 
-		sethomefile_s(brc_file, sizeof(brc_file), ptr_info->userid, "brc");
-		brc_init(&ptr_info->allbrc, ptr_info->userid, brc_file);
-		brc_getboard(&ptr_info->allbrc, &onebrc, board);
-		userunlock(ptr_info->userid, ulock);
-	}
+		if (count == 0)
+			count = total_article;
 
-	int sum = 0, num = 0;
-	struct api_article EMPTY_ARTICLE;
-	for(i = 0; i < total; ++i) {
-		if(data[i].thread != thread)
-			continue;
-		++sum;
-		if(sum < startnum)
-			continue;
-		if (data[i].sizebyte == 0) {
-			sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
-			data[i].sizebyte = ytht_num2byte(eff_size(filename));
-			fd = open(dir, O_RDWR);
-			if (fd < 0)
-				break;
-			flock(fd, LOCK_EX);
-			lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
-			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime) {
-				x2.sizebyte = data[i].sizebyte;
-				lseek(fd, -1 * sizeof (x2), SEEK_CUR);
-				if(write(fd, &x2, sizeof (x2)) == -1) {
-					snprintf(logbuf, sizeof(logbuf), "write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.", dir, (startnum-1+i), filename, errno, strerror(errno));
-					newtrace(logbuf);
+		if ((board_list = calloc(count, sizeof(struct api_article))) != NULL) {
+			if (startnum == 0)
+				startnum = total_article - count + 1;
+			if (startnum <= 0)
+				startnum = 1;
+
+			if (ptr_info) {
+				if ((ulock = userlock(ptr_info->userid, LOCK_EX)) >= 0) {
+					brc_inited = true;
+					sethomefile_s(brc_file, sizeof(brc_file), ptr_info->userid, "brc");
+					brc_init(&ptr_info->allbrc, ptr_info->userid, brc_file);
+					brc_getboard(&ptr_info->allbrc, &onebrc, board);
+					userunlock(ptr_info->userid, ulock);
 				}
 			}
-			flock(fd, LOCK_UN);
-			close(fd);
+
+			for (i = 0; i < total; ++i) {
+				if(data[i].thread != thread)
+					continue;
+				++sum;
+				if(sum < startnum)
+					continue;
+				if (data[i].sizebyte == 0) {
+					sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
+					data[i].sizebyte = ytht_num2byte(eff_size(filename));
+					fd = open(dir, O_RDWR);
+					if (fd < 0)
+						break;
+					flock(fd, LOCK_EX);
+					lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader), SEEK_SET);
+					if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime) {
+						x2.sizebyte = data[i].sizebyte;
+						lseek(fd, -1 * sizeof (x2), SEEK_CUR);
+						if (write(fd, &x2, sizeof (x2)) == -1) {
+							snprintf(logbuf, sizeof(logbuf), "write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.", dir, (startnum-1+i), filename, errno, strerror(errno));
+							newtrace(logbuf);
+						}
+					}
+					flock(fd, LOCK_UN);
+					close(fd);
+				}
+
+				board_list[num].mark = data[i].accessed;
+				board_list[num].filetime = data[i].filetime;
+				board_list[num].thread = data[i].thread;
+				board_list[num].type = 0;
+				board_list[num].latest = data[i].edittime ? data[i].edittime : data[i].filetime;
+				board_list[num].unread = (ptr_info == NULL || !brc_inited) ? true : brc_unreadt(&onebrc, board_list[num].latest);
+
+				ytht_strsncpy(board_list[num].board, board, sizeof(EMPTY_ARTICLE.board));
+				ytht_strsncpy(board_list[num].author, data[i].owner, sizeof(EMPTY_ARTICLE.author));
+				g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
+				++num;
+				if (num >= count)
+					break;
+			}
+			struct json_object *result = api_article_json_array(board_list, num);
+			free(board_list);
+
+			if (result) {
+				api_set_json_header(res);
+				onion_response_write0(res, json_object_to_json_string(result));
+				json_object_put(result);
+			} else {
+				errcode = API_RT_NOTENGMEM;
+			}
+		} else {
+			errcode = API_RT_NOTENGMEM;
 		}
-
-		board_list[num].mark = data[i].accessed;
-		board_list[num].filetime = data[i].filetime;
-		board_list[num].thread = data[i].thread;
-		board_list[num].type = 0;
-		board_list[num].latest = data[i].edittime ? data[i].edittime : data[i].filetime;
-		board_list[num].unread = (ptr_info == NULL) ? true : brc_unreadt(&onebrc, board_list[num].latest);
-
-		ytht_strsncpy(board_list[num].board, board, sizeof(EMPTY_ARTICLE.board));
-		ytht_strsncpy(board_list[num].author, data[i].owner, sizeof(EMPTY_ARTICLE.author));
-		g2u(data[i].title, strlen(data[i].title), board_list[num].title, 80);
-		++num;
-		if(num >= count)
-			break;
+		mmapfile(NULL, &mf);
+	} else {
+		errcode = API_RT_EMPTYBRD;
 	}
 
-	mmapfile(NULL, &mf);
-
-	struct json_object *result = api_article_json_array(board_list, num);
-	free(board_list);
-
-	if (result == NULL) {
-		return api_error(p, req, res, API_RT_NOTENGMEM);
-	}
-
-	api_set_json_header(res);
-	onion_response_write0(res, json_object_to_json_string(result));
-	json_object_put(result);
-	return OCS_PROCESSED;
+	return (errcode == API_RT_SUCCESSFUL) ? OCS_PROCESSED : api_error(p, req, res, errcode);
 }
 
 static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
