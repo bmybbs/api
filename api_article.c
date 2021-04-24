@@ -897,6 +897,27 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 		return api_error(p, req, res, API_RT_ATCLDELETED);
 	}
 
+	int ulock;
+	char brc_file[80];
+	time_t fh_time;
+	struct onebrc onebrc;
+
+	if (rc == API_RT_SUCCESSFUL) {
+		// 处理已读
+		if ((ulock = userlock(ptr_info->userid, LOCK_EX)) >= 0) {
+			sethomefile_s(brc_file, sizeof(brc_file), ptr_info->userid, "brc");
+			brc_init(&ptr_info->allbrc, ptr_info->userid, brc_file);
+			brc_getboard(&ptr_info->allbrc, &onebrc, bmem->header.filename);
+			fh_time = fh->edittime ? fh->edittime : fh->filetime;
+			if (brc_unreadt(&onebrc, fh_time)) {
+				brc_addlistt(&onebrc, fh_time);
+				brc_putboard(&ptr_info->allbrc, &onebrc);
+				brc_fini(&ptr_info->allbrc, ptr_info->userid);
+			}
+			userunlock(ptr_info->userid, ulock);
+		}
+	}
+
 	char title_utf8[180];
 	memset(title_utf8, 0, 180);
 	g2u(fh->title, strlen(fh->title), title_utf8, 180);
