@@ -20,7 +20,7 @@
  * @param ui 当前会话的 user_info 指针，用于判断版面是否存在未读信息
  * @return 字符指针
  */
-static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, struct user_info *ui);
+static struct json_object *bmy_board_array_to_json(struct boardmem **board_array, size_t count, board_sort_mode sortmode, struct user_info *ui);
 
 /**
  * @brief 返回用户的收藏版面列表
@@ -431,10 +431,13 @@ static int api_board_list_fav(ONION_FUNC_PROTO_STR)
 
 	ythtbbs_cache_Board_foreach_v(api_board_fav_list_callback, ptr_info, board_array, &count, &g_brd);
 
-	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, ptr_info);
+	struct json_object *obj = bmy_board_array_to_json(board_array, count, sortmode, ptr_info);
+	if (obj == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
 	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+	onion_response_write0(res, json_object_to_json_string(obj));
+	json_object_put(obj);
 	return OCS_PROCESSED;
 }
 
@@ -494,94 +497,107 @@ static int api_board_list_sec(ONION_FUNC_PROTO_STR)
 
 	ythtbbs_cache_Board_foreach_v(api_board_list_sec_callback, rc, ptr_info, board_array, &count, hasintro, secstr);
 
-	char *s = bmy_board_array_to_json_string(board_array, count, sortmode, ptr_info);
+	struct json_object *obj = bmy_board_array_to_json(board_array, count, sortmode, ptr_info);
+	if (obj == NULL) {
+		return api_error(p, req, res, API_RT_NOTENGMEM);
+	}
 	api_set_json_header(res);
-	onion_response_write0(res, s);
-	free(s);
+	onion_response_write0(res, json_object_to_json_string(obj));
+	json_object_put(obj);
 	return OCS_PROCESSED;
 }
 
-static char* bmy_board_array_to_json_string(struct boardmem **board_array, int count, board_sort_mode sortmode, struct user_info *ui)
+static struct json_object *bmy_board_array_to_json(struct boardmem **board_array, size_t count, board_sort_mode sortmode, struct user_info *ui)
 {
 	char buf[512];
-	int i, j;
+	struct boardheader EMPTY_BH;
+	char zh_name[sizeof(EMPTY_BH.title) * 2],
+		type[sizeof(EMPTY_BH.type) * 2],
+		keyword[sizeof(EMPTY_BH.keyword) * 2];
+	size_t i, j;
 	char brc_file[STRLEN * 2]; // 用于生成 brc 文件路径
 	struct onebrc onebrc;      // 用于解压 onebrc
 	int ulock = 0;             // 用于避免同时读写 allbrc
-	struct boardmem *bp;
-	struct json_object *jp;
-	struct json_object *obj = json_tokener_parse("{\"errcode\":0, \"boardlist\":[]}");
-	struct json_object *json_array = json_object_object_get(obj, "boardlist");
-
-	switch (sortmode) {
-	case BOARD_SORT_ALPHABET:
-		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboard);
-		break;
-	case BOARD_SORT_INBOARD:
-		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardinboard);
-		break;
-	default:
-	case BOARD_SORT_SCORE:
-		qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardscore);
-		break;
-	}
-
 	struct goodboard g_brd;
-	memset(&g_brd, 0, sizeof(struct goodboard));
-	if (ui != NULL) {
-		if ((ulock = userlock(ui->userid, LOCK_SH)) < 0) {
-			json_object_put(obj);
-			return NULL;
-		}
-		ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
-		sethomefile_s(brc_file, sizeof(brc_file), ui->userid, "brc");
-		brc_init(&ui->allbrc, ui->userid, brc_file);
-		memset(&onebrc, 0, sizeof(struct onebrc));
-	}
+	struct boardmem *bp;
+	struct json_object *jp, *obj = NULL, *json_array, *json_str;
 
-	for (i = 0; i < count; ++i) {
-		bp = board_array[i];
-		memset(buf, 0, sizeof(buf));
-		if (ui) {
-			brc_getboard(&ui->allbrc, &onebrc, bp->header.filename);
+	if ((obj = json_tokener_parse("{\"errcode\":0, \"boardlist\":[]}")) != NULL) {
+		json_array = json_object_object_get(obj, "boardlist");
+
+		switch (sortmode) {
+		case BOARD_SORT_ALPHABET:
+			qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboard);
+			break;
+		case BOARD_SORT_INBOARD:
+			qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardinboard);
+			break;
+		default:
+		case BOARD_SORT_SCORE:
+			qsort(board_array, count, sizeof(struct boardmem *), (void *)cmpboardscore);
+			break;
 		}
 
-		// @warning: by IronBlood
-		// 此处将 boardmem 中的部分字符字段转为 utf-8 编码，若 boardmem 发生变更
-		// 相关变量长度也应依据需要处理。
-		char zh_name[80], type[16], keyword[128];
-		g2u(bp->header.title, 24, zh_name, 80);
-		g2u(bp->header.keyword, 64, keyword, 128);
-		g2u(bp->header.type, 5, type, 16);
-		sprintf(buf, "{\"name\":\"%s\", \"zh_name\":\"%s\", \"type\":\"%s\", \"bm\":[],"
-				"\"unread\":%d, \"voting\":%d, \"article_num\":%d, \"score\":%d,"
-				"\"inboard_num\":%d, \"secstr\":\"%s\", \"keyword\":\"%s\", \"is_fav\":%d }",
-				bp->header.filename, zh_name, type,
-				(ui == NULL ? 1 : brc_unreadt(&onebrc, bp->lastpost)),
-				(bp->header.flag & VOTE_FLAG),
-				bp->total, bp->score,
-				bp->inboard, bp->header.sec1, keyword,
-				(ui == NULL ? 0 : ythtbbs_mybrd_exists(&g_brd, bp->header.filename)));
-		jp = json_tokener_parse(buf);
-		if(jp) {
-			struct json_object *bm_json_array = json_object_object_get(jp, "bm");
-			for(j=0; j<4; j++) {
-				if(bp->header.bm[j][0]==0)
-					break;
-				json_object_array_add(bm_json_array, json_object_new_string(bp->header.bm[j]));
+		memset(&g_brd, 0, sizeof(struct goodboard));
+		if (ui != NULL) {
+			if ((ulock = userlock(ui->userid, LOCK_SH)) < 0) {
+				return obj;
 			}
-			json_object_array_add(json_array, jp);
+			ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
+			sethomefile_s(brc_file, sizeof(brc_file), ui->userid, "brc");
+			brc_init(&ui->allbrc, ui->userid, brc_file);
+			memset(&onebrc, 0, sizeof(struct onebrc));
+		}
+
+		for (i = 0; i < count; ++i) {
+			bp = board_array[i];
+			memset(buf, 0, sizeof(buf));
+			if (ui) {
+				brc_getboard(&ui->allbrc, &onebrc, bp->header.filename);
+			}
+
+			g2u(bp->header.title, strlen(bp->header.title), zh_name, sizeof(zh_name));
+			g2u(bp->header.keyword, strlen(bp->header.keyword), keyword, sizeof(keyword));
+			g2u(bp->header.type, strlen(bp->header.type), type, sizeof(type));
+			snprintf(buf, sizeof(buf), "{\"name\":\"%s\", \"bm\":[],"
+					"\"unread\":%d, \"voting\":%d, \"article_num\":%d, \"score\":%d,"
+					"\"inboard_num\":%d, \"secstr\":\"%s\", \"is_fav\":%d }",
+					bp->header.filename,
+					(ui == NULL ? 1 : brc_unreadt(&onebrc, bp->lastpost)),
+					(bp->header.flag & VOTE_FLAG),
+					bp->total, bp->score,
+					bp->inboard, bp->header.sec1,
+					(ui == NULL ? 0 : ythtbbs_mybrd_exists(&g_brd, bp->header.filename)));
+
+			if ((jp = json_tokener_parse(buf)) != NULL) {
+				if ((json_str = json_object_new_string(zh_name)) != NULL) {
+					json_object_object_add(jp, "zh_name", json_str);
+				}
+				if ((json_str = json_object_new_string(type)) != NULL) {
+					json_object_object_add(jp, "type", json_str);
+				}
+				if ((json_str = json_object_new_string(keyword)) != NULL) {
+					json_object_object_add(jp, "keyword", json_str);
+				}
+
+				struct json_object *bm_json_array = json_object_object_get(jp, "bm");
+				for (j = 0; j < 4; j++) {
+					if (bp->header.bm[j][0] == 0)
+						break;
+					if ((json_str = json_object_new_string(bp->header.bm[j])) != NULL) {
+						json_object_array_add(bm_json_array, json_str);
+					}
+				}
+				json_object_array_add(json_array, jp);
+			}
+		}
+
+		if (ui != NULL) {
+			userunlock(ui->userid, ulock);
 		}
 	}
 
-	char *r = strdup(json_object_to_json_string(obj));
-	json_object_put(obj);
-
-	if (ui != NULL) {
-		userunlock(ui->userid, ulock);
-	}
-
-	return r;
+	return obj;
 }
 
 static int cmpboard(struct boardmem **b1, struct boardmem **b2)
