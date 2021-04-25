@@ -529,7 +529,10 @@ static char* bmy_board_array_to_json_string(struct boardmem **board_array, int c
 	struct goodboard g_brd;
 	memset(&g_brd, 0, sizeof(struct goodboard));
 	if (ui != NULL) {
-		ulock = userlock(ui->userid, LOCK_SH);
+		if ((ulock = userlock(ui->userid, LOCK_SH)) < 0) {
+			json_object_put(obj);
+			return NULL;
+		}
 		ythtbbs_mybrd_load_ext(ui, &g_brd, api_mybrd_has_read_perm);
 		sethomefile_s(brc_file, sizeof(brc_file), ui->userid, "brc");
 		brc_init(&ui->allbrc, ui->userid, brc_file);
