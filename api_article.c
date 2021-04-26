@@ -523,6 +523,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	if (startnum <= 0)
 		startnum = 1;
 	int sum = 0, num = 0;
+	unsigned char c;
 	struct api_article EMPTY_ARTICLE;
 	for (i = 0; i < total; ++i) {
 		// TODO: 高亮标题处理
@@ -537,7 +538,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 
 		if (data[i].sizebyte == 0) { // 如果内存中数据库记录的 sizebyte 为 0，则修正 .DIR 文件
 			snprintf(filename, sizeof(filename), "boards/%s/%s", board, fh2fname_s(&data[i], fname, sizeof(fname)));
-			data[i].sizebyte = ytht_num2byte(eff_size(filename));
+			c = ytht_num2byte(eff_size(filename));
 
 			fd = open(dir, O_RDWR);
 			if (fd < 0)
@@ -546,7 +547,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 			flock(fd, LOCK_EX);
 			lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader),SEEK_SET);
 			if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime) {
-				x2.sizebyte = data[i].sizebyte;
+				x2.sizebyte = c;
 				if (lseek(fd, -1 * sizeof (x2), SEEK_CUR) != (off_t) -1) {
 					if (write(fd, &x2, sizeof (x2)) == -1) {
 						snprintf(logbuf, sizeof(logbuf), "write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.", dir, (startnum-1+i), filename, errno, strerror(errno));
@@ -658,6 +659,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 		fname[16],
 		logbuf[512];
 	bool brc_inited = false;
+	unsigned char c;
 
 	struct fileheader *data = NULL, x2;
 	struct onebrc onebrc;
@@ -709,14 +711,14 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 					continue;
 				if (data[i].sizebyte == 0) {
 					snprintf(filename, sizeof(filename), "boards/%s/%s", board, fh2fname_s(&data[i], fname, sizeof(fname)));
-					data[i].sizebyte = ytht_num2byte(eff_size(filename));
+					c = ytht_num2byte(eff_size(filename));
 					fd = open(dir, O_RDWR);
 					if (fd < 0)
 						break;
 					flock(fd, LOCK_EX);
 					lseek(fd, (startnum - 1 + i) * sizeof (struct fileheader), SEEK_SET);
 					if (read(fd, &x2, sizeof (x2)) == sizeof (x2) && data[i].filetime == x2.filetime) {
-						x2.sizebyte = data[i].sizebyte;
+						x2.sizebyte = c;
 						lseek(fd, -1 * sizeof (x2), SEEK_CUR);
 						if (write(fd, &x2, sizeof (x2)) == -1) {
 							snprintf(logbuf, sizeof(logbuf), "write error to fileheader %s, at No. %d record, from file %s. Errno %d: %s.", dir, (startnum-1+i), filename, errno, strerror(errno));
