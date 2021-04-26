@@ -491,7 +491,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 	}
 
 	struct fileheader *data = NULL, x2;
-	char dir[80], filename[80];
+	char dir[80], filename[80], fname[16];
 	int i = 0, total = 0, total_article = 0;
 
 	snprintf(dir, sizeof(dir), "boards/%s/.DIR", board);
@@ -536,7 +536,7 @@ static int api_article_list_board(ONION_FUNC_PROTO_STR)
 		}
 
 		if (data[i].sizebyte == 0) { // 如果内存中数据库记录的 sizebyte 为 0，则修正 .DIR 文件
-			sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
+			snprintf(filename, sizeof(filename), "boards/%s/%s", board, fh2fname_s(&data[i], fname, sizeof(fname)));
 			data[i].sizebyte = ytht_num2byte(eff_size(filename));
 
 			fd = open(dir, O_RDWR);
@@ -655,6 +655,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	char dir[80],
 		filename[80],
 		brc_file[80],
+		fname[16],
 		logbuf[512];
 	bool brc_inited = false;
 
@@ -707,7 +708,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 				if(sum < startnum)
 					continue;
 				if (data[i].sizebyte == 0) {
-					sprintf(filename, "boards/%s/%s", board, fh2fname(&data[i]));
+					snprintf(filename, sizeof(filename), "boards/%s/%s", board, fh2fname_s(&data[i], fname, sizeof(fname)));
 					data[i].sizebyte = ytht_num2byte(eff_size(filename));
 					fd = open(dir, O_RDWR);
 					if (fd < 0)
