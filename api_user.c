@@ -58,6 +58,11 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
 
+	const char *host = bmy_cookie_check_host(onion_request_get_header(req, "Host"));
+	if (host == NULL) {
+		return api_error(p, req, res, API_RT_INVALIDHST);
+	}
+
 	const char *body = onion_block_data(onion_request_get_data(req));
 	if (body == NULL || body[0] == '\0') {
 		return api_error(p, req, res, API_RT_WRONGPARAM);
@@ -78,7 +83,6 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	const char *userid = json_object_get_string(req_json_userid);
 	const char *passwd = json_object_get_string(req_json_passwd);
 	const char *fromhost = onion_request_get_header(req, "X-Real-IP");
-
 	int utmp_index;
 
 	if(userid == NULL || passwd == NULL) {
@@ -107,7 +111,7 @@ int api_user_login(ONION_FUNC_PROTO_STR)
 	char buf[60];
 	bmy_cookie_gen(buf, sizeof(buf), &cookie);
 	api_set_json_header(res);
-	onion_response_add_cookie(res, SMAGIC, buf, MAX_SESS_TIME - 10, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY | OC_SAMESITE_STRICT);
+	onion_response_add_cookie(res, SMAGIC, buf, MAX_SESS_TIME - 10, "/", host, OC_HTTP_ONLY | OC_SAMESITE_STRICT);
 
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
@@ -175,13 +179,18 @@ int api_user_logout(ONION_FUNC_PROTO_STR)
 	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD); //只允许POST请求
 
+	const char *host = bmy_cookie_check_host(onion_request_get_header(req, "Host"));
+	if (host == NULL) {
+		return api_error(p, req, res, API_RT_INVALIDHST);
+	}
+
 	rc = api_check_session(req, cookie_buf, sizeof(cookie_buf), &cookie, &utmp_idx, &ptr_info);
 	if (rc != API_RT_SUCCESSFUL)
 		return api_error(p, req, res, rc);
 
 	ythtbbs_user_logout(ptr_info->userid, utmp_idx); // TODO return value
 
-	onion_response_add_cookie(res, SMAGIC, "", 0, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY | OC_SAMESITE_STRICT);
+	onion_response_add_cookie(res, SMAGIC, "", 0, "/", host, OC_HTTP_ONLY | OC_SAMESITE_STRICT);
 	return api_error(p, req, res, API_RT_SUCCESSFUL);
 }
 

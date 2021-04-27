@@ -1003,6 +1003,11 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 	if (!api_check_method(req, OR_POST))
 		return api_error(p, req, res, API_RT_WRONGMETHOD);
 
+	const char *host = bmy_cookie_check_host(onion_request_get_header(req, "Host"));
+	if (host == NULL) {
+		return api_error(p, req, res, API_RT_INVALIDHST);
+	}
+
 	const char *board, *title, *data;
 	bool replyMode = false;
 	time_t ref;
@@ -1146,7 +1151,7 @@ static int api_article_do_post(ONION_FUNC_PROTO_STR, int mode)
 
 	cookie.token = ptr_info->token;
 	bmy_cookie_gen(cookie_buf2, sizeof(cookie_buf2), &cookie);
-	onion_response_add_cookie(res, SMAGIC, cookie_buf2, MAX_SESS_TIME - 10, "/", MY_BBS_DOMAIN, OC_HTTP_ONLY);
+	onion_response_add_cookie(res, SMAGIC, cookie_buf2, MAX_SESS_TIME - 10, "/", host, OC_HTTP_ONLY);
 	if (strcmp(session_token, cookie_token) != 0) {
 		json_object_put(req_json);
 		return api_error(p, req, res, API_RT_WRONGTOKEN);
