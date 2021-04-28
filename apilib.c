@@ -70,25 +70,6 @@ int shm_init()
 	return 0;
 }
 
-/** 从共享内存中寻找用户
- * Hash userid and get index in PASSWDS file.
- * @warning remember to free userec address!
- * @param id
- * @return
- * @see getusernum
- * @see finduseridhash
- */
-struct userec * getuser(const char *id)
-{
-	struct userec local_ue, *user = NULL;
-	if (getuser_s(&local_ue, id) < 0)
-		return NULL;
-	if ((user = malloc(sizeof(struct userec))) != NULL) {
-		memcpy(user, &local_ue, sizeof(struct userec));
-	}
-	return user;
-}
-
 int getuser_s(struct userec *user, const char *id) {
 	int uid;
 	uid = getusernum(id);
