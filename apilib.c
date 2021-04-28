@@ -805,12 +805,12 @@ int mail_count(char *id, int *unread)
 	return total;
 }
 
-time_t do_article_post(const char *board, const char *title, const char *content, const char *id,
-		const char *nickname, const char *ip, int sig, int mark, int outgoing, const char *realauthor, time_t thread)
+time_t do_article_post(const char *board, const char *title_gbk, const char *content_gbk, const char *id,
+		const char *nickname_gbk, const char *ip, int sig, int mark, int outgoing, const char *realauthor, time_t thread)
 {
 	FILE *fp_final;
-	char buf3[1024], *content_utf8_buf, *content_gbk_buf, *title_gbk;
-	size_t content_utf8_buf_len;
+	char buf3[1024], *content_gbk_buf;
+	size_t content_gbk_buf_len;
 	struct fileheader header;
 	memset(&header, 0, sizeof(header));
 	time_t t;
@@ -830,45 +830,27 @@ time_t do_article_post(const char *board, const char *title, const char *content
 	header.filetime = t;
 	header.accessed = mark;
 
-	size_t title_gbk_size = strlen(title) * 2;
-	title_gbk = (char *) malloc(title_gbk_size);
-	if (title_gbk == NULL) {
-		return -1;
-	}
-
-	memset(title_gbk, 0, title_gbk_size);
-	u2g(title, strlen(title), title_gbk, title_gbk_size);
 	ytht_strsncpy(header.title, title_gbk, sizeof(header.title));
-	free(title_gbk);
 
 	char timestr_buf[30];
 	char QMD_gbk[300];
 	ytht_ctime_r(now_t, timestr_buf);
 
-	content_utf8_buf_len = strlen(content) + 512;
-	content_utf8_buf = malloc(content_utf8_buf_len);
-	if (content_utf8_buf == NULL) {
+	content_gbk_buf_len = strlen(content_gbk) + 512;
+	content_gbk_buf = malloc(content_gbk_buf_len);
+	if (content_gbk_buf == NULL) {
 		return -1;
 	}
 
 	// TODO: QMD
-	snprintf(content_utf8_buf, content_utf8_buf_len,
-			"发信人: %s (%s), 信区: %s\n标  题: %s\n发信站: 兵马俑BBS (%24.24s), %s)\n\n%s",
-			id, nickname, board, title, timestr_buf,
-			outgoing ? "转信(" MY_BBS_DOMAIN : "本站(" MY_BBS_DOMAIN,
-			content);
+	// 发信人 信区 标题 发信站
+	// 转信 本站
+	snprintf(content_gbk_buf, content_gbk_buf_len,
+			"\xB7\xA2\xD0\xC5\xC8\xCB: %s (%s), \xD0\xC5\xC7\xF8: %s\n\xB1\xEA  \xCC\xE2: %s\n\xB7\xA2\xD0\xC5\xD5\xBE: %s (%24.24s), %s)\n\n%s",
+			id, nickname_gbk, board, title_gbk, MY_BBS_NAME, timestr_buf,
+			outgoing ? "\xD7\xAA\xD0\xC5(" MY_BBS_DOMAIN : "\xB1\xBE\xD5\xBE(" MY_BBS_DOMAIN,
+			content_gbk);
 	snprintf(QMD_gbk, sizeof(QMD_gbk), "\n--\n\033[1;%dm\xA1\xF9 \xC0\xB4\xD4\xB4:\xA3\xAE" MY_BBS_NAME " " MY_BBS_DOMAIN " API [FROM: %.40s]\033[0m\n", 31 + rand() % 7, ip); // 来源
-
-	content_gbk_buf = (char *) malloc(content_utf8_buf_len * 2);
-	if (content_gbk_buf == NULL) {
-		free(content_utf8_buf);
-		return -1;
-	}
-
-	memset(content_gbk_buf, 0, content_utf8_buf_len * 2);
-	u2g(content_utf8_buf, content_utf8_buf_len, content_gbk_buf, content_utf8_buf_len * 2);
-	free(content_utf8_buf);
-	content_utf8_buf = NULL;
 
 	if (hasbinaryattach(realauthor)) {
 		if (insertattachments(buf3, content_gbk_buf, realauthor))
@@ -887,7 +869,6 @@ time_t do_article_post(const char *board, const char *title, const char *content
 	}
 
 	free(content_gbk_buf);
-	content_gbk_buf = NULL;
 
 	sprintf(buf3, "boards/%s/M.%ld.A", board, t);
 	header.sizebyte = ytht_num2byte(eff_size(buf3));
@@ -899,8 +880,6 @@ time_t do_article_post(const char *board, const char *title, const char *content
 
 	sprintf(buf3, "boards/%s/.DIR", board);
 	append_record(buf3, &header, sizeof(header));
-
-	//updatelastpost(board);  //TODO:
 
 	if (!bmy_board_is_system_board(board)) {
 		if (thread == -1) {
