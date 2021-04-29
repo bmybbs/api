@@ -66,7 +66,6 @@ void api_template_free(api_template_t tpl);
 int shm_init();
 
 int getusernum(const char *id);
-struct userec * getuser(const char *id);
 int getuser_s(struct userec *user, const char *id);
 char * getuserlevelname(unsigned userlevel);
 int save_user_data(struct userec *x);
@@ -157,10 +156,10 @@ const char *calc_perf_str_utf8(int perf);
  * @brief 实际处理发文的函数。
  * 该函数来自 nju09。
  * @param board 版面名称
- * @param title 文章标题, utf8 编码
- * @param content 内容 utf8 编码
+ * @param title_gbk 文章标题, gbk 编码
+ * @param content_gbk 内容 gbk 编码
  * @param id 用于显示的作者 id
- * @param nickname 作者昵称
+ * @param nickname_gbk 作者昵称，gbk 编码
  * @param ip 来自 ip
  * @param sig 选用的签名档数字
  * @param mark fileheader 的标记
@@ -169,8 +168,8 @@ const char *calc_perf_str_utf8(int perf);
  * @param thread 主题编号
  * @return 返回文件名中实际使用的时间戳
  */
-time_t do_article_post(const char *board, const char *title, const char *content, const char *id,
-					const char *nickname, const char *ip, int sig, int mark,
+time_t do_article_post(const char *board, const char *title_gbk, const char *content_gbk, const char *id,
+					const char *nickname_gbk, const char *ip, int sig, int mark,
 					int outgoing, const char *realauthor, time_t thread);
 
 /**
