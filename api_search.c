@@ -66,7 +66,7 @@ int api_search_content(ONION_FUNC_PROTO_STR) {
 	if (result != NULL) {
 		api_set_json_header(res);
 		onion_response_write0(res, json_object_to_json_string(result));
-		free(result);
+		json_object_put(result);
 		return OCS_PROCESSED;
 	} else {
 		return api_error(p, req, res, rc);
