@@ -78,7 +78,7 @@ struct json_object *convert_search_result_to_json(const struct fileheader_utf *s
 	size_t i;
 	const struct fileheader_utf *p;
 
-	if (!search_result) {
+	if (search_result) {
 		if ((result = json_object_new_object()) != NULL) {
 			if ((field = json_object_new_int(API_RT_SUCCESSFUL)) != NULL) {
 				json_object_object_add(result, "errcode", field);
