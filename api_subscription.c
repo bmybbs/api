@@ -49,7 +49,7 @@ int api_subscription_list(ONION_FUNC_PROTO_STR) {
 		return api_error(p, req, res, API_RT_NOTENGMEM);
 	}
 	for (int i = 0; i < g_brd.num; i++) {
-		bid_arr[i] = ythtbbs_cache_Board_get_idx_by_name(g_brd.ID[i]);
+		bid_arr[i] = ythtbbs_cache_Board_get_idx_by_name(g_brd.ID[i]) + 1;
 	}
 
 	struct bmy_articles *articles = bmy_article_list_selected_boards_by_offset(bid_arr, g_brd.num, COUNT_PER_PAGE, offset);
