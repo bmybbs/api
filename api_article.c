@@ -302,7 +302,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 		if ((t2 = strchr(t1, '=')) == NULL)
 			goto ERROR;
 		t2++;
-		sprintf(top_list[i].board, "%s", t2);
+		ytht_strsncpy(top_list[i].board, t2, sizeof(top_list[i].board));
 
 		if ((t1 = strtok(NULL, "&")) == NULL)
 			goto ERROR;
@@ -311,7 +311,7 @@ static int api_article_list_xmltopfile(ONION_FUNC_PROTO_STR, int mode, const cha
 
 		if (top_list[i].type) {
 			t2++;
-			sprintf(tmp, "%s", t2);
+			ytht_strsncpy(tmp, t2, sizeof(tmp));
 			top_list[i].thread = atoi(tmp);
 		} else {
 			t2 = t2 + 3;
@@ -673,7 +673,7 @@ static int api_article_list_thread(ONION_FUNC_PROTO_STR)
 	if (str_count != NULL)
 		count = atoi(str_count);
 
-	sprintf(dir, "boards/%s/.DIR", board);
+	snprintf(dir, sizeof(dir), "boards/%s/.DIR", board);
 	struct mmapfile mf = { .ptr = NULL };
 	if (mmapfile(dir, &mf) >= 0) {
 		data = (struct fileheader *) mf.ptr;
@@ -795,7 +795,7 @@ static int api_article_list_boardtop(ONION_FUNC_PROTO_STR)
 	char topdir[80];
 	FILE *fp;
 	struct fileheader x;
-	sprintf(topdir, "boards/%s/.TOPFILE", b->header.filename);
+	snprintf(topdir, sizeof(topdir), "boards/%s/.TOPFILE", b->header.filename);
 	fp = fopen(topdir, "r");
 	if (fp == 0)
 		return api_error(p, req, res, API_RT_NOBRDTPFILE);
@@ -879,8 +879,8 @@ static int api_article_get_content(ONION_FUNC_PROTO_STR, int mode)
 
 	char dir_file[80], filename[80];
 	struct fileheader *fh = NULL;
-	sprintf(filename, "M.%d.A", aid);
-	sprintf(dir_file, "boards/%s/.DIR", bname);
+	snprintf(filename, sizeof(filename), "M.%d.A", aid);
+	snprintf(dir_file, sizeof(dir_file), "boards/%s/.DIR", bname);
 
 	struct mmapfile mf = { .ptr = NULL };
 	if (mmapfile(dir_file, &mf) == -1) {
@@ -1370,7 +1370,7 @@ static int get_thread_by_filetime(char *board, int filetime)
 	struct fileheader *p_fh;
 	int thread;
 
-	sprintf(dir, "boards/%s/.DIR", board);
+	snprintf(dir, sizeof(dir), "boards/%s/.DIR", board);
 
 	if(mmapfile(dir, &mf) == -1)
 		return 0;
@@ -1454,7 +1454,7 @@ static int get_number_of_articles_in_thread(char *board, int thread)
 	struct mmapfile mf = { .ptr = NULL };
 	if(NULL == board)
 		return 0;
-	sprintf(dir, "boards/%s/.DIR",board);
+	snprintf(dir, sizeof(dir), "boards/%s/.DIR",board);
 
 	if(-1 == mmapfile(dir, &mf))
 		return 0;
@@ -1494,7 +1494,7 @@ static void get_fileheader_by_filetime_thread(int mode, char *board, int id, str
 	memset(fh_for_return, 0, sizeof(struct fileheader));
 	if(NULL == board)
 		return ;
-	sprintf(dir, "boards/%s/.DIR",board);
+	snprintf(dir, sizeof(dir), "boards/%s/.DIR",board);
 
 	if(-1 == mmapfile(dir, &mf))
 		return;

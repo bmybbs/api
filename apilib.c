@@ -921,8 +921,10 @@ int do_mail_post(const char *to_userid, const char *title, const char *filename,
 
 	fp2 = fopen(filename, "r");
 
+	char timestr_buf[30];
+	ytht_ctime_r(now_t, timestr_buf);
 	sprintf(tmp_utf_buf, "寄信人: %s (%s)\n标  题: %s\n发信站: 兵马俑BBS (%s)\n来  源: %s\n\n",
-			id, nickname, title, ytht_ctime(now_t), ip);
+			id, nickname, title, timestr_buf, ip);
 	u2g(tmp_utf_buf, 1024, tmp_gbk_buf, 1024);
 	fwrite(tmp_gbk_buf, 1, strlen(tmp_gbk_buf), fp);
 
@@ -981,8 +983,10 @@ int do_mail_post_to_sent_box(const char *userid, const char *title, const char *
 
 	fp2 = fopen(filename, "r");
 
+	char timestr_buf[30];
+	ytht_ctime_r(now_t, timestr_buf);
 	sprintf(tmp_utf_buf, "收信人: %s (%s)\n标  题: %s\n发信站: 兵马俑BBS (%s)\n来  源: %s\n\n",
-			id, nickname, title, ytht_ctime(now_t), ip);
+			id, nickname, title, timestr_buf, ip);
 	u2g(tmp_utf_buf, 1024, tmp_gbk_buf, 1024);
 	fwrite(tmp_gbk_buf, 1, strlen(tmp_gbk_buf), fp);
 
